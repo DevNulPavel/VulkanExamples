@@ -15,7 +15,7 @@
  *   - Slightly modified camera that should work better for stereo viewing
  *
  *
- * Camilla Löwy:
+ * Camilla Berglund:
  *   - Removed FPS counter (this is not a benchmark)
  *   - Added a few comments
  *   - Enabled vsync
@@ -172,7 +172,6 @@ static GLfloat angle = 0.f;
 /* OpenGL draw function & timing */
 static void draw(void)
 {
-  glClearColor(0.0, 0.0, 0.0, 0.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glPushMatrix();
@@ -312,7 +311,6 @@ int main(int argc, char *argv[])
     }
 
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
-    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
 
     window = glfwCreateWindow( 300, 300, "Gears", NULL, NULL );
     if (!window)

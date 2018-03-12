@@ -41,7 +41,7 @@ enable_testing()
 message("******** System libs search ***********")
 
 # На MacOS используем MoltenVK (https://github.com/KhronosGroup/MoltenVK)
-if(APPLE)
+if(APPLE___)
 	set(MONTLE_FULL_PATH "${CMAKE_SOURCE_DIR}/${OSX_MOLTEN_RELATIVE_PATH}")
 	set(MONTLE_INCLUDE_PATH "${MONTLE_FULL_PATH}/include")
 	set(MONTLE_LIBRARIES_PATH "${MONTLE_FULL_PATH}/macOS")
@@ -55,7 +55,7 @@ if(APPLE)
 	# Указываем, где искать кастомные фреймворки (для GLFW)! 
 	# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/
 	# "find_library(VULKAN_LIBRARY vulkan.1" -> "find_library(VULKAN_LIBRARY MoltenVK"
-	set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} "${MONTLE_LIBRARIES_PATH}")
+	# set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} "${MONTLE_LIBRARIES_PATH}")
 
 	# Инклюды библиотеки
 	include_directories(${MONTLE_INCLUDE_PATH})
@@ -78,6 +78,8 @@ else()
 	if(Vulkan_FOUND)
 		include_directories(${Vulkan_INCLUDE_DIRS})
 	    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${Vulkan_LIBRARIES})
+	    message("Vulkan includes: ${Vulkan_INCLUDE_DIRS}")
+	    message("Vulkan libs: ${Vulkan_LIBRARIES}")
 	else()
 		message(FATAL_ERROR "Vulkan lib not found!")
 	endif()
@@ -106,7 +108,7 @@ option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
 option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
 option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
 option(GLFW_INSTALL "Generate installation target" OFF)
-option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" ON)
+option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" OFF)
 option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
 if (WIN32)
     option(GLFW_USE_HYBRID_HPG "Force use of high-performance GPU on hybrid systems" ON)
@@ -210,7 +212,7 @@ set_target_properties(${EXECUTABLE_NAME}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
-if(APPLE)
+if(APPLE__)
 	# Чтобы xcode находил фреймворк Molten
 	set_target_properties(${EXECUTABLE_NAME} PROPERTIES COMPILE_FLAGS ${FRAMEWORKS_PATHES})
 	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS ${FRAMEWORKS_PATHES})

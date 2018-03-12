@@ -1,6 +1,6 @@
 //========================================================================
 // Simple GLFW example
-// Copyright (c) Camilla Löwy <elmindreda@glfw.org>
+// Copyright (c) Camilla Berglund <elmindreda@glfw.org>
 //
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
@@ -44,7 +44,6 @@ static const struct
 };
 
 static const char* vertex_shader_text =
-"#version 110\n"
 "uniform mat4 MVP;\n"
 "attribute vec3 vCol;\n"
 "attribute vec2 vPos;\n"
@@ -56,7 +55,6 @@ static const char* vertex_shader_text =
 "}\n";
 
 static const char* fragment_shader_text =
-"#version 110\n"
 "varying vec3 color;\n"
 "void main()\n"
 "{\n"
@@ -126,10 +124,10 @@ int main(void)
 
     glEnableVertexAttribArray(vpos_location);
     glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) 0);
+                          sizeof(float) * 5, (void*) 0);
     glEnableVertexAttribArray(vcol_location);
     glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
+                          sizeof(float) * 5, (void*) (sizeof(float) * 2));
 
     while (!glfwWindowShouldClose(window))
     {

@@ -19,7 +19,8 @@ The public interface uses the OpenGL naming conventions except with GLFW and
 glfw instead of GL and gl.  For struct members, where OpenGL sets no precedent,
 it use headless camel case.
 
-Examples: `glfwCreateWindow`, `GLFWwindow`, `GLFW_RED_BITS`
+Examples: @ref glfwCreateWindow, @ref GLFWwindow, @ref GLFWvidmode.redBits,
+`GLFW_RED_BITS`
 
 
 @section internals_native Native interface
@@ -33,7 +34,7 @@ The function names of the native interface are similar to those of the public
 interface, but embeds the name of the interface that the returned handle is
 from.
 
-Examples: `glfwGetX11Window`, `glfwGetWGLContext`
+Examples: @ref glfwGetX11Window, @ref glfwGetWGLContext
 
 
 @section internals_internal Internal interface
@@ -49,7 +50,7 @@ a `_GLFWlibrary` struct named `_glfw`.
 The internal interface uses the same style as the public interface, except all
 global names have a leading underscore.
 
-Examples: `_glfwIsValidContextConfig`, `_GLFWwindow`, `_glfw.monitorCount`
+Examples: @ref _glfwIsValidContextConfig, @ref _GLFWwindow, `_glfw.currentRamp`
 
 
 @section internals_platform Platform interface
@@ -66,7 +67,7 @@ perform platform-specific operations on some or all platforms.  The are also
 named the same except that the glfw function prefix is replaced by
 _glfwPlatform.
 
-Examples: `_glfwPlatformCreateWindow`
+Examples: @ref _glfwPlatformCreateWindow
 
 The platform interface also defines structs that contain platform-specific
 global and per-object state.  Their names mirror those of the internal
@@ -78,7 +79,7 @@ These structs are incorporated as members into the internal interface structs
 using special macros that name them after the specific interface used.  This
 prevents shared code from accidentally using these members.
 
-Examples: `window->win32.handle`, `_glfw.x11.display`
+Examples: `window.win32.handle`, `_glfw.x11.display`
 
 
 @section internals_event Event interface
@@ -90,7 +91,7 @@ application, either via callbacks, via window state changes or both.
 The function names of the event interface use a `_glfwInput` prefix and the
 ObjectEvent pattern.
 
-Examples: `_glfwInputWindowFocus`, `_glfwInputCursorPos`
+Examples: @ref _glfwInputWindowFocus, @ref _glfwInputCursorMotion
 
 
 @section internals_static Static functions
@@ -98,7 +99,7 @@ Examples: `_glfwInputWindowFocus`, `_glfwInputCursorPos`
 Static functions may be used by any interface and have no prefixes or suffixes.
 These use headless camel case.
 
-Examples: `isValidElementForJoystick`
+Examples: `clearScrollOffsets`
 
 
 @section internals_config Configuration macros
@@ -110,6 +111,6 @@ which is generated from the `glfw_config.h.in` file by CMake.
 Configuration macros the same style as tokens in the public interface, except
 with a leading underscore.
 
-Examples: `_GLFW_WIN32`, `_GLFW_BUILD_DLL`
+Examples: `_GLFW_HAS_XF86VM` 
 
 */
