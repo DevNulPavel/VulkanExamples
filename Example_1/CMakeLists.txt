@@ -1,15 +1,13 @@
 set(PROJECT_NAME "VulkanDemo1")
 set(EXECUTABLE_NAME "VulkanDemo1")
+set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
 
 
 ####################################################
 # Настройка CMake сборки
 ####################################################
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-cmake_policy(VERSION 3.0)
-if (NOT CMAKE_VERSION VERSION_LESS "3.1")
-	cmake_policy(SET CMP0054 NEW)
-endif()
+cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
+
 
 # Информация о текущих настройках
 function(print_current_cmake_config)
@@ -42,18 +40,49 @@ enable_testing()
 ####################################################
 message("******** System libs search ***********")
 
-find_package(OpenCL)
-if(OpenCL_FOUND)
-	include_directories(${OpenCL_INCLUDE_DIRS})
-    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${OpenCL_LIBRARIES})    
+# На MacOS используем MoltenVK (https://github.com/KhronosGroup/MoltenVK)
+if(APPLE)
+	set(MONTLE_FULL_PATH "${CMAKE_SOURCE_DIR}/${OSX_MOLTEN_RELATIVE_PATH}")
+	set(MONTLE_INCLUDE_PATH "${MONTLE_FULL_PATH}/include")
+	set(MONTLE_LIBRARIES_PATH "${MONTLE_FULL_PATH}/macOS")
+	set(MONTLE_DYNAMIC_LIB_PATH "${MONTLE_LIBRARIES_PATH}/libMoltenVK.dylib")
+	set(MONTLE_FRAMEWORK_PATH "${MONTLE_LIBRARIES_PATH}/MoltenVK.framework")
+
+	message("Montle include path: ${MONTLE_INCLUDE_PATH}")
+	message("Montle dynamic lib path: ${MONTLE_DYNAMIC_LIB_PATH}")
+	message("Montle framework path: ${MONTLE_FRAMEWORK_PATH}")
+
+	include_directories(${MONTLE_INCLUDE_PATH})	# Инклюды библиотеки
+	# link_directories(${MONTLE_LIBRARIES_PATH})	# Место поиска библиотеки
+	# set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} "MoltenVK")
+	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${MONTLE_DYNAMIC_LIB_PATH})
 else()
-	message(FATAL_ERROR "OpenCL lib not found!")
+	# https://cmake.org/cmake/help/v3.7/module/FindVulkan.html
+	find_package(Vulkan)
+	if(Vulkan_FOUND)
+		include_directories(${Vulkan_INCLUDE_DIRS})
+	    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${Vulkan_LIBRARIES})
+	else()
+		message(FATAL_ERROR "Vulkan lib not found!")
+	endif()
 endif()
 
 # Системные библиотеки
 if (UNIX AND NOT APPLE)
 	set(SYSTEM_LIBRARIES m)
+else()
+	set(SYSTEM_LIBRARIES m)
 endif()
+
+
+####################################################
+# Библиотеки из исходников
+####################################################
+message("******** Source libraries search ***********")
+
+# GLM library
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/glm")
+
 
 
 ####################################################
@@ -67,33 +96,53 @@ endif ()
 
 # Не кастомные флаги компиляции
 if(APPLE)
+	set(PROJECT_LINK_FLAGS "-stdlib=libc++")
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g")
-	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -stdlib=libc++ -std=c++11")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -stdlib=libc++ -std=c++11")
 endif ()
 if (UNIX AND NOT APPLE)
-	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g")
-	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -std=c++11")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -std=c++11")
 endif ()
 if (MSYS)
 	# микрософту не нужен флаг -std=c++11
-	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} /O0 /Wall /g")
-	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} /O2 /Wall")
+	set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} /O0 /Wall /g")
+    set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} /O2 /Wall")
+	set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} /O0 /Wall /g")
+    set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} /O2 /Wall")
 endif ()
 if (WIN32)
-    # микрософту не нужен флаг -std=c++11
-    set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g -std=c99")
-    set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall -std=c99")
+    # микрософту не нужен флаг -std=c++11 +  -stdlib=libc++??
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g -std=c99")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall -std=c99")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -std=c++11")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -std=c++11")
 endif ()
 
 # Вывод информации о настройке копиляции (Функция в CMake/Helpers.cmake)
 print_current_cmake_config()
 
 
+
 ####################################################
 # Исходники
 ####################################################
-source_group("Sources" FILES src/main.cpp)
-set(ALL_SOURCES src/main.cpp)
+set(ALL_SOURCES 
+	src/main.cpp 
+	src/CommonIncludes.h
+	src/CommonDefines.h
+	src/VulkanInstance.h
+	src/VulkanInstance.cpp
+	src/SwapchainImageResources.h
+	src/SwapchainImageResources.cpp
+	src/TextureObject.h
+	src/TextureObject.cpp)
+
+source_group("Sources" FILES ${ALL_SOURCES})
 
 # тип сборки
 if(NOT CMAKE_BUILD_TYPE)
