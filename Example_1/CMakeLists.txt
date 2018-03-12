@@ -19,8 +19,11 @@ function(print_current_cmake_config)
 	message("CMake Generator = ${CMAKE_GENERATOR}")
 	message("CMake build type = ${CMAKE_BUILD_TYPE}")
 	message("CC compiler = ${CMAKE_C_COMPILER}")
+	message("CXX compiler = ${CMAKE_CXX_COMPILER}")
 	message("CC Flags (Debug) = ${CMAKE_C_FLAGS_DEBUG}")
 	message("CC Flags (Release) = ${CMAKE_C_FLAGS_RELEASE}")
+	message("CXX Flags (Debug) = ${CMAKE_CXX_FLAGS_DEBUG}")
+	message("CXX Flags (Release) = ${CMAKE_CXX_FLAGS_RELEASE}")
 endfunction()
 
 # Цвета
@@ -96,8 +99,9 @@ endif()
 
 ##############
 # Системные библиотеки
-set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} m)
-
+if(UNIX)
+	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} m)
+endif()
 
 ####################################################
 # Библиотеки из исходников
@@ -146,7 +150,7 @@ message("GLFW link libraries list: ${GLFW_LIBRARIES}")
 # Настройка сборки текущего проекта
 ####################################################
 # Сразу отключаем ненужные предупреждения на Windows
-if (MSYS)
+if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 	add_definitions(-D_SCL_SECURE_NO_WARNINGS)
 endif ()
@@ -165,19 +169,24 @@ if (UNIX AND NOT APPLE)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -std=c++11")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -std=c++11")
 endif ()
-if (MSYS)
+if (MSVC)
 	# микрософту не нужен флаг -std=c++11
-	set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} /O0 /Wall /g")
-    set (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} /O2 /Wall")
-	set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} /O0 /Wall /g")
-    set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} /O2 /Wall")
-endif ()
-if (WIN32)
+	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} /O0 /Wall /g")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} /O2 /Wall")
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} /O0 /Wall /g")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} /O2 /Wall")
+
+	SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:msvcrt.lib")
+	SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:msvcrt.lib")
+
+	message("Microsoft VS flags")
+elseif (WIN32)
     # микрософту не нужен флаг -std=c++11 +  -stdlib=libc++??
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g -std=c99")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall -std=c99")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -std=c++11")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -std=c++11")
+	message("MinGW flags")
 endif ()
 
 # Вывод информации о настройке копиляции (Функция в CMake/Helpers.cmake)
@@ -212,7 +221,11 @@ endif()
 ####################################################
 message("******** Generating started ***********")
 # Из найденных исходников выставляем генерацию бинарника
-add_executable(${EXECUTABLE_NAME} ${ALL_SOURCES})
+if(MSVC)
+	add_executable(${EXECUTABLE_NAME} WIN32 ${ALL_SOURCES})
+else()
+	add_executable(${EXECUTABLE_NAME} ${ALL_SOURCES})
+endif()
 
 # Конкретные пути к бинарнику
 set_target_properties(${EXECUTABLE_NAME}
