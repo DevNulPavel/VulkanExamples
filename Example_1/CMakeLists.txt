@@ -41,6 +41,15 @@ enable_testing()
 message("******** System libs search ***********")
 
 # На MacOS используем MoltenVK (https://github.com/KhronosGroup/MoltenVK)
+# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/
+# убрав при этом поиск неправильный
+# elseif (APPLE__)
+#     find_library(VULKAN_LIBRARY vulkan HINTS
+#         "$ENV{VULKAN_SDK}/macOS/lib")
+#     find_path(VULKAN_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS
+#         "$ENV{VULKAN_SDK}/macOS/include")
+# else()
+
 if(APPLE___)
 	set(MONTLE_FULL_PATH "${CMAKE_SOURCE_DIR}/${OSX_MOLTEN_RELATIVE_PATH}")
 	set(MONTLE_INCLUDE_PATH "${MONTLE_FULL_PATH}/include")
