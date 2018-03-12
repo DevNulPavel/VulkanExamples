@@ -52,10 +52,26 @@ if(APPLE)
 	message("Montle dynamic lib path: ${MONTLE_DYNAMIC_LIB_PATH}")
 	message("Montle framework path: ${MONTLE_FRAMEWORK_PATH}")
 
-	include_directories(${MONTLE_INCLUDE_PATH})	# Инклюды библиотеки
-	# link_directories(${MONTLE_LIBRARIES_PATH})	# Место поиска библиотеки
-	# set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} "MoltenVK")
-	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${MONTLE_DYNAMIC_LIB_PATH})
+	# Указываем, где искать кастомные фреймворки (для GLFW)! 
+	# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/
+	# "find_library(VULKAN_LIBRARY vulkan.1" -> "find_library(VULKAN_LIBRARY MoltenVK"
+	set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} "${MONTLE_LIBRARIES_PATH}")
+
+	# Инклюды библиотеки
+	include_directories(${MONTLE_INCLUDE_PATH})
+
+	# Список фреймворков
+	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES}
+		"-framework Metal"
+		"-framework IOSurface"
+		"-framework QuartzCore"
+		"-framework IOKit"
+		"-framework Foundation"
+		"-framework MoltenVK")
+
+	# Путь поиска фреймворков
+	set(FRAMEWORKS_PATHES ${FRAMEWORKS_PATHES} "-F${MONTLE_LIBRARIES_PATH}")
+
 else()
 	# https://cmake.org/cmake/help/v3.7/module/FindVulkan.html
 	find_package(Vulkan)
@@ -67,12 +83,9 @@ else()
 	endif()
 endif()
 
+##############
 # Системные библиотеки
-if (UNIX AND NOT APPLE)
-	set(SYSTEM_LIBRARIES m)
-else()
-	set(SYSTEM_LIBRARIES m)
-endif()
+set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} m)
 
 
 ####################################################
@@ -80,9 +93,42 @@ endif()
 ####################################################
 message("******** Source libraries search ***********")
 
-# GLM library
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/glm")
+##############
+# GLM library (Header Only mode)
+message("GLM added")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glm")
 
+##############
+# GLFW library
+# Устанавливаем нужные нам настройки
+message("GLFW added")
+option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
+option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
+option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
+option(GLFW_INSTALL "Generate installation target" OFF)
+option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" ON)
+option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
+if (WIN32)
+    option(GLFW_USE_HYBRID_HPG "Force use of high-performance GPU on hybrid systems" ON)
+endif()
+if (APPLE)
+    option(GLFW_USE_CHDIR "Make glfwInit chdir to Contents/Resources" ON)
+    option(GLFW_USE_MENUBAR "Populate the menu bar on first window creation" ON)
+    option(GLFW_USE_RETINA "Use the full resolution of Retina displays" ON)
+endif()
+if (UNIX AND NOT APPLE)
+    option(GLFW_USE_WAYLAND "Use Wayland for window creation" OFF)
+    option(GLFW_USE_MIR     "Use Mir for window creation" OFF)
+endif()
+if (MSVC)
+    option(USE_MSVC_RUNTIME_LIBRARY_DLL "Use MSVC runtime library DLL" ON)
+endif()
+
+# Добавляем библиотеку
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include")
+set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} glfw ${GLFW_LIBRARIES})
+message("GLFW link libraries list: ${GLFW_LIBRARIES}")
 
 
 ####################################################
@@ -164,5 +210,11 @@ set_target_properties(${EXECUTABLE_NAME}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
+if(APPLE)
+	# Чтобы xcode находил фреймворк Molten
+	set_target_properties(${EXECUTABLE_NAME} PROPERTIES COMPILE_FLAGS ${FRAMEWORKS_PATHES})
+	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS ${FRAMEWORKS_PATHES})
+endif()
+
 # Библиотеки, с которыми будем ликовать
-target_link_libraries(${EXECUTABLE_NAME} ${LIBS_LINK_NAMES} ${SYSTEM_LIBRARIES})
+target_link_libraries(${EXECUTABLE_NAME} ${LIBS_LINK_NAMES})

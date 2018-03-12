@@ -29,11 +29,10 @@
     #warning "Cube does not have code for Mir at this time"
 #endif
 
-#ifdef ANDROID
-    #include "vulkan_wrapper.h"
-#else
-    #include <vulkan/vulkan.h>
-#endif
+// GLFW include
+#define GLFW_INCLUDE_VULKAN
+//#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 
 
 #endif
