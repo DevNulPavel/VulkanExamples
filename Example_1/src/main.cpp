@@ -5,12 +5,48 @@
 
 GLFWwindow* window = nullptr;
 VkInstance vulkanInstance = VK_NULL_HANDLE;
+VkSurfaceKHR vulkanSurface = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vulkanDebugCallback = VK_NULL_HANDLE;
 VkPhysicalDevice vulkanPhysicalDevice = VK_NULL_HANDLE;
-int vulkanQueueFamilyIndex = 0;
+int vulkanRenderQueueFamilyIndex = -1;
+int vulkanPresentQueueFamilyIndex = -1;
 VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
-VkQueue vulcanGraphicsQueue = VK_NULL_HANDLE;
+VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
+VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
 
+
+struct FamiliesQueueIndexes {
+    int renderQueueFamilyIndex;
+    int presentQueueFamilyIndex;
+    
+    FamiliesQueueIndexes(){
+        renderQueueFamilyIndex = -1;
+        presentQueueFamilyIndex = -1;
+    }
+    bool isComplete(){
+        return (renderQueueFamilyIndex >= 0) && (presentQueueFamilyIndex >= 0);
+    }
+};
+
+
+// К методам расширениям может не быть прямого доступа, поэтому создаем коллбек вручную
+VkResult createDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
+                                      const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback) {
+    auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pCallback);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+// Убираем коллбек
+void destroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator) {
+    auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    if (func != nullptr) {
+        func(instance, callback, pAllocator);
+    }
+}
 
 // Получаем расширения Vulkan
 std::vector<const char*> getRequiredExtensions() {
@@ -129,15 +165,22 @@ void setupDebugCallback() {
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
         createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT; // Выводим только ошибки и варнинги
         createInfo.pfnCallback = debugCallback;
-        
-        if (vkCreateDebugReportCallbackEXT(vulkanInstance, &createInfo, nullptr, &vulkanDebugCallback) != VK_SUCCESS) {
+    
+        if (createDebugReportCallbackEXT(vulkanInstance, &createInfo, nullptr, &vulkanDebugCallback) != VK_SUCCESS) {
             throw std::runtime_error("failed to set up debug callback!");
         }
     #endif
 }
 
+// Создаем плоскость отрисовки
+void createDrawSurface() {
+    if (glfwCreateWindowSurface(vulkanInstance, window, nullptr, &vulkanSurface) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create window surface!");
+    }
+}
+
 // Для данного устройства ищем очереди отрисовки
-int findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
+FamiliesQueueIndexes findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
     // Запрашиваем количество возможных типов очередей в устройстве
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -146,16 +189,32 @@ int findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
     
+    FamiliesQueueIndexes result;
+    
     int i = 0;
     for (const VkQueueFamilyProperties& queueFamily: queueFamilies) {
-        // Для группы очередей проверяем, что там есть очереди + есть очередь отрисовки
+        
+        // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
         if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-            return i;
+            result.renderQueueFamilyIndex = i;
         }
+        
+        // Провеяем, может является ли данная очередь - очередью отображения
+        VkBool32 presentSupport = false;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vulkanSurface, &presentSupport);
+        if ((queueFamily.queueCount > 0) && presentSupport) {
+            result.presentQueueFamilyIndex = i;
+        }
+        
+        // Нашли очереди
+        if (result.isComplete()) {
+            return result;
+        }
+        
         i++;
     }
     
-    return -1;
+    return result;
 }
 
 // Оценка производительности и пригодности конкретной GPU
@@ -202,16 +261,16 @@ void pickPhysicalDevice() {
     vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, devices.data());
     
     // Используем Map для автоматической сортировки по производительности
-    std::map<int, std::pair<VkPhysicalDevice, int>> candidates;
+    std::map<int, std::pair<VkPhysicalDevice, FamiliesQueueIndexes>> candidates;
     
     // Перебираем GPU на предмет производительности
     for (const auto& device: devices) {
         // Получаем индекс группы очередй отрисовки
-        int renderQueueFamilyIndex = findQueueFamiliesIndexInDevice(device);
-        if (renderQueueFamilyIndex >= 0) {
+        FamiliesQueueIndexes familiesFound = findQueueFamiliesIndexInDevice(device);
+        if (familiesFound.isComplete()) {
             // Оцениваем возможности устройства
             int score = rateDeviceScore(device);
-            candidates[score] = std::pair<VkPhysicalDevice,int>(device, renderQueueFamilyIndex);
+            candidates[score] = std::pair<VkPhysicalDevice,FamiliesQueueIndexes>(device, familiesFound);
         }
     }
     
@@ -223,7 +282,8 @@ void pickPhysicalDevice() {
     // Получаем наилучший вариант GPU
     if (candidates.begin()->first > 0) {
         vulkanPhysicalDevice = candidates.begin()->second.first;
-        vulkanQueueFamilyIndex = candidates.begin()->second.second;
+        vulkanRenderQueueFamilyIndex = candidates.begin()->second.second.renderQueueFamilyIndex;
+        vulkanPresentQueueFamilyIndex = candidates.begin()->second.second.presentQueueFamilyIndex;
     } else {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
@@ -235,7 +295,7 @@ void createLogicalDeviceAndQueue() {
     VkDeviceQueueCreateInfo queueCreateInfo;
     memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = vulkanQueueFamilyIndex;
+    queueCreateInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     
     // Приоритет очереди
@@ -269,7 +329,8 @@ void createLogicalDeviceAndQueue() {
     }
     
     // Получаем очередь из девайса
-    vkGetDeviceQueue(vulkanLogicalDevice, vulkanQueueFamilyIndex, 0, &vulcanGraphicsQueue);
+    vkGetDeviceQueue(vulkanLogicalDevice, vulkanRenderQueueFamilyIndex, 0, &vulkanGraphicsQueue);
+    vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 0, &vulkanPresentQueue);
 }
 
 int main(int argc, char** argv) {
@@ -296,6 +357,9 @@ int main(int argc, char** argv) {
     // Настраиваем коллбек
     setupDebugCallback();
     
+    // Создаем плоскость отрисовки
+    createDrawSurface();
+    
     // Получаем GPU устройство
     pickPhysicalDevice();
     
@@ -304,23 +368,26 @@ int main(int argc, char** argv) {
     
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
+    double lastFrameDuration = 1.0/60.0;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         
         // Стабилизация времени кадра
-        std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
-        std::chrono::high_resolution_clock::duration curFrameDuration = now - lastDrawTime;
+        std::chrono::high_resolution_clock::duration curFrameDuration = std::chrono::high_resolution_clock::now() - lastDrawTime;
         std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - curFrameDuration;
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
             std::this_thread::sleep_for(sleepDuration);
         }
+        // Расчет времени кадра
+        lastFrameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0;
         lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
     }
     
     // Очищаем Vulkan
     vkDestroyDevice(vulkanLogicalDevice, nullptr);
+    vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
-        vkDestroyDebugReportCallbackEXT(vulkanInstance, vulkanDebugCallback, nullptr);
+        destroyDebugReportCallbackEXT(vulkanInstance, vulkanDebugCallback, nullptr);
     #endif
     vkDestroyInstance(vulkanInstance, nullptr);
     
