@@ -303,8 +303,18 @@ int main(int argc, char** argv) {
     createLogicalDeviceAndQueue();
     
     // Цикл обработки графики
+    std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        
+        // Стабилизация времени кадра
+        std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
+        std::chrono::high_resolution_clock::duration curFrameDuration = now - lastDrawTime;
+        std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - curFrameDuration;
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
+            std::this_thread::sleep_for(sleepDuration);
+        }
+        lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
     }
     
     // Очищаем Vulkan
