@@ -28,6 +28,11 @@ struct FamiliesQueueIndexes {
     }
 };
 
+struct SwapChainSupportDetails {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> formats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
 
 // К методам расширениям может не быть прямого доступа, поэтому создаем коллбек вручную
 VkResult createDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
@@ -245,6 +250,55 @@ int rateDeviceScore(VkPhysicalDevice device) {
     return score;
 }
 
+// Проверяем, поддерживает ли девайс цепочку свопинга
+bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+    // Получаем количество расширений
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+    
+    // Получаем расширения
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+    
+    // Список требуемых расширений - смена кадров
+    std::set<std::string> requiredExtensions(DEVICE_EXTENTIONS, DEVICE_EXTENTIONS + DEVICE_EXTENTIONS_COUNT);
+    
+    for (const auto& extension : availableExtensions) {
+        printf("Available extention: %s\n", extension.extensionName);
+        requiredExtensions.erase(extension.extensionName);
+    }
+    
+    return requiredExtensions.empty();
+}
+
+// Запрашиваем поддержку свопа
+SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+    SwapChainSupportDetails details;
+    
+    // Получаем возможности
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, vulkanSurface, &details.capabilities);
+    
+    // Запрашиваем поддерживаемые форматы буффера цвета
+    uint32_t formatCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, nullptr);
+    
+    if (formatCount != 0) {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, details.formats.data());
+    }
+    
+    // Запрашиваем поддерживаемые форматы отображения
+    uint32_t presentModeCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, nullptr);
+    
+    if (presentModeCount != 0) {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, details.presentModes.data());
+    }
+    
+    return details;
+}
+
 // Дергаем видеокарту
 void pickPhysicalDevice() {
     // Получаем количество GPU
@@ -264,7 +318,20 @@ void pickPhysicalDevice() {
     std::map<int, std::pair<VkPhysicalDevice, FamiliesQueueIndexes>> candidates;
     
     // Перебираем GPU на предмет производительности
-    for (const auto& device: devices) {
+    for (const VkPhysicalDevice& device: devices) {
+        // Смотрим - есть ли у данного устройства поддержка свопа кадров в виде расширения?
+        bool swapchainExtentionSupported = checkDeviceExtensionSupport(device);
+        if(swapchainExtentionSupported == false){
+            continue;
+        }
+        
+        // Проверяем, поддержку свопчейна у девайса
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        if (swapChainValid == false) {
+            continue;
+        }
+        
         // Получаем индекс группы очередй отрисовки
         FamiliesQueueIndexes familiesFound = findQueueFamiliesIndexInDevice(device);
         if (familiesFound.isComplete()) {
@@ -317,7 +384,8 @@ void createLogicalDeviceAndQueue() {
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = 0;
+    createInfo.enabledExtensionCount = DEVICE_EXTENTIONS_COUNT;
+    createInfo.ppEnabledExtensionNames = DEVICE_EXTENTIONS;
     #ifdef VALIDATION_LAYERS_ENABLED
         createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
         createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
