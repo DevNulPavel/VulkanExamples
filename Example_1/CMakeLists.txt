@@ -100,11 +100,12 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glm")
 # GLFW library
 # Устанавливаем нужные нам настройки
 message("GLFW added")
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
 option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
 option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
 option(GLFW_INSTALL "Generate installation target" OFF)
-option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" OFF)
+option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" ON)
 option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
 if (WIN32)
     option(GLFW_USE_HYBRID_HPG "Force use of high-performance GPU on hybrid systems" ON)
@@ -210,11 +211,24 @@ set_target_properties(${EXECUTABLE_NAME}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
-if(APPLE__)
-	# Чтобы xcode находил фреймворк Molten
-	set_target_properties(${EXECUTABLE_NAME} PROPERTIES COMPILE_FLAGS ${FRAMEWORKS_PATHES})
-	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS ${FRAMEWORKS_PATHES})
-endif()
-
 # Библиотеки, с которыми будем ликовать
 target_link_libraries(${EXECUTABLE_NAME} ${LIBS_LINK_NAMES})
+
+# Создаем символьную ссылку на ресурсы (Для исполняемго файла, после выбора)
+if (WIN32)
+    string(REGEX REPLACE "/" "\\\\" SOURCE_RES_PATH "${CMAKE_SOURCE_DIR}/res")
+    string(REGEX REPLACE "/" "\\\\" RESULT_RES_PATH "${CMAKE_BINARY_DIR}/res/")
+    message("COPY RES COMMAND = xcopy ${SOURCE_RES_PATH} ${RESULT_RES_PATH} /y")
+    add_custom_command (
+        TARGET ${EXECUTABLE_NAME}
+        POST_BUILD
+        COMMAND xcopy ${SOURCE_RES_PATH} ${RESULT_RES_PATH} /y
+    )
+else()
+    add_custom_command (
+        TARGET ${EXECUTABLE_NAME}
+        POST_BUILD
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/res
+        COMMAND ln -s ../res ${CMAKE_BINARY_DIR}/res
+    )
+endif()
