@@ -291,33 +291,36 @@ void pickPhysicalDevice() {
 
 // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
 void createLogicalDeviceAndQueue() {
-    // Настройки создания очереди
-    VkDeviceQueueCreateInfo queueCreateInfo;
-    memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
+    // Только уникальные индексы очередей
+    std::set<int> uniqueQueueFamilies = {vulkanRenderQueueFamilyIndex, vulkanPresentQueueFamilyIndex};
     
-    // Приоритет очереди
+    // Создаем экземпляры настроек создания очереди
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    for (int queueFamily : uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = queueFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
     
     // Нужные фичи устройства (ничего не указываем)
-    VkPhysicalDeviceFeatures deviceFeatures = {};
+    VkPhysicalDeviceFeatures deviceFeatures;
     memset(&deviceFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
     
     // Конфиг создания девайса
-    VkDeviceCreateInfo createInfo = {};
+    VkDeviceCreateInfo createInfo;
     memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = 0;
-    
     #ifdef VALIDATION_LAYERS_ENABLED
-        createInfo.enabledLayerCount = validationLayers.size();
-        createInfo.ppEnabledLayerNames = validationLayers.data();
+        createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
+        createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
     #else
         createInfo.enabledLayerCount = 0;
     #endif
