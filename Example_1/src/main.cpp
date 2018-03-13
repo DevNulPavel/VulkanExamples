@@ -13,7 +13,10 @@ int vulkanPresentQueueFamilyIndex = -1;
 VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
 VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
 VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
-
+VkSwapchainKHR vulkanSwapchain = VK_NULL_HANDLE;
+std::vector<VkImage> vulkanSwapChainImages;
+VkFormat vulkanSwapChainImageFormat;
+VkExtent2D vulkanSwapChainExtent;
 
 struct FamiliesQueueIndexes {
     int renderQueueFamilyIndex;
@@ -299,6 +302,55 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
     return details;
 }
 
+// Выбираем нужный формат кадра
+VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+    if (availableFormats.size() == 0) {
+        throw std::runtime_error("No available color formats!");
+    }
+    
+    // Выбираем конкретный стандартный формат, если Vulkan не хочет ничего конкретного
+    if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
+        return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    }
+    
+    // Иначе - перебираем список
+    for (const auto& availableFormat : availableFormats) {
+        if ((availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM) &&
+            (availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) {
+            return availableFormat;
+        }
+    }
+    
+    // Если не нашли нужный - просто выбираем первый формат
+    return availableFormats[0];
+}
+
+// Выбор режима представления кадров из буффера
+VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
+    // Проверяем, можно ли использовать тройную буфферизацию??
+    for (const auto& availablePresentMode : availablePresentModes) {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            return availablePresentMode;
+        }
+    }
+    
+    // Если нет - просто двойная буфферизация
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+// Выбираем размер кадра-свопа
+VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return capabilities.currentExtent;
+    }
+    VkExtent2D actualExtent = {WINDOW_WIDTH, WINDOW_HEIGHT};
+    
+    actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
+    actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
+    
+    return actualExtent;
+}
+
 // Дергаем видеокарту
 void pickPhysicalDevice() {
     // Получаем количество GPU
@@ -404,6 +456,60 @@ void createLogicalDeviceAndQueue() {
     vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 0, &vulkanPresentQueue);
 }
 
+// Создание логики смены кадров
+void createSwapChain() {
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vulkanPhysicalDevice);
+    
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+    
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+        imageCount = swapChainSupport.capabilities.maxImageCount;
+    }
+    
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = vulkanSurface;
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+    createInfo.imageExtent = extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    
+    uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
+    if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0; // Optional
+        createInfo.pQueueFamilyIndices = nullptr; // Optional
+    }
+    
+    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = presentMode;
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+    
+    VkResult createStatus = vkCreateSwapchainKHR(vulkanLogicalDevice, &createInfo, nullptr, &vulkanSwapchain);
+    if (createStatus != VK_SUCCESS) {
+        throw std::runtime_error("failed to create swap chain!");
+    }
+    
+    uint32_t imagesCount = 0;
+    vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
+    vulkanSwapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, vulkanSwapChainImages.data());
+    
+    vulkanSwapChainImageFormat = surfaceFormat.format;
+    vulkanSwapChainExtent = extent;
+}
+
 int main(int argc, char** argv) {
     glfwInit();
     
@@ -437,6 +543,9 @@ int main(int argc, char** argv) {
     // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
     createLogicalDeviceAndQueue();
     
+    // Создание логики смены кадров
+    createSwapChain();
+    
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
     double lastFrameDuration = 1.0/60.0;
@@ -455,6 +564,7 @@ int main(int argc, char** argv) {
     }
     
     // Очищаем Vulkan
+    vkDestroySwapchainKHR(vulkanLogicalDevice, vulkanSwapchain, nullptr);
     vkDestroyDevice(vulkanLogicalDevice, nullptr);
     vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
