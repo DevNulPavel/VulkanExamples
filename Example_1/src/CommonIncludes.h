@@ -1,7 +1,8 @@
 #ifndef COMMON_INCLUDES_H
 #define COMMON_INCLUDES_H
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstring>
 #include <string>
 #include <iostream>
 #include <stdexcept>

@@ -90,7 +90,8 @@ std::vector<const char*> getRequiredExtensions() {
     
     for (unsigned int i = 0; i < glfwExtensionCount; i++) {
         extensions.push_back(glfwExtensions[i]);
-        printf("Available extention name: %s\n", glfwExtensions[i]);
+        printf("Required extention name: %s\n", glfwExtensions[i]);
+        fflush(stdout);
     }
     
     #ifdef VALIDATION_LAYERS_ENABLED
@@ -112,7 +113,7 @@ bool checkValidationLayerSupport() {
     
     // Проверяем, что запрошенные слои валидации доступны
     for(int i = 0; i < VALIDATION_LAYERS_COUNT; i++) {
-        const char* layerName = VALIATION_LAYERS[i];
+        const char* layerName = VALIDATION_LAYERS[i];
         bool layerFound = false;
         
         for (const auto& layerProperties : availableLayers) {
@@ -161,7 +162,7 @@ void createVulkanInstance(){
     #ifdef VALIDATION_LAYERS_ENABLED
         // Включаем стандартные слои валидации
         createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
-        createInfo.ppEnabledLayerNames = VALIATION_LAYERS;
+        createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
     #else
         // Не испольузем валидации
         createInfo.enabledLayerCount = 0;
@@ -186,6 +187,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
                                                     const char* msg,
                                                     void* userData) {
     printf("Validation layer: %s\n", msg);
+    fflush(stdout);
     return VK_FALSE;
 }
 #endif
@@ -259,7 +261,8 @@ int rateDeviceScore(VkPhysicalDevice device) {
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
     
     printf("Test GPU with name: %s\n", deviceProperties.deviceName);
-    
+    fflush(stdout);
+
     int score = 0;
     
     // Дискретная карта обычно имеет большую производительность
@@ -293,6 +296,7 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     
     for (const auto& extension : availableExtensions) {
         printf("Available extention: %s\n", extension.extensionName);
+        fflush(stdout);
         requiredExtensions.erase(extension.extensionName);
     }
     
@@ -542,6 +546,7 @@ void createImageViews() {
         VkImageViewCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = vulkanSwapChainImages[i];
+        createInfo.format = vulkanSwapChainImageFormat;
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -553,8 +558,9 @@ void createImageViews() {
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
         
-        if (vkCreateImageView(vulkanLogicalDevice, &createInfo, nullptr, &(vulkanSwapChainImageViews[i])) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create image views!");
+        VkResult createStatus = vkCreateImageView(vulkanLogicalDevice, &createInfo, nullptr, &(vulkanSwapChainImageViews[i]));
+        if (createStatus != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create image views!");
         }
     }
 }
