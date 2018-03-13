@@ -7,6 +7,9 @@ GLFWwindow* window = nullptr;
 VkInstance vulkanInstance = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vulkanDebugCallback = VK_NULL_HANDLE;
 VkPhysicalDevice vulkanPhysicalDevice = VK_NULL_HANDLE;
+int vulkanQueueFamilyIndex = 0;
+VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
+VkQueue vulcanGraphicsQueue = VK_NULL_HANDLE;
 
 
 // Получаем расширения Vulkan
@@ -191,7 +194,7 @@ void pickPhysicalDevice() {
     
     // Есть ли вообще карты?
     if (deviceCount == 0) {
-        throw std::runtime_error("failed to find GPUs with Vulkan support!");
+        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
     
     // Получаем список устройств
@@ -199,7 +202,7 @@ void pickPhysicalDevice() {
     vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, devices.data());
     
     // Используем Map для автоматической сортировки по производительности
-    std::map<int, VkPhysicalDevice> candidates;
+    std::map<int, std::pair<VkPhysicalDevice, int>> candidates;
     
     // Перебираем GPU на предмет производительности
     for (const auto& device: devices) {
@@ -208,16 +211,65 @@ void pickPhysicalDevice() {
         if (renderQueueFamilyIndex >= 0) {
             // Оцениваем возможности устройства
             int score = rateDeviceScore(device);
-            candidates[score] = device;
+            candidates[score] = std::pair<VkPhysicalDevice,int>(device, renderQueueFamilyIndex);
         }
+    }
+    
+    // Есть ли вообще карты?
+    if (candidates.size() == 0) {
+        throw std::runtime_error("No picked GPU physical devices!");
     }
     
     // Получаем наилучший вариант GPU
     if (candidates.begin()->first > 0) {
-        vulkanPhysicalDevice = candidates.begin()->second;
+        vulkanPhysicalDevice = candidates.begin()->second.first;
+        vulkanQueueFamilyIndex = candidates.begin()->second.second;
     } else {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
+}
+
+// Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+void createLogicalDeviceAndQueue() {
+    // Настройки создания очереди
+    VkDeviceQueueCreateInfo queueCreateInfo;
+    memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = vulkanQueueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    
+    // Приоритет очереди
+    float queuePriority = 1.0f;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+    
+    // Нужные фичи устройства (ничего не указываем)
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+    memset(&deviceFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
+    
+    // Конфиг создания девайса
+    VkDeviceCreateInfo createInfo = {};
+    memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos = &queueCreateInfo;
+    createInfo.queueCreateInfoCount = 1;
+    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.enabledExtensionCount = 0;
+    
+    #ifdef VALIDATION_LAYERS_ENABLED
+        createInfo.enabledLayerCount = validationLayers.size();
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+    #else
+        createInfo.enabledLayerCount = 0;
+    #endif
+    
+    // Пробуем создать логический девайс
+    VkResult createStatus = vkCreateDevice(vulkanPhysicalDevice, &createInfo, nullptr, &vulkanLogicalDevice);
+    if (createStatus != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create logical device!");
+    }
+    
+    // Получаем очередь из девайса
+    vkGetDeviceQueue(vulkanLogicalDevice, vulkanQueueFamilyIndex, 0, &vulcanGraphicsQueue);
 }
 
 int main(int argc, char** argv) {
@@ -244,8 +296,11 @@ int main(int argc, char** argv) {
     // Настраиваем коллбек
     setupDebugCallback();
     
-    // Получаем GPU
+    // Получаем GPU устройство
     pickPhysicalDevice();
+    
+    // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+    createLogicalDeviceAndQueue();
     
     // Цикл обработки графики
     while (!glfwWindowShouldClose(window)) {
@@ -253,6 +308,7 @@ int main(int argc, char** argv) {
     }
     
     // Очищаем Vulkan
+    vkDestroyDevice(vulkanLogicalDevice, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
         vkDestroyDebugReportCallbackEXT(vulkanInstance, vulkanDebugCallback, nullptr);
     #endif
