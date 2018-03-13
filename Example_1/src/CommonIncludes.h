@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <functional>
 #include <vector>
+#include <map>
 
 // Windows
 //#include <windows.h>

@@ -4,19 +4,21 @@
 
 
 GLFWwindow* window = nullptr;
-VkInstance vulkanInstance;
-VkDebugReportCallbackEXT vulkanDebugCallback;
+VkInstance vulkanInstance = VK_NULL_HANDLE;
+VkDebugReportCallbackEXT vulkanDebugCallback = VK_NULL_HANDLE;
+VkPhysicalDevice vulkanPhysicalDevice = VK_NULL_HANDLE;
+
 
 // Получаем расширения Vulkan
 std::vector<const char*> getRequiredExtensions() {
     std::vector<const char*> extensions;
     
     unsigned int glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
     
     for (unsigned int i = 0; i < glfwExtensionCount; i++) {
         extensions.push_back(glfwExtensions[i]);
+        printf("Available extention name: %s\n", glfwExtensions[i]);
     }
     
     #ifdef VALIDATION_LAYERS_ENABLED
@@ -131,6 +133,93 @@ void setupDebugCallback() {
     #endif
 }
 
+// Для данного устройства ищем очереди отрисовки
+int findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
+    // Запрашиваем количество возможных типов очередей в устройстве
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+    
+    // Запрашиваем список очередей устройства
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+    
+    int i = 0;
+    for (const VkQueueFamilyProperties& queueFamily: queueFamilies) {
+        // Для группы очередей проверяем, что там есть очереди + есть очередь отрисовки
+        if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+            return i;
+        }
+        i++;
+    }
+    
+    return -1;
+}
+
+// Оценка производительности и пригодности конкретной GPU
+int rateDeviceScore(VkPhysicalDevice device) {
+    // Получаем свойства и фичи устройства
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+    
+    printf("Test GPU with name: %s\n", deviceProperties.deviceName);
+    
+    int score = 0;
+    
+    // Дискретная карта обычно имеет большую производительность
+    if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        score += 1000;
+    }
+    
+    // Максимальный размер текстур
+    score += deviceProperties.limits.maxImageDimension2D;
+    
+    // Нету геометрического шейдера??
+    /*if (!deviceFeatures.geometryShader) {
+        return 0;
+    }*/
+    
+    return score;
+}
+
+// Дергаем видеокарту
+void pickPhysicalDevice() {
+    // Получаем количество GPU
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, nullptr);
+    
+    // Есть ли вообще карты?
+    if (deviceCount == 0) {
+        throw std::runtime_error("failed to find GPUs with Vulkan support!");
+    }
+    
+    // Получаем список устройств
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, devices.data());
+    
+    // Используем Map для автоматической сортировки по производительности
+    std::map<int, VkPhysicalDevice> candidates;
+    
+    // Перебираем GPU на предмет производительности
+    for (const auto& device: devices) {
+        // Получаем индекс группы очередй отрисовки
+        int renderQueueFamilyIndex = findQueueFamiliesIndexInDevice(device);
+        if (renderQueueFamilyIndex >= 0) {
+            // Оцениваем возможности устройства
+            int score = rateDeviceScore(device);
+            candidates[score] = device;
+        }
+    }
+    
+    // Получаем наилучший вариант GPU
+    if (candidates.begin()->first > 0) {
+        vulkanPhysicalDevice = candidates.begin()->second;
+    } else {
+        throw std::runtime_error("failed to find a suitable GPU!");
+    }
+}
+
 int main(int argc, char** argv) {
     glfwInit();
     
@@ -154,6 +243,9 @@ int main(int argc, char** argv) {
     
     // Настраиваем коллбек
     setupDebugCallback();
+    
+    // Получаем GPU
+    pickPhysicalDevice();
     
     // Цикл обработки графики
     while (!glfwWindowShouldClose(window)) {
