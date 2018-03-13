@@ -8,7 +8,6 @@ set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
 ####################################################
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
 
-
 # Информация о текущих настройках
 function(print_current_cmake_config)
 	# https://cmake.org/Wiki/CMake_Useful_Variables
@@ -26,6 +25,9 @@ function(print_current_cmake_config)
 	message("CXX Flags (Release) = ${CMAKE_CXX_FLAGS_RELEASE}")
 endfunction()
 
+# Модули поиска
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
+
 # Цвета
 option(CMAKE_COLOR_MAKEFILE "Color makefile" ON)
 
@@ -38,63 +40,42 @@ project(${PROJECT_NAME})
 enable_testing()
 
 
+
 ####################################################
 # Библиотеки в системе
 ####################################################
 message("******** System libs search ***********")
 
 # На MacOS используем MoltenVK (https://github.com/KhronosGroup/MoltenVK)
-# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/
-# убрав при этом поиск неправильный
-# elseif (APPLE__)
-#     find_library(VULKAN_LIBRARY vulkan HINTS
-#         "$ENV{VULKAN_SDK}/macOS/lib")
+# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/ + в папке CMake проекта
+# убрав при этом поиск неправильный поиск библиотеки
+# elseif (APPLE)
+#     find_library(VULKAN_LIBRARY MoltenVK HINTS
+#         "$ENV{VULKAN_SDK}/lib")
 #     find_path(VULKAN_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS
-#         "$ENV{VULKAN_SDK}/macOS/include")
+#         "$ENV{VULKAN_SDK}/include")
 # else()
 
-if(APPLE___)
-	set(MONTLE_FULL_PATH "${CMAKE_SOURCE_DIR}/${OSX_MOLTEN_RELATIVE_PATH}")
-	set(MONTLE_INCLUDE_PATH "${MONTLE_FULL_PATH}/include")
-	set(MONTLE_LIBRARIES_PATH "${MONTLE_FULL_PATH}/macOS")
-	set(MONTLE_DYNAMIC_LIB_PATH "${MONTLE_LIBRARIES_PATH}/libMoltenVK.dylib")
-	set(MONTLE_FRAMEWORK_PATH "${MONTLE_LIBRARIES_PATH}/MoltenVK.framework")
+# Стандартный поиск плохо работает на Mac с MoltenVK https://cmake.org/cmake/help/v3.7/module/FindVulkan.html, 
+# Как результат - требует установки переменной окружения VULKAN_SDK, используется кастомный поиск Vulkan из CMake папки (взято из GLFW)
+find_package(Vulkan)
+if(VULKAN_FOUND)
+	include_directories(${VULKAN_INCLUDE_DIR})
+    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${VULKAN_LIBRARY})
+    message("Vulkan includes: ${VULKAN_INCLUDE_DIR}")
+    message("Vulkan libs: ${VULKAN_LIBRARY}")
+else()
+	message(FATAL_ERROR "Vulkan lib not found!")
+endif()
 
-	message("Montle include path: ${MONTLE_INCLUDE_PATH}")
-	message("Montle dynamic lib path: ${MONTLE_DYNAMIC_LIB_PATH}")
-	message("Montle framework path: ${MONTLE_FRAMEWORK_PATH}")
-
-	# Указываем, где искать кастомные фреймворки (для GLFW)! 
-	# Возможно - надо поправить файлик FindVulkan.cmake в glfw/cmake/modules/
-	# "find_library(VULKAN_LIBRARY vulkan.1" -> "find_library(VULKAN_LIBRARY MoltenVK"
-	# set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} "${MONTLE_LIBRARIES_PATH}")
-
-	# Инклюды библиотеки
-	include_directories(${MONTLE_INCLUDE_PATH})
-
-	# Список фреймворков
+# Список фреймворков OSX для MoltenVK
+if(APPLE)
 	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES}
 		"-framework Metal"
 		"-framework IOSurface"
 		"-framework QuartzCore"
 		"-framework IOKit"
-		"-framework Foundation"
-		"-framework MoltenVK")
-
-	# Путь поиска фреймворков
-	set(FRAMEWORKS_PATHES ${FRAMEWORKS_PATHES} "-F${MONTLE_LIBRARIES_PATH}")
-
-else()
-	# https://cmake.org/cmake/help/v3.7/module/FindVulkan.html
-	find_package(Vulkan)
-	if(Vulkan_FOUND)
-		include_directories(${Vulkan_INCLUDE_DIRS})
-	    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${Vulkan_LIBRARIES})
-	    message("Vulkan includes: ${Vulkan_INCLUDE_DIRS}")
-	    message("Vulkan libs: ${Vulkan_LIBRARIES}")
-	else()
-		message(FATAL_ERROR "Vulkan lib not found!")
-	endif()
+		"-framework Foundation")
 endif()
 
 ##############
@@ -102,6 +83,8 @@ endif()
 if(UNIX)
 	set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} m)
 endif()
+
+
 
 ####################################################
 # Библиотеки из исходников
@@ -146,15 +129,10 @@ set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} glfw ${GLFW_LIBRARIES})
 message("GLFW link libraries list: ${GLFW_LIBRARIES}")
 
 
+
 ####################################################
 # Настройка сборки текущего проекта
 ####################################################
-# Сразу отключаем ненужные предупреждения на Windows
-if (MSVC)
-	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-	add_definitions(-D_SCL_SECURE_NO_WARNINGS)
-endif ()
-
 # Не кастомные флаги компиляции
 if(APPLE)
 	set(PROJECT_LINK_FLAGS "-stdlib=libc++")
@@ -162,14 +140,16 @@ if(APPLE)
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
 	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -stdlib=libc++ -std=c++11")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -stdlib=libc++ -std=c++11")
-endif ()
-if (UNIX AND NOT APPLE)
+elseif (UNIX AND NOT APPLE)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -g")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O2 -Wall")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -O0 -Wall -g -std=c++11")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O2 -Wall -std=c++11")
-endif ()
-if (MSVC)
+elseif (MSVC)
+	# Сразу отключаем ненужные предупреждения на Windows
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+	add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+
 	# микрософту не нужен флаг -std=c++11
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} /O0 /Wall /g")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} /O2 /Wall")
@@ -201,12 +181,7 @@ set(ALL_SOURCES
 	src/main.cpp 
 	src/CommonIncludes.h
 	src/CommonDefines.h
-	src/VulkanInstance.h
-	src/VulkanInstance.cpp
-	src/SwapchainImageResources.h
-	src/SwapchainImageResources.cpp
-	src/TextureObject.h
-	src/TextureObject.cpp)
+	src/CommonConstants.h)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 
@@ -214,6 +189,7 @@ source_group("Sources" FILES ${ALL_SOURCES})
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE)
 endif()
+
 
 
 ####################################################

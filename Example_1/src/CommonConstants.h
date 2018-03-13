@@ -1,0 +1,12 @@
+#ifndef COMMON_CONSTANTS_H
+#define COMMON_CONSTANTS_H
+
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+
+// Validation layers
+//#define VALIDATION_LAYERS_ENABLED
+#define VALIDATION_LAYERS_COUNT 1
+const char* VALIATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_standard_validation" };
+
+#endif
