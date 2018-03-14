@@ -18,11 +18,16 @@ std::vector<VkImage> vulkanSwapChainImages;
 VkFormat vulkanSwapChainImageFormat;
 VkExtent2D vulkanSwapChainExtent;
 std::vector<VkImageView> vulkanSwapChainImageViews;
-std::vector<VkFramebuffer> vulkanSwapChainFramebuffers; // TODO: Deleter
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
 VkShaderModule vulkanFragmentShader = VK_NULL_HANDLE;
 VkRenderPass vulkanRenderPass = VK_NULL_HANDLE;
 VkPipelineLayout vulkanPipelineLayout = VK_NULL_HANDLE;
+VkPipeline vulkanPipeline = VK_NULL_HANDLE;
+std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
+VkCommandPool vulkanCommandPool = VK_NULL_HANDLE;
+std::vector<VkCommandBuffer> vulkanCommandBuffers;
+VkSemaphore vulkanImageAvailableSemaphore;
+VkSemaphore vulkanRenderFinishedSemaphore;
 
 
 
@@ -711,6 +716,28 @@ void createGraphicsPipeline() {
     if (vkCreatePipelineLayout(vulkanLogicalDevice, &pipelineLayoutInfo, nullptr, &vulkanPipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
+    
+    // Непосредственно создание пайплайна
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.layout = vulkanPipelineLayout;
+    pipelineInfo.renderPass = vulkanRenderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.pDepthStencilState = nullptr; // Optional
+    pipelineInfo.pDynamicState = nullptr; // Optional
+    
+    if (vkCreateGraphicsPipelines(vulkanLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vulkanPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create graphics pipeline!");
+    }
 }
 
 // Создание рендер-прохода
@@ -744,6 +771,151 @@ void createRenderPass() {
     if (vkCreateRenderPass(vulkanLogicalDevice, &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
+}
+
+// Создаем фреймбуфферы
+void createFramebuffers(){
+    vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
+    
+    for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
+        VkImageView attachments[] = { vulkanSwapChainImageViews[i] };
+        
+        VkFramebufferCreateInfo framebufferInfo = {};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = vulkanRenderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = vulkanSwapChainExtent.width;
+        framebufferInfo.height = vulkanSwapChainExtent.height;
+        framebufferInfo.layers = 1;
+        
+        if (vkCreateFramebuffer(vulkanLogicalDevice, &framebufferInfo, nullptr, &(vulkanSwapChainFramebuffers[i])) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create framebuffer!");
+        }
+    }
+}
+
+// Создаем пулл комманд
+void createCommandPool() {
+    VkCommandPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;
+    poolInfo.flags = 0; // Optional
+    
+    if (vkCreateCommandPool(vulkanLogicalDevice, &poolInfo, nullptr, &vulkanCommandPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create command pool!");
+    }
+}
+
+// Создаем коммандные буфферы
+void createCommandBuffers() {
+    // TODO: !!
+    // Очистка буферов команд включает в себя несколько иную функцию, нежели другие объекты. Функция vkFreeCommandBuffers принимает пул команд и массив буферов команд.
+    
+    vulkanCommandBuffers.resize(vulkanSwapChainFramebuffers.size());
+    
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = vulkanCommandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (uint32_t)vulkanCommandBuffers.size();
+    
+    if (vkAllocateCommandBuffers(vulkanLogicalDevice, &allocInfo, vulkanCommandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate command buffers!");
+    }
+    
+    for (size_t i = 0; i < vulkanCommandBuffers.size(); i++) {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+        beginInfo.pInheritanceInfo = nullptr; // Optional
+        
+        vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
+        
+        VkRenderPassBeginInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = vulkanRenderPass;
+        renderPassInfo.framebuffer = vulkanSwapChainFramebuffers[i];
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = vulkanSwapChainExtent;
+        
+        VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColor;
+        
+        vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
+        
+        vkCmdDraw(vulkanCommandBuffers[i], 3, 1, 0, 0);
+        
+        vkCmdEndRenderPass(vulkanCommandBuffers[i]);
+        
+        if (vkEndCommandBuffer(vulkanCommandBuffers[i]) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+}
+
+// Создаем семафоры
+void createSemaphores(){
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    
+    if (vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanRenderFinishedSemaphore) != VK_SUCCESS) {
+        
+        throw std::runtime_error("failed to create semaphores!");
+    }
+}
+
+// Непосредственно отрисовка кадра
+void drawFrame() {
+    uint32_t imageIndex = 0;
+    vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain, std::numeric_limits<uint64_t>::max(), vulkanImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    
+    VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vulkanCommandBuffers[imageIndex];
+    
+    VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+    
+    if (vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        throw std::runtime_error("failed to submit draw command buffer!");
+    }
+    
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    
+    VkRenderPassCreateInfo renderPassInfo = {};
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+    
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+    
+    VkSwapchainKHR swapChains[] = {vulkanSwapchain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr; // Optional
 }
 
 int main(int argc, char** argv) {
@@ -785,17 +957,32 @@ int main(int argc, char** argv) {
     // Создание вьюшек изображений буффера кадра
     createImageViews();
     
+    // Создание рендер-прохода
+    createRenderPass();
+    
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
     
-    // Создание рендер-прохода
-    createRenderPass();
+    // Создаем фреймбуфферы
+    createFramebuffers();
+    
+    // Создаем пулл комманд
+    createCommandPool();
+    
+    // Создаем коммандные буфферы
+    createCommandBuffers();
+    
+    // Создаем семафоры
+    createSemaphores();
     
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
     double lastFrameDuration = 1.0/60.0;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        
+        // Непосредственно отрисовка кадра
+        drawFrame();
         
         // Стабилизация времени кадра
         std::chrono::high_resolution_clock::duration curFrameDuration = std::chrono::high_resolution_clock::now() - lastDrawTime;
@@ -808,11 +995,21 @@ int main(int argc, char** argv) {
         lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
     }
     
+    // Ждем завершения работы Vulkan
+    vkDeviceWaitIdle(vulkanLogicalDevice);
+    
     // Очищаем Vulkan
-    vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanRenderFinishedSemaphore, nullptr);
+    vkDestroyCommandPool(vulkanLogicalDevice, vulkanCommandPool, nullptr);
+    for (const auto& buffer: vulkanSwapChainFramebuffers) {
+        vkDestroyFramebuffer(vulkanLogicalDevice, buffer, nullptr);
+    }
+    vkDestroyPipeline(vulkanLogicalDevice, vulkanPipeline, nullptr);
     vkDestroyPipelineLayout(vulkanLogicalDevice, vulkanPipelineLayout, nullptr);
     vkDestroyShaderModule(vulkanLogicalDevice, vulkanVertexShader, nullptr);
     vkDestroyShaderModule(vulkanLogicalDevice, vulkanFragmentShader, nullptr);
+    vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
     for(const auto& imageView: vulkanSwapChainImageViews){
         vkDestroyImageView(vulkanLogicalDevice, imageView, nullptr);
     }
