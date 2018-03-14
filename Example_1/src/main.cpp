@@ -597,33 +597,41 @@ void createGraphicsPipeline() {
     auto vertShaderCode = readFile("res/shaders/vert.spv");
     auto fragShaderCode = readFile("res/shaders/frag.spv");
     
+    // Создаем шейдерный модуль
     createShaderModule(vertShaderCode, vulkanVertexShader);
     createShaderModule(fragShaderCode, vulkanFragmentShader);
     
+    // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // Вершинный
     vertShaderStageInfo.module = vulkanVertexShader;
     vertShaderStageInfo.pName = "main";
     
+    // Описание настроек фрагментного шейдера
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // Фрагментный шейдер
     fragShaderStageInfo.module = vulkanFragmentShader;
     fragShaderStageInfo.pName = "main";
     
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
+    // Описание формата входных данны
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
     
+    // Топология вершин
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;   // Рисуем обычными треугольниками
     inputAssembly.primitiveRestartEnable = VK_FALSE;
     
+    // Настраиваем вьюпорт
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -632,10 +640,12 @@ void createGraphicsPipeline() {
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     
+    // Выставляем сциссор
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
     scissor.extent = vulkanSwapChainExtent;
     
+    // Создаем структуру настроек вьюпорта
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
@@ -643,6 +653,11 @@ void createGraphicsPipeline() {
     viewportState.scissorCount = 1;
     viewportState.pScissors = &scissor;
     
+    // Настройки растеризатора
+    //  - Если depthClampEnable установлен в значение VK_TRUE, тогда фрагменты, находящиеся за ближней и дальней плоскостью, прикрепляются к ним, а не отбрасываются.
+    // Это бывает полезно в ряде случаев, например для карты теней. Для использования необходимо включить функцию GPU.
+    // - Если rasterizerDiscardEnable установлен в значение VK_TRUE, тогда геометрия не проходит через растеризатор.
+    // По сути это отключает любой вывод в фреймбуфер.
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
