@@ -182,6 +182,7 @@ void createVulkanInstance(){
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
     if (createStatus != VK_SUCCESS) {
         printf("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
+		fflush(stdout);
         throw std::runtime_error("Failed to create instance!");
     }
 }
@@ -892,33 +893,27 @@ void drawFrame() {
     if (vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
-    
-    VkSubpassDependency dependency = {};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
-    VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-    
+
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    
+
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
-    
+
     VkSwapchainKHR swapChains[] = {vulkanSwapchain};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
+
     presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = nullptr; // Optional
+
+    vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
 }
 
+#ifndef _MSVC_LANG
 int main(int argc, char** argv) {
+#else
+int local_main(int argc, char** argv) {
+#endif
     glfwInit();
     
     // Говорим GLFW, что не нужно создавать GL контекст
@@ -933,6 +928,7 @@ int main(int argc, char** argv) {
     int vulkanSupportStatus = glfwVulkanSupported();
     if (vulkanSupportStatus != GLFW_TRUE){
         printf("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
+		fflush(stdout);
         throw std::runtime_error("Vulkan support not found!");
     }
     
@@ -1028,15 +1024,10 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-/*INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow) {
-	printf("Windows start");
-	__main(1, NULL);
-	fflush(stdout);
-	if (glfwVulkanSupported()) {
-		printf("Vulkan available!!!");
-		MessageBox(NULL, lpCmdLine, "Vulkan available!!!", 0);
-	}
-	MessageBox(NULL, lpCmdLine, "WinMain Demo", 0);
+#ifdef _MSVC_LANG
+INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow) {
+	local_main(0, NULL);
 	return 0;
-}*/
+}
+#endif
 

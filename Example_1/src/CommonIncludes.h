@@ -1,6 +1,12 @@
 #ifndef COMMON_INCLUDES_H
 #define COMMON_INCLUDES_H
 
+// Windows
+#ifdef _MSVC_LANG
+	#define NOMINMAX 
+	#include <windows.h>
+#endif // MSV
+
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -13,9 +19,9 @@
 #include <thread>
 #include <chrono>
 #include <fstream>
+#include <algorithm>
+#include <limits>
 
-// Windows
-//#include <windows.h>
 
 // GLFW include
 #define GLFW_INCLUDE_VULKAN
