@@ -45,20 +45,25 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
+// Читаем побайтово файлик
 std::vector<char> readFile(const std::string& filename) {
+    // Открываем файлик в бинарном режиме чтения + чтение с конца
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     
     if (!file.is_open()) {
         throw std::runtime_error("failed to open file!");
     }
     
+    // Получаем размер файлика
     size_t fileSize = (size_t) file.tellg();
     std::vector<char> buffer(fileSize);
     
+    // Переходим в начало файла и читаем данные
     file.seekg(0);
     file.read(buffer.data(), fileSize);
     
     file.close();
+    
     return buffer;
 }
 
@@ -292,7 +297,7 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
     
     // Список требуемых расширений - смена кадров
-    std::set<std::string> requiredExtensions(DEVICE_EXTENTIONS, DEVICE_EXTENTIONS + DEVICE_EXTENTIONS_COUNT);
+    std::set<std::string> requiredExtensions(DEVICE_REQUIRED_EXTENTIONS, DEVICE_REQUIRED_EXTENTIONS + DEVICE_EXTENTIONS_COUNT);
     
     for (const auto& extension : availableExtensions) {
         printf("Available extention: %s\n", extension.extensionName);
@@ -313,7 +318,6 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
     // Запрашиваем поддерживаемые форматы буффера цвета
     uint32_t formatCount = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, nullptr);
-    
     if (formatCount != 0) {
         details.formats.resize(formatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, details.formats.data());
@@ -322,7 +326,6 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
     // Запрашиваем поддерживаемые форматы отображения
     uint32_t presentModeCount = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, nullptr);
-    
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, details.presentModes.data());
@@ -466,7 +469,7 @@ void createLogicalDeviceAndQueue() {
     createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = DEVICE_EXTENTIONS_COUNT;
-    createInfo.ppEnabledExtensionNames = DEVICE_EXTENTIONS;
+    createInfo.ppEnabledExtensionNames = DEVICE_REQUIRED_EXTENTIONS;
     #ifdef VALIDATION_LAYERS_ENABLED
         createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
         createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
@@ -487,17 +490,22 @@ void createLogicalDeviceAndQueue() {
 
 // Создание логики смены кадров
 void createSwapChain() {
+    // Запрашиваем информацию о свопчейне
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vulkanPhysicalDevice);
     
+    // Выбираем подходящие форматы пикселя, режима смены кадров, размеры кадра
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
     
+    // Получаем количество изображений в смене кадров, +1 для возможности создания тройной буфферизации
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+    // Значение 0 для maxImageCount означает, что объем памяти не ограничен
+    if ((swapChainSupport.capabilities.maxImageCount > 0) && (imageCount > swapChainSupport.capabilities.maxImageCount)) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
     }
     
+    // Структура настроек создания Swapchain
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = vulkanSurface;
@@ -508,28 +516,33 @@ void createSwapChain() {
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     
-    uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
+    // Если у нас разные очереди для рендеринга и отображения -
     if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
+        uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
+        // Изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
+        // Изображение может быть использовано несколькими семействами без явной передачи.
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         createInfo.queueFamilyIndexCount = 0; // Optional
         createInfo.pQueueFamilyIndices = nullptr; // Optional
     }
     
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
     
+    // Создаем свопчейн
     VkResult createStatus = vkCreateSwapchainKHR(vulkanLogicalDevice, &createInfo, nullptr, &vulkanSwapchain);
     if (createStatus != VK_SUCCESS) {
         throw std::runtime_error("failed to create swap chain!");
     }
     
+    // Получаем изображения для отображения
     uint32_t imagesCount = 0;
     vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
     vulkanSwapChainImages.resize(imageCount);
@@ -543,17 +556,18 @@ void createSwapChain() {
 void createImageViews() {
     vulkanSwapChainImageViews.resize(vulkanSwapChainImages.size());
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
+        // Структура информации о вьюшке
         VkImageViewCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = vulkanSwapChainImages[i];
-        createInfo.format = vulkanSwapChainImageFormat;
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.image = vulkanSwapChainImages[i];    // Какую картинку берем
+        createInfo.format = vulkanSwapChainImageFormat; // Формат
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;    // 2Д картинка
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Дергать будем цвет
+        createInfo.subresourceRange.baseMipLevel = 0;   // На 0 уровне мипмаппинга
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
@@ -565,6 +579,7 @@ void createImageViews() {
     }
 }
 
+// Из байткода исходника создаем шейдерный модуль
 void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule) {
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -578,6 +593,7 @@ void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderMod
 
 // Создание пайплайна отрисовки
 void createGraphicsPipeline() {
+    // Читаем байт-код шейдеров
     auto vertShaderCode = readFile("res/shaders/vert.spv");
     auto fragShaderCode = readFile("res/shaders/frag.spv");
     
