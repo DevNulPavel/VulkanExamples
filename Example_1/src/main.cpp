@@ -816,51 +816,62 @@ void createCommandBuffers() {
     
     vulkanCommandBuffers.resize(vulkanSwapChainFramebuffers.size());
     
+    // Настройки создания коммандного буффера
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = vulkanCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)vulkanCommandBuffers.size();
     
+    // Аллоцируем память под коммандные буфферы
     if (vkAllocateCommandBuffers(vulkanLogicalDevice, &allocInfo, vulkanCommandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
     
     for (size_t i = 0; i < vulkanCommandBuffers.size(); i++) {
+        // Информация о запуске коммандного буффера
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
         beginInfo.pInheritanceInfo = nullptr; // Optional
         
+        // Запуск коммандного буффера
         vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
         
+        // Информация о запуске рендер-прохода
         VkRenderPassBeginInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = vulkanRenderPass;
-        renderPassInfo.framebuffer = vulkanSwapChainFramebuffers[i];
+        renderPassInfo.renderPass = vulkanRenderPass;   // Рендер проход
+        renderPassInfo.framebuffer = vulkanSwapChainFramebuffers[i];    // Фреймбуффер смены кадров
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = vulkanSwapChainExtent;
         
+        // Настройка рендер прохода
         VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
         VkClearValue clearSetup = {clearColor};
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearSetup;
         
+        // Запуск рендер-прохода
         vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         
+        // Устанавливаем пайплайн у коммандного буффера
         vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
         
+        // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         vkCmdDraw(vulkanCommandBuffers[i], 3, 1, 0, 0);
         
+        // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
         
+        // Заканчиваем подготовку коммандного буффера
         if (vkEndCommandBuffer(vulkanCommandBuffers[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
         }
     }
 }
 
-// Создаем семафоры
+// Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
 void createSemaphores(){
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -874,40 +885,41 @@ void createSemaphores(){
 
 // Непосредственно отрисовка кадра
 void drawFrame() {
+    // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t imageIndex = 0;
     vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain, std::numeric_limits<uint64_t>::max(), vulkanImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
     
+    // Настраиваем отправление в очередь комманд отрисовки
+    // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
+    VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore}; // Семафор ожидания картинки для вывода туда графики
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем возможности вывода в буфер цвета
+    VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore}; // Семафор оповещения о завершении рендеринга
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    
-    VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.pWaitSemaphores = waitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
+    submitInfo.pWaitDstStageMask = waitStages;      // Ждать будем возможности вывода в буфер цвета
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vulkanCommandBuffers[imageIndex];
-    
-    VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore};
+    submitInfo.pCommandBuffers = &vulkanCommandBuffers[imageIndex]; // Указываем коммандный буффер отрисовки
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
     
+    // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
     if (vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 
+    // Настраиваем задачу отображения полученного изображения
+    VkSwapchainKHR swapChains[] = {vulkanSwapchain};
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {vulkanSwapchain};
+    presentInfo.pWaitSemaphores = signalSemaphores; // Ожидаем окончания подготовки кадра с помощью семафора
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-
     presentInfo.pImageIndices = &imageIndex;
 
+    // Закидываем в очередь задачу отображения картинки
     vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
 }
 
@@ -994,6 +1006,8 @@ int local_main(int argc, char** argv) {
     }
     
     // Ждем завершения работы Vulkan
+    vkQueueWaitIdle(vulkanGraphicsQueue);
+    vkQueueWaitIdle(vulkanPresentQueue);
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Очищаем Vulkan
