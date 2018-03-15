@@ -543,10 +543,20 @@ void createSwapChain() {
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
     
+    // Пересоздание свопчейна
+    VkSwapchainKHR oldSwapChain = vulkanSwapchain;
+    createInfo.oldSwapchain = oldSwapChain;
+    
     // Создаем свопчейн
     VkResult createStatus = vkCreateSwapchainKHR(vulkanLogicalDevice, &createInfo, nullptr, &vulkanSwapchain);
     if (createStatus != VK_SUCCESS) {
         throw std::runtime_error("failed to create swap chain!");
+    }
+    
+    // Удаляем старый свопчейн, если был
+    if (oldSwapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(vulkanLogicalDevice, oldSwapChain, nullptr);
+        oldSwapChain = VK_NULL_HANDLE;
     }
     
     // Получаем изображения для отображения
@@ -561,6 +571,14 @@ void createSwapChain() {
 
 // Создание вьюшек изображений буффера кадра
 void createImageViews() {
+    // Удаляем старые, если есть
+    if(vulkanSwapChainImageViews.size() > 0){
+        for(const auto& imageView: vulkanSwapChainImageViews){
+            vkDestroyImageView(vulkanLogicalDevice, imageView, nullptr);
+        }
+        vulkanSwapChainImageViews.clear();
+    }
+    
     vulkanSwapChainImageViews.resize(vulkanSwapChainImages.size());
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
         // Структура информации о вьюшке
@@ -600,6 +618,16 @@ void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderMod
 
 // Создание пайплайна отрисовки
 void createGraphicsPipeline() {
+    // Уничтожаем старое
+    if(vulkanPipeline != VK_NULL_HANDLE){
+        vkDestroyPipeline(vulkanLogicalDevice, vulkanPipeline, nullptr);
+        vulkanPipeline = VK_NULL_HANDLE;
+    }
+    if(vulkanPipelineLayout != VK_NULL_HANDLE){
+        vkDestroyPipelineLayout(vulkanLogicalDevice, vulkanPipelineLayout, nullptr);
+        vulkanPipelineLayout = VK_NULL_HANDLE;
+    }
+    
     // Читаем байт-код шейдеров
     auto vertShaderCode = readFile("res/shaders/vert.spv");
     auto fragShaderCode = readFile("res/shaders/frag.spv");
@@ -744,6 +772,11 @@ void createGraphicsPipeline() {
 
 // Создание рендер-прохода
 void createRenderPass() {
+    // Уничтожаем старый рендер пасс, если был уже
+    if(vulkanRenderPass != VK_NULL_HANDLE){
+        vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
+    }
+    
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = vulkanSwapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -777,6 +810,14 @@ void createRenderPass() {
 
 // Создаем фреймбуфферы
 void createFramebuffers(){
+    // Уничтожаем старые свопчейны
+    if (vulkanSwapChainFramebuffers.size() > 0) {
+        for (const auto& buffer: vulkanSwapChainFramebuffers) {
+            vkDestroyFramebuffer(vulkanLogicalDevice, buffer, nullptr);
+        }
+        vulkanSwapChainFramebuffers.clear();
+    }
+    
     vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
     
     for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
@@ -813,6 +854,12 @@ void createCommandPool() {
 void createCommandBuffers() {
     // TODO: !!
     // Очистка буферов команд включает в себя несколько иную функцию, нежели другие объекты. Функция vkFreeCommandBuffers принимает пул команд и массив буферов команд.
+    
+    // Очистка старых буфферов комманд
+    if (vulkanCommandBuffers.size() > 0) {
+        vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, vulkanCommandBuffers.size(), vulkanCommandBuffers.data());
+        vulkanCommandBuffers.clear();
+    }
     
     vulkanCommandBuffers.resize(vulkanSwapChainFramebuffers.size());
     
@@ -883,11 +930,33 @@ void createSemaphores(){
     }
 }
 
+// Вызывается при различных ресайзах окна
+void recreateSwapChain() {
+    vkDeviceWaitIdle(vulkanLogicalDevice);
+    
+    // Заново пересоздаем свопчейны, старые удалятся внутри
+    createSwapChain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+    createCommandBuffers();
+}
+
 // Непосредственно отрисовка кадра
 void drawFrame() {
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t imageIndex = 0;
-    vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain, std::numeric_limits<uint64_t>::max(), vulkanImageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain,
+                                            std::numeric_limits<uint64_t>::max(), vulkanImageAvailableSemaphore,
+                                            VK_NULL_HANDLE, &imageIndex);
+    
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapChain();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
     
     // Настраиваем отправление в очередь комманд отрисовки
     // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
@@ -920,7 +989,20 @@ void drawFrame() {
     presentInfo.pImageIndices = &imageIndex;
 
     // Закидываем в очередь задачу отображения картинки
-    vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
+    VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
+    
+    // В случае проблем - пересоздаем свопчейн
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
+        recreateSwapChain();
+        return;
+    } else if (presentResult != VK_SUCCESS) {
+        throw std::runtime_error("failed to present swap chain image!");
+    }
+}
+
+void onGLFWWindowResized(GLFWwindow* window, int width, int height) {
+    if (width == 0 || height == 0) return;
+    recreateSwapChain();
 }
 
 #ifndef _MSVC_LANG
@@ -933,10 +1015,11 @@ int local_main(int argc, char** argv) {
     // Говорим GLFW, что не нужно создавать GL контекст
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     // Окно без изменения размера
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     
     // Создаем окно
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);
+    glfwSetWindowSizeCallback(window, onGLFWWindowResized);
     
     // Проверяем наличие поддержки Vulkan
     int vulkanSupportStatus = glfwVulkanSupported();
