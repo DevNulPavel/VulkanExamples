@@ -187,9 +187,12 @@ print_current_cmake_config()
 ####################################################
 set(ALL_SOURCES 
     src/main.cpp
-    src/CommonIncludes.h
     src/CommonDefines.h
-    src/CommonConstants.h)
+    src/CommonConstants.h
+    src/Vertex.h
+    src/Vertex.cpp
+    src/Figures.h
+    src/Figures.cpp)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 

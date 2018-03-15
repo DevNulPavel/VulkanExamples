@@ -1,6 +1,42 @@
-#include "CommonIncludes.h"
+// Windows
+#ifdef _MSVC_LANG
+    #define NOMINMAX
+    #include <windows.h>
+#endif
+
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <iostream>
+#include <stdexcept>
+#include <functional>
+#include <vector>
+#include <map>
+#include <set>
+#include <thread>
+#include <chrono>
+#include <fstream>
+#include <algorithm>
+#include <limits>
+
+// GLFW include
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+// GLM
+#include <glm/glm.hpp>
+
 #include "CommonDefines.h"
 #include "CommonConstants.h"
+#include "Vertex.h"
+#include "Figures.h"
+
+
+#define VALIDATION_LAYERS_COUNT 1
+const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_standard_validation" };
+
+#define DEVICE_EXTENTIONS_COUNT 1
+const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 
 GLFWwindow* window = nullptr;
@@ -652,13 +688,17 @@ void createGraphicsPipeline() {
     
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
+    // Описание вершин
+    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = Vertex::getAttributeDescriptions();
+    
     // Описание формата входных данны
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription; // Optional
+    vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.size();
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data(); // Optional
     
     // Топология вершин
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -850,11 +890,20 @@ void createCommandPool() {
     }
 }
 
+// Создание буфферов вершин
+void createVertexBuffer(){
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    
+    // TODO: Drawing
+    // http://vulkanapi.ru/2016/11/20/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-34-%D1%81%D0%BE%D0%B7%D0%B4%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B1%D1%83%D1%84%D0%B5%D1%80%D0%B0-%D0%B2%D0%B5%D1%80%D1%88%D0%B8%D0%BD/
+}
+
 // Создаем коммандные буфферы
 void createCommandBuffers() {
-    // TODO: !!
-    // Очистка буферов команд включает в себя несколько иную функцию, нежели другие объекты. Функция vkFreeCommandBuffers принимает пул команд и массив буферов команд.
-    
+
     // Очистка старых буфферов комманд
     if (vulkanCommandBuffers.size() > 0) {
         vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, vulkanCommandBuffers.size(), vulkanCommandBuffers.data());
@@ -1061,6 +1110,9 @@ int local_main(int argc, char** argv) {
     
     // Создаем пулл комманд
     createCommandPool();
+    
+    // Создание буфферов вершин
+    createVertexBuffer();
     
     // Создаем коммандные буфферы
     createCommandBuffers();
