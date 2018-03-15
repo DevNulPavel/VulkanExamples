@@ -6,7 +6,7 @@
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 
-#ifndef APPLE
+#ifndef __APPLE__
 	#define VALIDATION_LAYERS_ENABLED
 	#define VALIDATION_LAYERS_COUNT 1
 	const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_standard_validation" };

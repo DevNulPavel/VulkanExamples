@@ -113,31 +113,32 @@ std::vector<const char*> getRequiredExtensions() {
 
 // Проверка наличия уровней валидации
 bool checkValidationLayerSupport() {
-    // Количество уровней валидации
-    uint32_t layerCount = 0;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    #ifdef VALIDATION_LAYERS_ENABLED
+        // Количество уровней валидации
+        uint32_t layerCount = 0;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
     
-    // Получаем слои валидации
-    std::vector<VkLayerProperties> availableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        // Получаем слои валидации
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
     
-    // Проверяем, что запрошенные слои валидации доступны
-    for(int i = 0; i < VALIDATION_LAYERS_COUNT; i++) {
-        const char* layerName = VALIDATION_LAYERS[i];
-        bool layerFound = false;
-        
-        for (const auto& layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
+        // Проверяем, что запрошенные слои валидации доступны
+        for(int i = 0; i < VALIDATION_LAYERS_COUNT; i++) {
+            const char* layerName = VALIDATION_LAYERS[i];
+            bool layerFound = false;
+            
+            for (const auto& layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+            
+            if (!layerFound) {
+                return false;
             }
         }
-        
-        if (!layerFound) {
-            return false;
-        }
-    }
-    
+    #endif
     return true;
 }
 
@@ -840,9 +841,10 @@ void createCommandBuffers() {
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = vulkanSwapChainExtent;
         
-        VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        VkClearValue clearSetup = {clearColor};
         renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        renderPassInfo.pClearValues = &clearSetup;
         
         vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         
