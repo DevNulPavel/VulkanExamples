@@ -635,20 +635,22 @@ void createImageViews() {
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
         // Структура информации о вьюшке
         VkImageViewCreateInfo createInfo = {};
+        memset(&createInfo, 0, sizeof(VkImageViewCreateInfo));
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = vulkanSwapChainImages[i];    // Какую картинку берем
         createInfo.format = vulkanSwapChainImageFormat; // Формат
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;    // 2Д картинка
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;    // Вью будет идентичное по цвету
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;    // Вью будет идентичное по цвету
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;    // Вью будет идентичное по цвету
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;    // Вью будет идентичное по цвету
         createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Дергать будем цвет
         createInfo.subresourceRange.baseMipLevel = 0;   // На 0 уровне мипмаппинга
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
         
+        // Создаем вью изображений
         VkResult createStatus = vkCreateImageView(vulkanLogicalDevice, &createInfo, nullptr, &(vulkanSwapChainImageViews[i]));
         if (createStatus != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image views!");
@@ -659,6 +661,7 @@ void createImageViews() {
 // Из байткода исходника создаем шейдерный модуль
 void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule) {
     VkShaderModuleCreateInfo createInfo = {};
+    memset(&createInfo, 0, sizeof(VkShaderModuleCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
     createInfo.pCode = (uint32_t*)code.data();
@@ -681,8 +684,8 @@ void createGraphicsPipeline() {
     }
     
     // Читаем байт-код шейдеров
-    auto vertShaderCode = readFile("res/shaders/vert.spv");
-    auto fragShaderCode = readFile("res/shaders/frag.spv");
+    std::vector<char> vertShaderCode = readFile("res/shaders/vert.spv");
+    std::vector<char> fragShaderCode = readFile("res/shaders/frag.spv");
     
     // Создаем шейдерный модуль
     createShaderModule(vertShaderCode, vulkanVertexShader);
@@ -690,6 +693,7 @@ void createGraphicsPipeline() {
     
     // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+    memset(&vertShaderStageInfo, 0, sizeof(VkPipelineShaderStageCreateInfo));
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // Вершинный
     vertShaderStageInfo.module = vulkanVertexShader;
@@ -697,12 +701,11 @@ void createGraphicsPipeline() {
     
     // Описание настроек фрагментного шейдера
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+    memset(&fragShaderStageInfo, 0, sizeof(VkPipelineShaderStageCreateInfo));
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // Фрагментный шейдер
     fragShaderStageInfo.module = vulkanFragmentShader;
     fragShaderStageInfo.pName = "main";
-    
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
     // Описание вершин
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
@@ -710,6 +713,7 @@ void createGraphicsPipeline() {
     
     // Описание формата входных данны
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+    memset(&vertexInputInfo, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription; // Optional
@@ -718,12 +722,14 @@ void createGraphicsPipeline() {
     
     // Топология вершин
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+    memset(&inputAssembly, 0, sizeof(VkPipelineInputAssemblyStateCreateInfo));
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;   // Рисуем обычными треугольниками
     inputAssembly.primitiveRestartEnable = VK_FALSE;
     
     // Настраиваем вьюпорт
     VkViewport viewport = {};
+    memset(&viewport, 0, sizeof(VkViewport));
     viewport.x = 0.0f;
     viewport.y = 0.0f;
     viewport.width = (float)vulkanSwapChainExtent.width;
@@ -733,11 +739,13 @@ void createGraphicsPipeline() {
     
     // Выставляем сциссор
     VkRect2D scissor = {};
+    memset(&scissor, 0, sizeof(VkRect2D));
     scissor.offset = {0, 0};
     scissor.extent = vulkanSwapChainExtent;
     
     // Создаем структуру настроек вьюпорта
     VkPipelineViewportStateCreateInfo viewportState = {};
+    memset(&viewportState, 0, sizeof(VkPipelineViewportStateCreateInfo));
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.pViewports = &viewport;
@@ -750,24 +758,25 @@ void createGraphicsPipeline() {
     // - Если rasterizerDiscardEnable установлен в значение VK_TRUE, тогда геометрия не проходит через растеризатор.
     // По сути это отключает любой вывод в фреймбуфер.
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
+    memset(&rasterizer, 0, sizeof(VkPipelineRasterizationStateCreateInfo));
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthClampEnable = VK_FALSE;         // Включено ли округление глубины крайними значениями
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;  // Графика рисуется в буффер кадра
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // Заполненные полигоны
+    rasterizer.lineWidth = 1.0f;                    // Толщина линии
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;    // Отбрасываем заднюю грань
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // Обход по часовой стрелке для фронтальной стороны
+    rasterizer.depthBiasEnable = VK_FALSE;          // Смещение по глубине отключено
     
     // Настройка антиаллиасинга с помощью мультисемплинга
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f; // Optional
-    multisampling.pSampleMask = nullptr; /// Optional
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;    // Кратность семплирования
+    multisampling.minSampleShading = 1.0f;      // Optional
+    multisampling.pSampleMask = nullptr;        // Optional
     multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+    multisampling.alphaToOneEnable = VK_FALSE;      // Optional
     
     // Настройки классического блендинга
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
@@ -804,6 +813,7 @@ void createGraphicsPipeline() {
     }
     
     // Непосредственно создание пайплайна
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
