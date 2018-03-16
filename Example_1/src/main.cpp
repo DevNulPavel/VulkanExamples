@@ -77,6 +77,7 @@ VkBuffer vulkanUniformStagingBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformStagingBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
+VkDescriptorPool vulkanDescriptorPool = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1184,6 +1185,27 @@ void createUniformBuffer() {
                  vulkanUniformBuffer, vulkanUniformBufferMemory);
 }
 
+// Создаем пул дескрипторов ресурсов
+void createDescriptorPool() {
+    VkDescriptorPoolSize poolSize = {};
+    memset(&poolSize, 0, sizeof(VkDescriptorPoolSize));
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+    
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    memset(&poolSize, 0, sizeof(VkDescriptorPoolCreateInfo));
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+    poolInfo.flags = 0;
+    poolInfo.pNext = nullptr;
+    
+    if (vkCreateDescriptorPool(vulkanLogicalDevice, &poolInfo, nullptr, &vulkanDescriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor pool!");
+    }
+}
+
 // Создаем коммандные буфферы
 void createCommandBuffers() {
 
@@ -1446,6 +1468,9 @@ int local_main(int argc, char** argv) {
     // Создаем буффер юниформов
     createUniformBuffer();
     
+    // Создаем пул дескрипторов ресурсов
+    createDescriptorPool();
+    
     // Создаем коммандные буфферы
     createCommandBuffers();
     
@@ -1481,6 +1506,7 @@ int local_main(int argc, char** argv) {
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Очищаем Vulkan
+    vkDestroyDescriptorPool(vulkanLogicalDevice, vulkanDescriptorPool, nullptr);
     vkDestroyBuffer(vulkanLogicalDevice, vulkanUniformStagingBuffer, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanUniformStagingBufferMemory, nullptr);
     vkDestroyBuffer(vulkanLogicalDevice, vulkanUniformBuffer, nullptr);
