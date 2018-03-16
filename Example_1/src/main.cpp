@@ -907,33 +907,33 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-// Создание буфферов вершин
-void createVertexBuffer(){
+// Создаем буффер нужного размера
+void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
     // Удаляем старое, если есть
-    if(vulkanVertexBufferMemory != VK_NULL_HANDLE){
-        vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
+    if(bufferMemory != VK_NULL_HANDLE){
+        vkFreeMemory(vulkanLogicalDevice, bufferMemory, nullptr);
         vulkanVertexBufferMemory = VK_NULL_HANDLE;
     }
-    if (vulkanVertexBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(vulkanLogicalDevice, vulkanVertexBuffer, nullptr);
+    if (buffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vulkanLogicalDevice, buffer, nullptr);
         vulkanVertexBuffer = VK_NULL_HANDLE;
     }
     
     // Описание формата буффера
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
     // Непосредственно создание буффера
-    if (vkCreateBuffer(vulkanLogicalDevice, &bufferInfo, nullptr, &vulkanVertexBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create vertex buffer!");
+    if (vkCreateBuffer(vulkanLogicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create buffer!");
     }
     
     // Запрашиваем данные о необходимой памяти
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(vulkanLogicalDevice, vulkanVertexBuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(vulkanLogicalDevice, buffer, &memRequirements);
     
     // Настройки аллокации буффера
     uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits,
@@ -952,13 +952,22 @@ void createVertexBuffer(){
     // Последний параметр – смещение в области памяти. Т.к. эта память выделяется специально для буфера вершин, смещение просто 0.
     // Если же оно не будет равно нулю, то значение должно быть кратным memRequirements.alignment.
     vkBindBufferMemory(vulkanLogicalDevice, vulkanVertexBuffer, vulkanVertexBufferMemory, 0);
+}
+
+// Создание буфферов вершин
+void createVertexBuffer(){
+    // Создаем буффер и память под него
+    VkDeviceSize bufferSize = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
+    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 vulkanVertexBuffer, vulkanVertexBufferMemory);
     
     // Маппим видео-память в адресное пространство оперативной памяти
     void* data = nullptr;
-    vkMapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    vkMapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, 0, bufferSize, 0, &data);
     
     // Копируем вершины в память
-    memcpy(data, TRIANGLE_VERTEXES.data(), (size_t)bufferInfo.size);
+    memcpy(data, TRIANGLE_VERTEXES.data(), (size_t)bufferSize);
     
     // Размапим
     vkUnmapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory);
@@ -1179,7 +1188,7 @@ int local_main(int argc, char** argv) {
     
     // Создаем пулл комманд
     createCommandPool();
-    
+
     // Создание буфферов вершин
     createVertexBuffer();
     
