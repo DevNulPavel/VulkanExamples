@@ -1,6 +1,7 @@
 #ifndef VERTEX_H
 #define VERTEX_H
 
+#include <cstring>
 #include <array>
 
 // GLFW
