@@ -62,9 +62,10 @@ VkPipeline vulkanPipeline = VK_NULL_HANDLE;
 std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
 VkCommandPool vulkanCommandPool = VK_NULL_HANDLE;
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
-VkSemaphore vulkanImageAvailableSemaphore;
-VkSemaphore vulkanRenderFinishedSemaphore;
-
+VkSemaphore vulkanImageAvailableSemaphore = VK_NULL_HANDLE;
+VkSemaphore vulkanRenderFinishedSemaphore = VK_NULL_HANDLE;
+VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
+VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
 
 
 struct FamiliesQueueIndexes {
@@ -890,15 +891,77 @@ void createCommandPool() {
     }
 }
 
+// Подбираем тип памяти буффера вершин
+uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    // Запрашиваем типы памяти физического устройства
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(vulkanPhysicalDevice, &memProperties);
+    
+    // Найдем тип памяти, который подходит для самого буфера
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
 // Создание буфферов вершин
 void createVertexBuffer(){
+    // Удаляем старое, если есть
+    if(vulkanVertexBufferMemory != VK_NULL_HANDLE){
+        vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
+        vulkanVertexBufferMemory = VK_NULL_HANDLE;
+    }
+    if (vulkanVertexBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vulkanLogicalDevice, vulkanVertexBuffer, nullptr);
+        vulkanVertexBuffer = VK_NULL_HANDLE;
+    }
+    
+    // Описание формата буффера
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
-    // TODO: Drawing
-    // http://vulkanapi.ru/2016/11/20/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-34-%D1%81%D0%BE%D0%B7%D0%B4%D0%B0%D0%BD%D0%B8%D0%B5-%D0%B1%D1%83%D1%84%D0%B5%D1%80%D0%B0-%D0%B2%D0%B5%D1%80%D1%88%D0%B8%D0%BD/
+    // Непосредственно создание буффера
+    if (vkCreateBuffer(vulkanLogicalDevice, &bufferInfo, nullptr, &vulkanVertexBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create vertex buffer!");
+    }
+    
+    // Запрашиваем данные о необходимой памяти
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(vulkanLogicalDevice, vulkanVertexBuffer, &memRequirements);
+    
+    // Настройки аллокации буффера
+    uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits,
+                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryType;
+    
+    // Выделяем память для буффера
+    if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &vulkanVertexBufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate vertex buffer memory!");
+    }
+    
+    // Подцепляем память к буфферу
+    // Последний параметр – смещение в области памяти. Т.к. эта память выделяется специально для буфера вершин, смещение просто 0.
+    // Если же оно не будет равно нулю, то значение должно быть кратным memRequirements.alignment.
+    vkBindBufferMemory(vulkanLogicalDevice, vulkanVertexBuffer, vulkanVertexBufferMemory, 0);
+    
+    // Маппим видео-память в адресное пространство оперативной памяти
+    void* data = nullptr;
+    vkMapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    
+    // Копируем вершины в память
+    memcpy(data, TRIANGLE_VERTEXES.data(), (size_t)bufferInfo.size);
+    
+    // Размапим
+    vkUnmapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory);
 }
 
 // Создаем коммандные буфферы
@@ -954,8 +1017,13 @@ void createCommandBuffers() {
         // Устанавливаем пайплайн у коммандного буффера
         vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
         
+        // Привязываем вершинный буффер к пайлпайну
+        VkBuffer vertexBuffers[] = {vulkanVertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+        
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-        vkCmdDraw(vulkanCommandBuffers[i], 3, 1, 0, 0);
+        vkCmdDraw(vulkanCommandBuffers[i], TRIANGLE_VERTEXES.size(), 1, 0, 0);
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
@@ -1049,6 +1117,7 @@ void drawFrame() {
     }
 }
 
+// Коллбек, вызываемый при изменении размеров окна приложения
 void onGLFWWindowResized(GLFWwindow* window, int width, int height) {
     if (width == 0 || height == 0) return;
     recreateSwapChain();
@@ -1146,6 +1215,8 @@ int local_main(int argc, char** argv) {
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Очищаем Vulkan
+    vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
+    vkDestroyBuffer(vulkanLogicalDevice, vulkanVertexBuffer, nullptr);
     vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
     vkDestroySemaphore(vulkanLogicalDevice, vulkanRenderFinishedSemaphore, nullptr);
     vkDestroyCommandPool(vulkanLogicalDevice, vulkanCommandPool, nullptr);
