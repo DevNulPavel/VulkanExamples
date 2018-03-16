@@ -944,33 +944,104 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     allocInfo.memoryTypeIndex = memoryType;
     
     // Выделяем память для буффера
-    if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &vulkanVertexBufferMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate vertex buffer memory!");
     }
     
     // Подцепляем память к буфферу
     // Последний параметр – смещение в области памяти. Т.к. эта память выделяется специально для буфера вершин, смещение просто 0.
     // Если же оно не будет равно нулю, то значение должно быть кратным memRequirements.alignment.
-    vkBindBufferMemory(vulkanLogicalDevice, vulkanVertexBuffer, vulkanVertexBufferMemory, 0);
+    vkBindBufferMemory(vulkanLogicalDevice, buffer, bufferMemory, 0);
+}
+
+// Копирование буффера
+void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    // Настройка аллокации
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = vulkanCommandPool;
+    allocInfo.commandBufferCount = 1;
+    
+    // Создаем коммандный буффер
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(vulkanLogicalDevice, &allocInfo, &commandBuffer);
+    
+    // Описание запуска буффер комманд
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    
+    // Запускаем
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    
+    // Кидаем в очередь задание на копирование буфферов
+    VkBufferCopy copyRegion = {};
+    copyRegion.srcOffset = 0; // Optional
+    copyRegion.dstOffset = 0; // Optional
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+    
+    // Заканчиваем копирование
+    vkEndCommandBuffer(commandBuffer);
+    
+    // Описание добавления коммандного буффера
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    
+    // Добавляем коммандный буффер в очередь
+    vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    
+    // Ожидаем копирования
+    vkQueueWaitIdle(vulkanGraphicsQueue);
+    
+    // Освобождаем коммандный буффер
+    vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, 1, &commandBuffer);
 }
 
 // Создание буфферов вершин
 void createVertexBuffer(){
-    // Создаем буффер и память под него
+    // Размер буфферов
     VkDeviceSize bufferSize = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
-    createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 vulkanVertexBuffer, vulkanVertexBufferMemory);
+    
+    // Создание временного буффера для передачи данных
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
+                 stagingBuffer, stagingBufferMemory);
     
     // Маппим видео-память в адресное пространство оперативной памяти
     void* data = nullptr;
-    vkMapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, 0, bufferSize, 0, &data);
+    vkMapMemory(vulkanLogicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
     
     // Копируем вершины в память
     memcpy(data, TRIANGLE_VERTEXES.data(), (size_t)bufferSize);
     
     // Размапим
-    vkUnmapMemory(vulkanLogicalDevice, vulkanVertexBufferMemory);
+    vkUnmapMemory(vulkanLogicalDevice, stagingBufferMemory);
+    
+    // Создаем рабочий буффер
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,  // Буффер может принимать данные + для отрисовки используется
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится на видео-карте
+                 vulkanVertexBuffer, vulkanVertexBufferMemory);
+    
+    // Ставим задачу на копирование буфферов
+    copyBuffer(stagingBuffer, vulkanVertexBuffer, bufferSize);
+    
+    // Удаляем временный буффер, если есть
+    if(stagingBufferMemory != VK_NULL_HANDLE){
+        vkFreeMemory(vulkanLogicalDevice, stagingBufferMemory, nullptr);
+        stagingBufferMemory = VK_NULL_HANDLE;
+    }
+    if (stagingBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vulkanLogicalDevice, stagingBuffer, nullptr);
+        stagingBuffer = VK_NULL_HANDLE;
+    }
 }
 
 // Создаем коммандные буфферы
