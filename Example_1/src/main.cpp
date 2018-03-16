@@ -38,6 +38,8 @@ const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_stan
 #define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
+#define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
+
 
 GLFWwindow* window = nullptr;
 VkInstance vulkanInstance = VK_NULL_HANDLE;
@@ -66,6 +68,8 @@ VkSemaphore vulkanImageAvailableSemaphore = VK_NULL_HANDLE;
 VkSemaphore vulkanRenderFinishedSemaphore = VK_NULL_HANDLE;
 VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
+VkBuffer vulkanIndexBuffer = VK_NULL_HANDLE;
+VkDeviceMemory vulkanIndexBufferMemory = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -770,9 +774,10 @@ void createGraphicsPipeline() {
     
     // Настройка антиаллиасинга с помощью мультисемплинга
     VkPipelineMultisampleStateCreateInfo multisampling = {};
+    memset(&multisampling, 0, sizeof(VkPipelineMultisampleStateCreateInfo));
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;    // Кратность семплирования
+    multisampling.rasterizationSamples = APPLICATION_SAMPLING_VALUE;    // Кратность семплирования
     multisampling.minSampleShading = 1.0f;      // Optional
     multisampling.pSampleMask = nullptr;        // Optional
     multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
@@ -780,6 +785,7 @@ void createGraphicsPipeline() {
     
     // Настройки классического блендинга
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    memset(&colorBlendAttachment, 0, sizeof(VkPipelineColorBlendAttachmentState));
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
@@ -791,6 +797,7 @@ void createGraphicsPipeline() {
     
     // Настройка конкретного блендинга
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
+    memset(&colorBlending, 0, sizeof(VkPipelineColorBlendStateCreateInfo));
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
@@ -801,7 +808,9 @@ void createGraphicsPipeline() {
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
     
+    // Лаяут пайплайна
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    memset(&pipelineLayoutInfo, 0, sizeof(VkPipelineLayoutCreateInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 0; // Optional
     pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
@@ -815,6 +824,7 @@ void createGraphicsPipeline() {
     // Непосредственно создание пайплайна
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    memset(&pipelineInfo, 0, sizeof(VkGraphicsPipelineCreateInfo));
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
@@ -843,9 +853,11 @@ void createRenderPass() {
         vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
     }
     
+    // Описание подсоединенного буффера цвета
     VkAttachmentDescription colorAttachment = {};
+    memset(&colorAttachment, 0, sizeof(VkAttachmentDescription));
     colorAttachment.format = vulkanSwapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.samples = APPLICATION_SAMPLING_VALUE;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при начале работы с цветом+глубиной?
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // После завершения что делать?
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -853,22 +865,29 @@ void createRenderPass() {
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Изображение показывается в swap chain
     
+    // Референс присоединенного цвета
     VkAttachmentReference colorAttachmentRef = {};
+    memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     
+    // Подпроход
     VkSubpassDescription subPass = {};
+    memset(&subPass, 0, sizeof(VkSubpassDescription));
     subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subPass.colorAttachmentCount = 1;
     subPass.pColorAttachments = &colorAttachmentRef;
     
+    // Описание создания рендер-прохода
     VkRenderPassCreateInfo renderPassInfo = {};
+    memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subPass;
     
+    // Создаем ренде-проход
     if (vkCreateRenderPass(vulkanLogicalDevice, &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
@@ -876,7 +895,7 @@ void createRenderPass() {
 
 // Создаем фреймбуфферы
 void createFramebuffers(){
-    // Уничтожаем старые свопчейны
+    // Уничтожаем старые буфферы свопчейнов
     if (vulkanSwapChainFramebuffers.size() > 0) {
         for (const auto& buffer: vulkanSwapChainFramebuffers) {
             vkDestroyFramebuffer(vulkanLogicalDevice, buffer, nullptr);
@@ -889,9 +908,11 @@ void createFramebuffers(){
     for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
         VkImageView attachments[] = { vulkanSwapChainImageViews[i] };
         
+        // Информация для создания фрейб-буфферов
         VkFramebufferCreateInfo framebufferInfo = {};
+        memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = vulkanRenderPass;
+        framebufferInfo.renderPass = vulkanRenderPass;  // Используем стандартный рендер-проход
         framebufferInfo.attachmentCount = 1;
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = vulkanSwapChainExtent.width;
@@ -906,7 +927,9 @@ void createFramebuffers(){
 
 // Создаем пулл комманд
 void createCommandPool() {
+    // Информация о пуле коммандных буфферов
     VkCommandPoolCreateInfo poolInfo = {};
+    memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;
     poolInfo.flags = 0; // Optional
@@ -946,6 +969,7 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     
     // Описание формата буффера
     VkBufferCreateInfo bufferInfo = {};
+    memset(&bufferInfo, 0, sizeof(VkBufferCreateInfo));
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
     bufferInfo.usage = usage;
@@ -961,12 +985,13 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     vkGetBufferMemoryRequirements(vulkanLogicalDevice, buffer, &memRequirements);
     
     // Настройки аллокации буффера
-    uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits,
-                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    uint32_t memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkMemoryAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = memoryType;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
     
     // Выделяем память для буффера
     if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
@@ -983,6 +1008,7 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     // Настройка аллокации
     VkCommandBufferAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandPool = vulkanCommandPool;
@@ -994,6 +1020,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     
     // Описание запуска буффер комманд
     VkCommandBufferBeginInfo beginInfo = {};
+    memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     
@@ -1002,6 +1029,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     
     // Кидаем в очередь задание на копирование буфферов
     VkBufferCopy copyRegion = {};
+    memset(&copyRegion, 0, sizeof(VkBufferCopy));
     copyRegion.srcOffset = 0; // Optional
     copyRegion.dstOffset = 0; // Optional
     copyRegion.size = size;
@@ -1012,6 +1040,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
     
     // Описание добавления коммандного буффера
     VkSubmitInfo submitInfo = {};
+    memset(&submitInfo, 0, sizeof(VkSubmitInfo));
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
@@ -1029,7 +1058,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
 // Создание буфферов вершин
 void createVertexBuffer(){
     // Размер буфферов
-    VkDeviceSize bufferSize = sizeof(TRIANGLE_VERTEXES[0]) * TRIANGLE_VERTEXES.size();
+    VkDeviceSize bufferSize = sizeof(QUAD_VERTEXES[0]) * QUAD_VERTEXES.size();
     
     // Создание временного буффера для передачи данных
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -1044,7 +1073,7 @@ void createVertexBuffer(){
     vkMapMemory(vulkanLogicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
     
     // Копируем вершины в память
-    memcpy(data, TRIANGLE_VERTEXES.data(), (size_t)bufferSize);
+    memcpy(data, QUAD_VERTEXES.data(), (size_t)bufferSize);
     
     // Размапим
     vkUnmapMemory(vulkanLogicalDevice, stagingBufferMemory);
@@ -1057,6 +1086,47 @@ void createVertexBuffer(){
     
     // Ставим задачу на копирование буфферов
     copyBuffer(stagingBuffer, vulkanVertexBuffer, bufferSize);
+    
+    // Удаляем временный буффер, если есть
+    if(stagingBufferMemory != VK_NULL_HANDLE){
+        vkFreeMemory(vulkanLogicalDevice, stagingBufferMemory, nullptr);
+        stagingBufferMemory = VK_NULL_HANDLE;
+    }
+    if (stagingBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vulkanLogicalDevice, stagingBuffer, nullptr);
+        stagingBuffer = VK_NULL_HANDLE;
+    }
+}
+
+// Создание буффера индексов
+void createIndexBuffer() {
+    VkDeviceSize bufferSize = sizeof(QUAD_INDICES[0]) * QUAD_INDICES.size();
+    
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+    
+    // Маппим видео-память в адресное пространство оперативной памяти
+    void* data = nullptr;
+    vkMapMemory(vulkanLogicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+    
+    // Копируем данные
+    memcpy(data, QUAD_INDICES.data(), (size_t)bufferSize);
+    
+    // Размапим память
+    vkUnmapMemory(vulkanLogicalDevice, stagingBufferMemory);
+    
+    // Создаем рабочий буффер
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, // Используется как получатель + индексный буффер
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 vulkanIndexBuffer, vulkanIndexBufferMemory);
+    
+    // Ставим задачу на копирование буфферов
+    copyBuffer(stagingBuffer, vulkanIndexBuffer, bufferSize);
     
     // Удаляем временный буффер, если есть
     if(stagingBufferMemory != VK_NULL_HANDLE){
@@ -1082,6 +1152,7 @@ void createCommandBuffers() {
     
     // Настройки создания коммандного буффера
     VkCommandBufferAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = vulkanCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1095,6 +1166,7 @@ void createCommandBuffers() {
     for (size_t i = 0; i < vulkanCommandBuffers.size(); i++) {
         // Информация о запуске коммандного буффера
         VkCommandBufferBeginInfo beginInfo = {};
+        memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
         beginInfo.pInheritanceInfo = nullptr; // Optional
@@ -1103,16 +1175,15 @@ void createCommandBuffers() {
         vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
         
         // Информация о запуске рендер-прохода
+        VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        VkClearValue clearSetup = {clearColor};
         VkRenderPassBeginInfo renderPassInfo = {};
+        memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = vulkanRenderPass;   // Рендер проход
         renderPassInfo.framebuffer = vulkanSwapChainFramebuffers[i];    // Фреймбуффер смены кадров
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = vulkanSwapChainExtent;
-        
-        // Настройка рендер прохода
-        VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        VkClearValue clearSetup = {clearColor};
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearSetup;
         
@@ -1127,8 +1198,13 @@ void createCommandBuffers() {
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
         
+        // Привязываем индексный буффер к пайплайну
+        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-        vkCmdDraw(vulkanCommandBuffers[i], TRIANGLE_VERTEXES.size(), 1, 0, 0);
+        //vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        vkCmdDrawIndexed(vulkanCommandBuffers[i], QUAD_INDICES.size(), 1, 0, 0, 0);
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
@@ -1143,6 +1219,7 @@ void createCommandBuffers() {
 // Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
 void createSemaphores(){
     VkSemaphoreCreateInfo semaphoreInfo = {};
+    memset(&semaphoreInfo, 0, sizeof(VkSemaphoreCreateInfo));
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     
     if (vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphore) != VK_SUCCESS ||
@@ -1186,6 +1263,7 @@ void drawFrame() {
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем возможности вывода в буфер цвета
     VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore}; // Семафор оповещения о завершении рендеринга
     VkSubmitInfo submitInfo = {};
+    memset(&submitInfo, 0, sizeof(VkSubmitInfo));
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
@@ -1289,6 +1367,9 @@ int local_main(int argc, char** argv) {
     // Создание буфферов вершин
     createVertexBuffer();
     
+    // Создание индексного буффера
+    createIndexBuffer();
+    
     // Создаем коммандные буфферы
     createCommandBuffers();
     
@@ -1321,6 +1402,8 @@ int local_main(int argc, char** argv) {
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Очищаем Vulkan
+    vkFreeMemory(vulkanLogicalDevice, vulkanIndexBufferMemory, nullptr);
+    vkDestroyBuffer(vulkanLogicalDevice, vulkanIndexBuffer, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
     vkDestroyBuffer(vulkanLogicalDevice, vulkanVertexBuffer, nullptr);
     vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
