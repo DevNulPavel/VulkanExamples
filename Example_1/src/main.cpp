@@ -25,11 +25,13 @@
 
 // GLM
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "CommonDefines.h"
 #include "CommonConstants.h"
 #include "Vertex.h"
 #include "Figures.h"
+#include "UniformBuffer.h"
 
 
 #define VALIDATION_LAYERS_COUNT 1
@@ -59,6 +61,7 @@ std::vector<VkImageView> vulkanSwapChainImageViews;
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
 VkShaderModule vulkanFragmentShader = VK_NULL_HANDLE;
 VkRenderPass vulkanRenderPass = VK_NULL_HANDLE;
+VkDescriptorSetLayout vulkanDescriptorSetLayout = VK_NULL_HANDLE;
 VkPipelineLayout vulkanPipelineLayout = VK_NULL_HANDLE;
 VkPipeline vulkanPipeline = VK_NULL_HANDLE;
 std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
@@ -70,6 +73,14 @@ VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanIndexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanIndexBufferMemory = VK_NULL_HANDLE;
+VkBuffer vulkanUniformStagingBuffer = VK_NULL_HANDLE;
+VkDeviceMemory vulkanUniformStagingBufferMemory = VK_NULL_HANDLE;
+VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
+VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+float rotateAngle = 0.0f;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -662,6 +673,25 @@ void createImageViews() {
     }
 }
 
+// Создаем дескриптор для буффера юниформов
+void createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Предназначен буффер для вершинного шейдера
+    uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+    
+    if (vkCreateDescriptorSetLayout(vulkanLogicalDevice, &layoutInfo, nullptr, &vulkanDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+}
+
 // Из байткода исходника создаем шейдерный модуль
 void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule) {
     VkShaderModuleCreateInfo createInfo = {};
@@ -809,11 +839,12 @@ void createGraphicsPipeline() {
     colorBlending.blendConstants[3] = 0.0f;
     
     // Лаяут пайплайна
+    VkDescriptorSetLayout setLayouts[] = {vulkanDescriptorSetLayout};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     memset(&pipelineLayoutInfo, 0, sizeof(VkPipelineLayoutCreateInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+    pipelineLayoutInfo.setLayoutCount = 1; // Optional
+    pipelineLayoutInfo.pSetLayouts = setLayouts; // Optional
     pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
     pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
     
@@ -1139,6 +1170,20 @@ void createIndexBuffer() {
     }
 }
 
+// Создаем буффер юниформов
+void createUniformBuffer() {
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 vulkanUniformStagingBuffer, vulkanUniformStagingBufferMemory);
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 vulkanUniformBuffer, vulkanUniformBufferMemory);
+}
+
 // Создаем коммандные буфферы
 void createCommandBuffers() {
 
@@ -1201,6 +1246,9 @@ void createCommandBuffers() {
         // Привязываем индексный буффер к пайплайну
         vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
         
+        // Привязываем юниформ буффер к коммандному буфферу
+        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         //vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
@@ -1240,6 +1288,28 @@ void recreateSwapChain() {
     createGraphicsPipeline();
     createFramebuffers();
     createCommandBuffers();
+}
+
+// Обновляем юниформ буффер
+void updateUniformBuffer(float delta){
+    rotateAngle += delta * 10.0f;
+    
+    UniformBufferObject ubo = {};
+    memset(&ubo, 0, sizeof(UniformBufferObject));
+    ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // TODO: Верх!!!
+    ubo.proj = glm::perspective(glm::radians(45.0f), vulkanSwapChainExtent.width / (float)vulkanSwapChainExtent.height, 0.1f, 10.0f);
+    
+    // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
+    // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
+    ubo.proj[1][1] *= -1;
+    
+    void* data = nullptr;
+    vkMapMemory(vulkanLogicalDevice, vulkanUniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(vulkanLogicalDevice, vulkanUniformStagingBufferMemory);
+    
+    copyBuffer(vulkanUniformStagingBuffer, vulkanUniformBuffer, sizeof(ubo));
 }
 
 // Непосредственно отрисовка кадра
@@ -1355,6 +1425,9 @@ int local_main(int argc, char** argv) {
     // Создание рендер-прохода
     createRenderPass();
     
+    // Создаем дескриптор для буффера юниформов
+    createDescriptorSetLayout();
+    
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
     
@@ -1370,6 +1443,9 @@ int local_main(int argc, char** argv) {
     // Создание индексного буффера
     createIndexBuffer();
     
+    // Создаем буффер юниформов
+    createUniformBuffer();
+    
     // Создаем коммандные буфферы
     createCommandBuffers();
     
@@ -1381,6 +1457,9 @@ int local_main(int argc, char** argv) {
     double lastFrameDuration = 1.0/60.0;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        
+        // Обновляем юниформы
+        updateUniformBuffer(lastFrameDuration);
         
         // Непосредственно отрисовка кадра
         drawFrame();
@@ -1402,6 +1481,10 @@ int local_main(int argc, char** argv) {
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Очищаем Vulkan
+    vkDestroyBuffer(vulkanLogicalDevice, vulkanUniformStagingBuffer, nullptr);
+    vkFreeMemory(vulkanLogicalDevice, vulkanUniformStagingBufferMemory, nullptr);
+    vkDestroyBuffer(vulkanLogicalDevice, vulkanUniformBuffer, nullptr);
+    vkFreeMemory(vulkanLogicalDevice, vulkanUniformBufferMemory, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanIndexBufferMemory, nullptr);
     vkDestroyBuffer(vulkanLogicalDevice, vulkanIndexBuffer, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
@@ -1414,6 +1497,7 @@ int local_main(int argc, char** argv) {
     }
     vkDestroyPipeline(vulkanLogicalDevice, vulkanPipeline, nullptr);
     vkDestroyPipelineLayout(vulkanLogicalDevice, vulkanPipelineLayout, nullptr);
+    vkDestroyDescriptorSetLayout(vulkanLogicalDevice, vulkanDescriptorSetLayout, nullptr);
     vkDestroyShaderModule(vulkanLogicalDevice, vulkanVertexShader, nullptr);
     vkDestroyShaderModule(vulkanLogicalDevice, vulkanFragmentShader, nullptr);
     vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);

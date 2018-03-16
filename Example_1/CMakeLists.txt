@@ -192,7 +192,9 @@ set(ALL_SOURCES
     src/Vertex.h
     src/Vertex.cpp
     src/Figures.h
-    src/Figures.cpp)
+    src/Figures.cpp
+    src/UniformBuffer.h
+    src/UniformBuffer.cpp)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 
