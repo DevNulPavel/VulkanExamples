@@ -1692,6 +1692,9 @@ void createSemaphores(){
 
 // Вызывается при различных ресайзах окна
 void recreateSwapChain() {
+    // Ждем завершения работы Vulkan
+    vkQueueWaitIdle(vulkanGraphicsQueue);
+    vkQueueWaitIdle(vulkanPresentQueue);
     vkDeviceWaitIdle(vulkanLogicalDevice);
     
     // Заново пересоздаем свопчейны, старые удалятся внутри
