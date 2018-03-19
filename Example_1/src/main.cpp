@@ -108,8 +108,8 @@ float rotateAngle = 0.0f;
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct FamiliesQueueIndexes {
-    int renderQueueFamilyIndex;
-    int presentQueueFamilyIndex;
+    int renderQueueFamilyIndex;     // Индекс семейства очередей отрисовки
+    int presentQueueFamilyIndex;    // Индекс семейства очередей отображения
     
     FamiliesQueueIndexes(){
         renderQueueFamilyIndex = -1;
@@ -606,13 +606,13 @@ void createSwapChain() {
     VkSwapchainCreateInfoKHR createInfo = {};
     memset(&createInfo, 0, sizeof(VkSwapchainCreateInfoKHR));
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = vulkanSurface;
-    createInfo.minImageCount = imageCount;
-    createInfo.imageFormat = surfaceFormat.format;
-    createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = extent;
+    createInfo.surface = vulkanSurface;         // Плоскость отрисовки текущего окна
+    createInfo.minImageCount = imageCount;      // Количество изображений в буффере
+    createInfo.imageFormat = surfaceFormat.format; // Формат отображения
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;  // Цветовое пространство
+    createInfo.imageExtent = extent;    // Границы окна
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;    // Картинки используются в качестве буффера цвета
     
     // Если у нас разные очереди для рендеринга и отображения -
     if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
@@ -628,8 +628,8 @@ void createSwapChain() {
         createInfo.pQueueFamilyIndices = nullptr; // Optional
     }
     
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
+    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     
@@ -652,6 +652,7 @@ void createSwapChain() {
     // Получаем изображения для отображения
     uint32_t imagesCount = 0;
     vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
+    
     vulkanSwapChainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, vulkanSwapChainImages.data());
     
@@ -659,23 +660,32 @@ void createSwapChain() {
     vulkanSwapChainExtent = extent;
 }
 
+// Создание вью для изображения
 void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView) {
+    // Удаляем старый объект, если есть
     if(imageView != VK_NULL_HANDLE){
         vkDestroyImageView(vulkanLogicalDevice, imageView, nullptr);
         imageView = VK_NULL_HANDLE;
     }
     
+    // Описание вьюшки
     VkImageViewCreateInfo viewInfo = {};
+    memset(&viewInfo, 0, sizeof(VkImageViewCreateInfo));
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.image = image; // Изображение
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 2D
+    viewInfo.format = format;   // Формат вьюшки
+    viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
+    viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
+    viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
+    viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
+    viewInfo.subresourceRange.aspectMask = aspectFlags; // Использование вью текстуры
+    viewInfo.subresourceRange.baseMipLevel = 0; // 0 мипмаплевел
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
     
+    // Создаем имедж вью
     if (vkCreateImageView(vulkanLogicalDevice, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture image view!");
     }
@@ -691,35 +701,43 @@ void createImageViews() {
         vulkanSwapChainImageViews.clear();
     }
     
+    // Ресайз массива
     vulkanSwapChainImageViews.resize(vulkanSwapChainImages.size());
     
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
+        // Создаем вьюшку с типом использования цвета
         createImageView(vulkanSwapChainImages[i], vulkanSwapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, vulkanSwapChainImageViews[i]);
     }
 }
 
 // Создаем дескриптор для буффера юниформов
 void createDescriptorSetLayout() {
+    // Лаяут для юниформ буффера
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    memset(&uboLayoutBinding, 0, sizeof(VkDescriptorSetLayoutBinding));
+    uboLayoutBinding.binding = 0;   // Юниформ буффер находится на 0 позиции
     uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Предназначен буффер для вершинного шейдера
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;    // Тип - юниформ буффер
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Предназначен буффер толкьо для вершинного шейдера, можно подрубить другие
     uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
     
+    // Лаяут для семплера
     VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-    samplerLayoutBinding.binding = 1;
+    memset(&samplerLayoutBinding, 0, sizeof(VkDescriptorSetLayoutBinding));
+    samplerLayoutBinding.binding = 1;   // Находится на 1й позиции
     samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;    // Семплер для текстуры
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Предназначено для фрагментного шейдера
     samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     
+    // Биндинги
     std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{uboLayoutBinding, samplerLayoutBinding}};
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = bindings.size();
     layoutInfo.pBindings = bindings.data();
     
+    // Создаем лаяут для шейдера
     if (vkCreateDescriptorSetLayout(vulkanLogicalDevice, &layoutInfo, nullptr, &vulkanDescriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
     }
@@ -774,12 +792,14 @@ void createGraphicsPipeline() {
     fragShaderStageInfo.module = vulkanFragmentShader;
     fragShaderStageInfo.pName = "main";
     
+    // Описание настроек глубины и трафарета
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+    memset(&depthStencil, 0, sizeof(VkPipelineDepthStencilStateCreateInfo));
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.depthTestEnable = VK_TRUE;     // Тест глубины включен
+    depthStencil.depthWriteEnable = VK_TRUE;    // Запись глубины включена
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;   // Функция глубины
+    depthStencil.depthBoundsTestEnable = VK_FALSE;  // TODO: ???
     depthStencil.minDepthBounds = 0.0f; // Optional
     depthStencil.maxDepthBounds = 1.0f; // Optional
     depthStencil.stencilTestEnable = VK_FALSE;
@@ -790,14 +810,14 @@ void createGraphicsPipeline() {
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
     std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = Vertex::getAttributeDescriptions();
     
-    // Описание формата входных данны
+    // Описание формата входных данных
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     memset(&vertexInputInfo, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription; // Optional
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
     vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptions.size();
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data(); // Optional
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
     
     // Топология вершин
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -843,8 +863,8 @@ void createGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;  // Графика рисуется в буффер кадра
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // Заполненные полигоны
     rasterizer.lineWidth = 1.0f;                    // Толщина линии
-    rasterizer.cullMode = VK_CULL_MODE_NONE;        // Отключаем кулинг
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Обход против часовой стрелки для фронтальной стороны
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;        //  Задняя часть
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // Обход по часовой стрелке для фронтальной стороны
     rasterizer.depthBiasEnable = VK_FALSE;          // Смещение по глубине отключено
     
     // Настройка антиаллиасинга с помощью мультисемплинга
@@ -861,14 +881,14 @@ void createGraphicsPipeline() {
     // Настройки классического блендинга
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     memset(&colorBlendAttachment, 0, sizeof(VkPipelineColorBlendAttachmentState));
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;    // Цвета, которые пишем
+    colorBlendAttachment.blendEnable = VK_FALSE;    // Блендинг выключен
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     
     // Настройка конкретного блендинга
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
@@ -896,6 +916,8 @@ void createGraphicsPipeline() {
     if (vkCreatePipelineLayout(vulkanLogicalDevice, &pipelineLayoutInfo, nullptr, &vulkanPipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
+    
+    // TODO: Наследование позволяет ускорить переключение пайплайнов с общим родителем
     
     // Непосредственно создание пайплайна
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
@@ -1252,7 +1274,7 @@ void createTextureImage() {
     int texWidth = 0;
     int texHeight = 0;
     int texChannels = 0;
-    stbi_uc* pixels = stbi_load("res/textures/chalet.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("res/textures/chalet.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha); // STBI_rgb_alpha STBI_default
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     
     if (!pixels) {
@@ -1899,6 +1921,7 @@ int local_main(int argc, char** argv) {
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
     double lastFrameDuration = 1.0/60.0;
+    int totalFrames = 0;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         
@@ -1917,6 +1940,15 @@ int local_main(int argc, char** argv) {
         // Расчет времени кадра
         lastFrameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0;
         lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
+        
+        // FPS
+        totalFrames++;
+        if (totalFrames > 60) {
+            totalFrames = 0;
+            char outText[64];
+            sprintf(outText, "Possible FPS: %d, sleep duration: %lldms", static_cast<int>(1.0/lastFrameDuration), std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count());
+            glfwSetWindowTitle(window, outText);
+        }
    }
     
     // Ждем завершения работы Vulkan
