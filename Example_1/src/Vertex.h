@@ -9,10 +9,12 @@
 #include <GLFW/glfw3.h>
 
 // GLM
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
     
@@ -32,7 +34,7 @@ struct Vertex {
         memset(&attributeDescriptions[0], 0, sizeof(VkVertexInputAttributeDescription));
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;  // 0 в шейдере
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
         // Цвет
         memset(&attributeDescriptions[1], 0, sizeof(VkVertexInputAttributeDescription));

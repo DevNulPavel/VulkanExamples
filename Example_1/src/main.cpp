@@ -24,6 +24,8 @@
 #include <GLFW/glfw3.h>
 
 // GLM
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -60,6 +62,7 @@ VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
 VkSwapchainKHR vulkanSwapchain = VK_NULL_HANDLE;
 std::vector<VkImage> vulkanSwapChainImages;
 VkFormat vulkanSwapChainImageFormat = VK_FORMAT_UNDEFINED;
+VkFormat vulkanDepthFormat = VK_FORMAT_UNDEFINED;
 VkExtent2D vulkanSwapChainExtent = {0, 0};
 std::vector<VkImageView> vulkanSwapChainImageViews;
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
@@ -87,6 +90,9 @@ VkImage vulkanTextureImage = VK_NULL_HANDLE;
 VkDeviceMemory vulkanTextureImageMemory = VK_NULL_HANDLE;
 VkImageView vulkanTextureImageView = VK_NULL_HANDLE;
 VkSampler vulkanTextureSampler = VK_NULL_HANDLE;
+VkImage vulkanDepthImage = VK_NULL_HANDLE;
+VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
+VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -646,7 +652,7 @@ void createSwapChain() {
     vulkanSwapChainExtent = extent;
 }
 
-void createImageView(VkImage image, VkFormat format, VkImageView& imageView) {
+void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView) {
     if(imageView != VK_NULL_HANDLE){
         vkDestroyImageView(vulkanLogicalDevice, imageView, nullptr);
         imageView = VK_NULL_HANDLE;
@@ -657,7 +663,7 @@ void createImageView(VkImage image, VkFormat format, VkImageView& imageView) {
     viewInfo.image = image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -681,7 +687,7 @@ void createImageViews() {
     vulkanSwapChainImageViews.resize(vulkanSwapChainImages.size());
     
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
-        createImageView(vulkanSwapChainImages[i], vulkanSwapChainImageFormat, vulkanSwapChainImageViews[i]);
+        createImageView(vulkanSwapChainImages[i], vulkanSwapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, vulkanSwapChainImageViews[i]);
     }
 }
 
@@ -916,11 +922,25 @@ void createRenderPass() {
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Изображение показывается в swap chain
     
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = vulkanDepthFormat;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
     // Референс присоединенного цвета
     VkAttachmentReference colorAttachmentRef = {};
     memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    
+    VkAttachmentReference depthAttachmentRef = {};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     
     // Подпроход
     VkSubpassDescription subPass = {};
@@ -928,15 +948,19 @@ void createRenderPass() {
     subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subPass.colorAttachmentCount = 1;
     subPass.pColorAttachments = &colorAttachmentRef;
+    subPass.pDepthStencilAttachment = &depthAttachmentRef;
     
     // Описание создания рендер-прохода
+    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};
     VkRenderPassCreateInfo renderPassInfo = {};
     memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = attachments.size();
+    renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subPass;
+    renderPassInfo.dependencyCount = 0;
+    renderPassInfo.pDependencies = nullptr;
     
     // Создаем ренде-проход
     if (vkCreateRenderPass(vulkanLogicalDevice, &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
@@ -957,15 +981,18 @@ void createFramebuffers(){
     vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
     
     for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
-        VkImageView attachments[] = { vulkanSwapChainImageViews[i] };
+        std::array<VkImageView, 2> attachments = {
+            {vulkanSwapChainImageViews[i],
+                vulkanDepthImageView}
+        };
         
         // Информация для создания фрейб-буфферов
         VkFramebufferCreateInfo framebufferInfo = {};
         memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = vulkanRenderPass;  // Используем стандартный рендер-проход
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.attachmentCount = attachments.size();
+        framebufferInfo.pAttachments = attachments.data();
         framebufferInfo.width = vulkanSwapChainExtent.width;
         framebufferInfo.height = vulkanSwapChainExtent.height;
         framebufferInfo.layers = 1;
@@ -1087,6 +1114,10 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, 1, &commandBuffer);
 }
 
+bool hasStencilComponent(VkFormat format) {
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
 void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
     
@@ -1112,8 +1143,21 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     } else {
         throw std::invalid_argument("unsupported layout transition!");
+    }
+    
+    if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        
+        if (hasStencilComponent(format)) {
+            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    } else {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     }
     
     vkCmdPipelineBarrier(commandBuffer,
@@ -1150,6 +1194,36 @@ void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t heig
                    1, &region);
     
     endSingleTimeCommands(commandBuffer);
+}
+
+VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+    for (VkFormat format : candidates) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(vulkanPhysicalDevice, format, &props);
+        
+        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+            return format;
+        } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+            return format;
+        }
+    }
+    
+    throw std::runtime_error("failed to find supported format!");
+}
+
+VkFormat findDepthFormat() {
+    vulkanDepthFormat = findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+                               VK_IMAGE_TILING_OPTIMAL,
+                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    return vulkanDepthFormat;
+}
+
+// Создаем буфферы для глубины
+void createDepthResources() {
+    createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height, vulkanDepthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vulkanDepthImage, vulkanDepthImageMemory);
+    createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
+    
+    transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 // Создание текстуры из изображения
@@ -1215,7 +1289,7 @@ void createTextureImage() {
 }
 
 void createTextureImageView() {
-    createImageView(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, vulkanTextureImageView);
+    createImageView(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, vulkanTextureImageView);
 }
 
 // Создание семплера для картинки
@@ -1504,8 +1578,10 @@ void createCommandBuffers() {
         vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
         
         // Информация о запуске рендер-прохода
-        VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        VkClearValue clearSetup = {clearColor};
+        std::array<VkClearValue, 2> clearValues = {};
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        
         VkRenderPassBeginInfo renderPassInfo = {};
         memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1513,8 +1589,8 @@ void createCommandBuffers() {
         renderPassInfo.framebuffer = vulkanSwapChainFramebuffers[i];    // Фреймбуффер смены кадров
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = vulkanSwapChainExtent;
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearSetup;
+        renderPassInfo.clearValueCount = clearValues.size();
+        renderPassInfo.pClearValues = clearValues.data();
         
         // Запуск рендер-прохода
         vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1584,7 +1660,7 @@ void updateUniformBuffer(float delta){
     UniformBufferObject ubo = {};
     memset(&ubo, 0, sizeof(UniformBufferObject));
     ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, -3.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), vulkanSwapChainExtent.width / (float)vulkanSwapChainExtent.height, 0.1f, 10.0f);
     
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
@@ -1709,6 +1785,9 @@ int local_main(int argc, char** argv) {
     // Создание вьюшек изображений буффера кадра
     createImageViews();
     
+    // Ищем формат буффера глубины
+    findDepthFormat();
+    
     // Создание рендер-прохода
     createRenderPass();
     
@@ -1718,12 +1797,15 @@ int local_main(int argc, char** argv) {
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
     
-    // Создаем фреймбуфферы
-    createFramebuffers();
-    
     // Создаем пулл комманд
     createCommandPool();
 
+    // Создаем ресурсы для глубины
+    createDepthResources();
+    
+    // Создаем фреймбуфферы
+    createFramebuffers();
+    
     // Создание текстуры из изображения
     createTextureImage();
     
@@ -1784,6 +1866,9 @@ int local_main(int argc, char** argv) {
     
     // Очищаем Vulkan
     // Удаляем старые объекты
+    vkDestroyImage(vulkanLogicalDevice, vulkanDepthImage, nullptr);
+    vkFreeMemory(vulkanLogicalDevice, vulkanDepthImageMemory, nullptr);
+    vkDestroyImageView(vulkanLogicalDevice, vulkanDepthImageView, nullptr);
     vkDestroySampler(vulkanLogicalDevice, vulkanTextureSampler, nullptr);
     vkDestroyImageView(vulkanLogicalDevice, vulkanTextureImageView, nullptr);
     vkDestroyImage(vulkanLogicalDevice, vulkanTextureImage, nullptr);
