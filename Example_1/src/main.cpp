@@ -756,6 +756,74 @@ void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderMod
     }
 }
 
+// Создание рендер-прохода
+void createRenderPass() {
+    // Уничтожаем старый рендер пасс, если был уже
+    if(vulkanRenderPass != VK_NULL_HANDLE){
+        vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
+    }
+    
+    // Описание подсоединенного буффера цвета
+    VkAttachmentDescription colorAttachment = {};
+    memset(&colorAttachment, 0, sizeof(VkAttachmentDescription));
+    colorAttachment.format = vulkanSwapChainImageFormat;    // Формат буфферов цвета кадра
+    colorAttachment.samples = APPLICATION_SAMPLING_VALUE;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при начале работы с цветом?
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // После завершения что делать?
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Что делать с трафаретом при начале
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;  // Что делать с трафаретом после
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;  // TODO: ???
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Изображение показывается в swap chain
+    
+    // Описание присоединенного буффера глубины
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = vulkanDepthFormat; //  Формат
+    depthAttachment.samples = APPLICATION_SAMPLING_VALUE; // Уровень семплирования
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при загрузке буффера глубины?
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Что делать после отрисовки с буффером глубины - буффер не рисуется, так что пофик на него
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+    // Референс присоединенного цвета
+    VkAttachmentReference colorAttachmentRef = {};
+    memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    
+    // Референс присоединенного буффера глубины
+    VkAttachmentReference depthAttachmentRef = {};
+    memset(&depthAttachmentRef, 0, sizeof(VkAttachmentReference));
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+    // Подпроход
+    VkSubpassDescription subPass = {};
+    memset(&subPass, 0, sizeof(VkSubpassDescription));
+    subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subPass.colorAttachmentCount = 1;
+    subPass.pColorAttachments = &colorAttachmentRef;
+    subPass.pDepthStencilAttachment = &depthAttachmentRef;
+    
+    // Описание создания рендер-прохода
+    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};
+    VkRenderPassCreateInfo renderPassInfo = {};
+    memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = attachments.size();
+    renderPassInfo.pAttachments = attachments.data();
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subPass;
+    renderPassInfo.dependencyCount = 0;
+    renderPassInfo.pDependencies = nullptr;
+    
+    // Создаем ренде-проход
+    if (vkCreateRenderPass(vulkanLogicalDevice, &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create render pass!");
+    }
+}
+
 // Создание пайплайна отрисовки
 void createGraphicsPipeline() {
     // Уничтожаем старое
@@ -904,14 +972,14 @@ void createGraphicsPipeline() {
     colorBlending.blendConstants[3] = 0.0f;
     
     // Лаяут пайплайна
-    VkDescriptorSetLayout setLayouts[] = {vulkanDescriptorSetLayout};
+    VkDescriptorSetLayout setLayouts[] = {vulkanDescriptorSetLayout};   // Лаяют для юниформ буффер и семплера
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     memset(&pipelineLayoutInfo, 0, sizeof(VkPipelineLayoutCreateInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1; // Optional
-    pipelineLayoutInfo.pSetLayouts = setLayouts; // Optional
-    pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-    pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = 0;
     
     if (vkCreatePipelineLayout(vulkanLogicalDevice, &pipelineLayoutInfo, nullptr, &vulkanPipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
@@ -935,7 +1003,7 @@ void createGraphicsPipeline() {
     pipelineInfo.layout = vulkanPipelineLayout;
     pipelineInfo.renderPass = vulkanRenderPass;
     pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;   // Родительский пайплайн
     pipelineInfo.pDepthStencilState = &depthStencil; // Optional
     pipelineInfo.pDynamicState = nullptr; // Optional
     
@@ -944,70 +1012,6 @@ void createGraphicsPipeline() {
     }
 }
 
-// Создание рендер-прохода
-void createRenderPass() {
-    // Уничтожаем старый рендер пасс, если был уже
-    if(vulkanRenderPass != VK_NULL_HANDLE){
-        vkDestroyRenderPass(vulkanLogicalDevice, vulkanRenderPass, nullptr);
-    }
-    
-    // Описание подсоединенного буффера цвета
-    VkAttachmentDescription colorAttachment = {};
-    memset(&colorAttachment, 0, sizeof(VkAttachmentDescription));
-    colorAttachment.format = vulkanSwapChainImageFormat;
-    colorAttachment.samples = APPLICATION_SAMPLING_VALUE;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при начале работы с цветом+глубиной?
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // После завершения что делать?
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Изображение показывается в swap chain
-    
-    VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = vulkanDepthFormat;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    // Референс присоединенного цвета
-    VkAttachmentReference colorAttachmentRef = {};
-    memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    VkAttachmentReference depthAttachmentRef = {};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    // Подпроход
-    VkSubpassDescription subPass = {};
-    memset(&subPass, 0, sizeof(VkSubpassDescription));
-    subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subPass.colorAttachmentCount = 1;
-    subPass.pColorAttachments = &colorAttachmentRef;
-    subPass.pDepthStencilAttachment = &depthAttachmentRef;
-    
-    // Описание создания рендер-прохода
-    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};
-    VkRenderPassCreateInfo renderPassInfo = {};
-    memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = attachments.size();
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subPass;
-    renderPassInfo.dependencyCount = 0;
-    renderPassInfo.pDependencies = nullptr;
-    
-    // Создаем ренде-проход
-    if (vkCreateRenderPass(vulkanLogicalDevice, &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
-    }
-}
 
 // Создаем фреймбуфферы
 void createFramebuffers(){
