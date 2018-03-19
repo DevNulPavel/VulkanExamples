@@ -86,6 +86,7 @@ VkDescriptorSet vulkanDescriptorSet = VK_NULL_HANDLE;
 VkImage vulkanTextureImage = VK_NULL_HANDLE;
 VkDeviceMemory vulkanTextureImageMemory = VK_NULL_HANDLE;
 VkImageView vulkanTextureImageView = VK_NULL_HANDLE;
+VkSampler vulkanTextureSampler = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -693,10 +694,18 @@ void createDescriptorSetLayout() {
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Предназначен буффер для вершинного шейдера
     uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
     
+    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{uboLayoutBinding, samplerLayoutBinding}};
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
+    layoutInfo.bindingCount = bindings.size();
+    layoutInfo.pBindings = bindings.data();
     
     if (vkCreateDescriptorSetLayout(vulkanLogicalDevice, &layoutInfo, nullptr, &vulkanDescriptorSetLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout!");
@@ -754,7 +763,7 @@ void createGraphicsPipeline() {
     
     // Описание вершин
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = Vertex::getAttributeDescriptions();
+    std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = Vertex::getAttributeDescriptions();
     
     // Описание формата входных данны
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
@@ -1209,6 +1218,31 @@ void createTextureImageView() {
     createImageView(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, vulkanTextureImageView);
 }
 
+// Создание семплера для картинки
+void createTextureSampler() {
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = 16;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+    
+    if (vkCreateSampler(vulkanLogicalDevice, &samplerInfo, nullptr, &vulkanTextureSampler) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture sampler!");
+    }
+}
+
 // Создаем буффер нужного размера
 void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
     // Удаляем старое, если есть
@@ -1369,16 +1403,17 @@ void createUniformBuffer() {
 
 // Создаем пул дескрипторов ресурсов
 void createDescriptorPool() {
-    VkDescriptorPoolSize poolSize = {};
-    memset(&poolSize, 0, sizeof(VkDescriptorPoolSize));
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = 1;
+    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
     
     VkDescriptorPoolCreateInfo poolInfo = {};
     memset(&poolInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = poolSizes.size();
+    poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = 1;
     
     if (vkCreateDescriptorPool(vulkanLogicalDevice, &poolInfo, nullptr, &vulkanDescriptorPool) != VK_SUCCESS) {
@@ -1406,18 +1441,30 @@ void createDescriptorSet() {
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(UniformBufferObject);
     
-    VkWriteDescriptorSet descriptorWrite = {};
-    memset(&descriptorWrite, 0, sizeof(VkWriteDescriptorSet));
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = vulkanDescriptorSet;
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &bufferInfo;
-    descriptorWrite.pImageInfo = nullptr; // Optional
-    descriptorWrite.pTexelBufferView = nullptr; // Optional
-    vkUpdateDescriptorSets(vulkanLogicalDevice, 1, &descriptorWrite, 0, nullptr);
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = vulkanTextureImageView;
+    imageInfo.sampler = vulkanTextureSampler;
+    
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+    
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = vulkanDescriptorSet;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+    
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = vulkanDescriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+    
+    vkUpdateDescriptorSets(vulkanLogicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
 }
 
@@ -1683,6 +1730,9 @@ int local_main(int argc, char** argv) {
     // Создание вью для текстуры
     createTextureImageView();
     
+    // Создаем семплер для картинки
+    createTextureSampler();
+    
     // Создание буфферов вершин
     createVertexBuffer();
     
@@ -1734,6 +1784,7 @@ int local_main(int argc, char** argv) {
     
     // Очищаем Vulkan
     // Удаляем старые объекты
+    vkDestroySampler(vulkanLogicalDevice, vulkanTextureSampler, nullptr);
     vkDestroyImageView(vulkanLogicalDevice, vulkanTextureImageView, nullptr);
     vkDestroyImage(vulkanLogicalDevice, vulkanTextureImage, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanTextureImageMemory, nullptr);
