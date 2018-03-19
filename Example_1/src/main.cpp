@@ -33,6 +33,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+// TinyObj
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include "CommonDefines.h"
 #include "CommonConstants.h"
 #include "Vertex.h"
@@ -93,6 +97,8 @@ VkSampler vulkanTextureSampler = VK_NULL_HANDLE;
 VkImage vulkanDepthImage = VK_NULL_HANDLE;
 VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
 VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
+std::vector<Vertex> vulkanVertices;
+std::vector<uint32_t> vulkanIndices;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1243,7 +1249,7 @@ void createTextureImage() {
     int texWidth = 0;
     int texHeight = 0;
     int texChannels = 0;
-    stbi_uc* pixels = stbi_load("res/textures/wall.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load("res/textures/chalet.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     
     if (!pixels) {
@@ -1310,10 +1316,10 @@ void createTextureSampler() {
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
     samplerInfo.maxAnisotropy = 16;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -1327,6 +1333,41 @@ void createTextureSampler() {
     if (vkCreateSampler(vulkanLogicalDevice, &samplerInfo, nullptr, &vulkanTextureSampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler!");
     }
+}
+
+void loadModel(){
+    printf("Model loading started\n");
+    fflush(stdout);
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err;
+    
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "res/models/chalet.obj")) {
+        throw std::runtime_error(err);
+    }
+    
+    for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            Vertex vertex = {};
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            
+            vertex.color = {1.0f, 1.0f, 1.0f};
+            
+            vulkanVertices.push_back(vertex);
+            vulkanIndices.push_back(vulkanIndices.size());
+        }
+    }
+    printf("Model loading complete\n");
+    fflush(stdout);
 }
 
 // Создаем буффер нужного размера
@@ -1392,7 +1433,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
 // Создание буфферов вершин
 void createVertexBuffer(){
     // Размер буфферов
-    VkDeviceSize bufferSize = sizeof(QUAD_VERTEXES[0]) * QUAD_VERTEXES.size();
+    VkDeviceSize bufferSize = sizeof(vulkanVertices[0]) * vulkanVertices.size();
     
     // Создание временного буффера для передачи данных
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -1407,7 +1448,7 @@ void createVertexBuffer(){
     vkMapMemory(vulkanLogicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
     
     // Копируем вершины в память
-    memcpy(data, QUAD_VERTEXES.data(), (size_t)bufferSize);
+    memcpy(data, vulkanVertices.data(), (size_t)bufferSize);
     
     // Размапим
     vkUnmapMemory(vulkanLogicalDevice, stagingBufferMemory);
@@ -1434,7 +1475,7 @@ void createVertexBuffer(){
 
 // Создание буффера индексов
 void createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(QUAD_INDICES[0]) * QUAD_INDICES.size();
+    VkDeviceSize bufferSize = sizeof(vulkanIndices[0]) * vulkanIndices.size();
     
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
@@ -1448,7 +1489,7 @@ void createIndexBuffer() {
     vkMapMemory(vulkanLogicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
     
     // Копируем данные
-    memcpy(data, QUAD_INDICES.data(), (size_t)bufferSize);
+    memcpy(data, vulkanIndices.data(), (size_t)bufferSize);
     
     // Размапим память
     vkUnmapMemory(vulkanLogicalDevice, stagingBufferMemory);
@@ -1616,10 +1657,7 @@ void createCommandBuffers() {
         vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
         
         // Привязываем индексный буффер к пайплайну
-        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
-        
-        // Привязываем юниформ буффер к коммандному буфферу
-        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
         
         // Подключаем дескрипторы ресурсов для юниформ буффера
         vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
@@ -1627,7 +1665,7 @@ void createCommandBuffers() {
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         //vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-        vkCmdDrawIndexed(vulkanCommandBuffers[i], QUAD_INDICES.size(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanIndices.size(), 1, 0, 0, 0);
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
@@ -1673,7 +1711,7 @@ void updateUniformBuffer(float delta){
     UniformBufferObject ubo = {};
     memset(&ubo, 0, sizeof(UniformBufferObject));
     ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, -1.5f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), vulkanSwapChainExtent.width / (float)vulkanSwapChainExtent.height, 0.1f, 10.0f);
     
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
@@ -1827,6 +1865,9 @@ int local_main(int argc, char** argv) {
     
     // Создаем семплер для картинки
     createTextureSampler();
+    
+    // Грузим нашу модель
+    loadModel();
     
     // Создание буфферов вершин
     createVertexBuffer();
