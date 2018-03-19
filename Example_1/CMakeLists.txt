@@ -132,6 +132,10 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include")
 set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} glfw ${GLFW_LIBRARIES})
 message("GLFW link libraries list: ${GLFW_LIBRARIES}")
 
+##############
+# stb_image library
+message("STB added")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/stb_image")
 
 
 ####################################################

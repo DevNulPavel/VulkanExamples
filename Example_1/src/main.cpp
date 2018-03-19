@@ -27,6 +27,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+// STB image
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include "CommonDefines.h"
 #include "CommonConstants.h"
 #include "Vertex.h"
@@ -988,6 +992,90 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
+// Создание текстуры из изображения
+void createTextureImage() {
+    int texWidth = 0;
+    int texHeight = 0;
+    int texChannels = 0;
+    stbi_uc* pixels = stbi_load("res/textures/wall.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+    
+    VkImage stagingImage = VK_NULL_HANDLE;
+    VkDeviceMemory stagingImageMemory = VK_NULL_HANDLE;
+    
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = texWidth;
+    imageInfo.extent.height = texHeight;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.flags = 0; // Optional
+    
+    if (vkCreateImage(vulkanLogicalDevice, &imageInfo, nullptr, &stagingImage) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image!");
+    }
+    
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(vulkanLogicalDevice, stagingImage, &memRequirements);
+    
+    uint32_t memoryTypeIndex = findMemoryType((uint32_t)memRequirements.memoryTypeBits,
+                                              (VkMemoryPropertyFlags)(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+    
+    if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &stagingImageMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate image memory!");
+    }
+    
+    vkBindImageMemory(vulkanLogicalDevice, stagingImage, stagingImageMemory, 0);
+    
+    void* data = nullptr;
+    vkMapMemory(vulkanLogicalDevice, stagingImageMemory, 0, imageSize, 0, &data);
+    
+    VkImageSubresource subresource = {};
+    subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresource.mipLevel = 0;
+    subresource.arrayLayer = 0;
+    
+    VkSubresourceLayout stagingImageLayout;
+    vkGetImageSubresourceLayout(vulkanLogicalDevice, stagingImage, &subresource, &stagingImageLayout);
+    
+    if (stagingImageLayout.rowPitch == texWidth * 4) {
+        memcpy(data, pixels, (size_t) imageSize);
+    } else {
+        uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
+        
+        for (int y = 0; y < texHeight; y++) {
+            memcpy(&dataBytes[y * stagingImageLayout.rowPitch],
+                   &pixels[y * texWidth * 4],
+                   texWidth * 4);
+        }
+    }
+    
+    vkUnmapMemory(vulkanLogicalDevice, stagingImageMemory);
+    
+    // Удаляем временные объекты
+    vkDestroyImage(vulkanLogicalDevice, stagingImage, nullptr);
+    vkFreeMemory(vulkanLogicalDevice, stagingImageMemory, nullptr);
+    
+    // Учищаем буффер данных картинки
+    stbi_image_free(pixels);
+}
+
 // Создаем буффер нужного размера
 void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
     // Удаляем старое, если есть
@@ -1496,6 +1584,9 @@ int local_main(int argc, char** argv) {
     // Создаем пулл комманд
     createCommandPool();
 
+    // Создание текстуры из изображения
+    createTextureImage();
+    
     // Создание буфферов вершин
     createVertexBuffer();
     
