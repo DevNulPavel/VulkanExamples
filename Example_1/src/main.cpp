@@ -78,6 +78,7 @@ VkDeviceMemory vulkanUniformStagingBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
 VkDescriptorPool vulkanDescriptorPool = VK_NULL_HANDLE;
+VkDescriptorSet vulkanDescriptorSet = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -361,7 +362,7 @@ int rateDeviceScore(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
     
-    printf("Test GPU with name: %s\n", deviceProperties.deviceName);
+    printf("Test GPU with name: %s, API version: %d\n", deviceProperties.deviceName, deviceProperties.apiVersion);
     fflush(stdout);
 
     int score = 0;
@@ -799,8 +800,8 @@ void createGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;  // Графика рисуется в буффер кадра
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // Заполненные полигоны
     rasterizer.lineWidth = 1.0f;                    // Толщина линии
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;    // Отбрасываем заднюю грань
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // Обход по часовой стрелке для фронтальной стороны
+    rasterizer.cullMode = VK_CULL_MODE_NONE;        // Отключаем кулинг
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Обход против часовой стрелки для фронтальной стороны
     rasterizer.depthBiasEnable = VK_FALSE;          // Смещение по глубине отключено
     
     // Настройка антиаллиасинга с помощью мультисемплинга
@@ -1193,17 +1194,50 @@ void createDescriptorPool() {
     poolSize.descriptorCount = 1;
     
     VkDescriptorPoolCreateInfo poolInfo = {};
-    memset(&poolSize, 0, sizeof(VkDescriptorPoolCreateInfo));
+    memset(&poolInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
     poolInfo.maxSets = 1;
-    poolInfo.flags = 0;
-    poolInfo.pNext = nullptr;
     
     if (vkCreateDescriptorPool(vulkanLogicalDevice, &poolInfo, nullptr, &vulkanDescriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
+}
+
+// Создаем набор дескрипторов ресурсов
+void createDescriptorSet() {
+    VkDescriptorSetLayout layouts[] = {vulkanDescriptorSetLayout};
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = vulkanDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+    
+    if (vkAllocateDescriptorSets(vulkanLogicalDevice, &allocInfo, &vulkanDescriptorSet) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor set!");
+    }
+    
+    VkDescriptorBufferInfo bufferInfo = {};
+    memset(&bufferInfo, 0, sizeof(VkDescriptorBufferInfo));
+    bufferInfo.buffer = vulkanUniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+    
+    VkWriteDescriptorSet descriptorWrite = {};
+    memset(&descriptorWrite, 0, sizeof(VkWriteDescriptorSet));
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = vulkanDescriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr; // Optional
+    descriptorWrite.pTexelBufferView = nullptr; // Optional
+    vkUpdateDescriptorSets(vulkanLogicalDevice, 1, &descriptorWrite, 0, nullptr);
+
 }
 
 // Создаем коммандные буфферы
@@ -1271,6 +1305,9 @@ void createCommandBuffers() {
         // Привязываем юниформ буффер к коммандному буфферу
         vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
         
+        // Подключаем дескрипторы ресурсов для юниформ буффера
+        vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
+        
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         //vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
@@ -1314,17 +1351,17 @@ void recreateSwapChain() {
 
 // Обновляем юниформ буффер
 void updateUniformBuffer(float delta){
-    rotateAngle += delta * 10.0f;
+    rotateAngle += delta * 30.0f;
     
     UniformBufferObject ubo = {};
     memset(&ubo, 0, sizeof(UniformBufferObject));
     ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // TODO: Верх!!!
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), vulkanSwapChainExtent.width / (float)vulkanSwapChainExtent.height, 0.1f, 10.0f);
     
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
     // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
-    ubo.proj[1][1] *= -1;
+    //ubo.proj[1][1] *= -1;
     
     void* data = nullptr;
     vkMapMemory(vulkanLogicalDevice, vulkanUniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
@@ -1470,6 +1507,9 @@ int local_main(int argc, char** argv) {
     
     // Создаем пул дескрипторов ресурсов
     createDescriptorPool();
+    
+    // Создаем набор дескрипторов
+    createDescriptorSet();
     
     // Создаем коммандные буфферы
     createCommandBuffers();
