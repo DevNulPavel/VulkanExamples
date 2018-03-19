@@ -1,5 +1,5 @@
 // Windows
-#ifdef _MSVC_LANG
+#ifdef _MSVC_LANG 
     #define NOMINMAX
     #include <windows.h>
 #endif
