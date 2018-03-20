@@ -22,9 +22,9 @@ struct Vertex {
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription = {};
         memset(&bindingDescription, 0, sizeof(VkVertexInputBindingDescription));
-        bindingDescription.binding = 0;
+        bindingDescription.binding = 0;     // Буффер вершинной информации находится на 0 индексе
         bindingDescription.stride = sizeof(Vertex); // Размер шага равен размеру данной вершины
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Идем повершинно
         return bindingDescription;
     }
     
@@ -44,7 +44,7 @@ struct Vertex {
         attributeDescriptions[1].offset = offsetof(Vertex, color);
         // TexCoord
         attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].location = 2; // 2 в шейдере
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
         

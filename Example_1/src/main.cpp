@@ -777,6 +777,7 @@ void createRenderPass() {
     
     // Описание присоединенного буффера глубины
     VkAttachmentDescription depthAttachment = {};
+    memset(&depthAttachment, 0, sizeof(VkAttachmentDescription));
     depthAttachment.format = vulkanDepthFormat; //  Формат
     depthAttachment.samples = APPLICATION_SAMPLING_VALUE; // Уровень семплирования
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при загрузке буффера глубины?
@@ -789,25 +790,25 @@ void createRenderPass() {
     // Референс присоединенного цвета
     VkAttachmentReference colorAttachmentRef = {};
     memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentRef.attachment = 0;  // Аттачмент находится по 0му индексу в массиве attachments ниже
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;   // Используется для цвета
     
     // Референс присоединенного буффера глубины
     VkAttachmentReference depthAttachmentRef = {};
     memset(&depthAttachmentRef, 0, sizeof(VkAttachmentReference));
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachmentRef.attachment = 1; // Аттачмент глубины находится по 1му индексу в массиве attachments ниже
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;   // Используется для глубины
     
-    // Подпроход
+    // Подпроход, всего один (наверное можно задействовать для постэффектов)
     VkSubpassDescription subPass = {};
     memset(&subPass, 0, sizeof(VkSubpassDescription));
-    subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subPass.colorAttachmentCount = 1;
-    subPass.pColorAttachments = &colorAttachmentRef;
-    subPass.pDepthStencilAttachment = &depthAttachmentRef;
+    subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
+    subPass.colorAttachmentCount = 1;    // Один аттачмент цвета
+    subPass.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
+    subPass.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины
     
     // Описание создания рендер-прохода
-    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};
+    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};  // Индексы и использование указаны выше
     VkRenderPassCreateInfo renderPassInfo = {};
     memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -815,7 +816,7 @@ void createRenderPass() {
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subPass;
-    renderPassInfo.dependencyCount = 0;
+    renderPassInfo.dependencyCount = 0;     // TODO: Зависимости?
     renderPassInfo.pDependencies = nullptr;
     
     // Создаем ренде-проход
@@ -848,19 +849,21 @@ void createGraphicsPipeline() {
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     memset(&vertShaderStageInfo, 0, sizeof(VkPipelineShaderStageCreateInfo));
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // Вершинный
-    vertShaderStageInfo.module = vulkanVertexShader;
-    vertShaderStageInfo.pName = "main";
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // Вершинный шейдер
+    vertShaderStageInfo.module = vulkanVertexShader;    // Модуль
+    vertShaderStageInfo.pName = "main";     // Входная функция
     
     // Описание настроек фрагментного шейдера
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     memset(&fragShaderStageInfo, 0, sizeof(VkPipelineShaderStageCreateInfo));
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // Фрагментный шейдер
-    fragShaderStageInfo.module = vulkanFragmentShader;
-    fragShaderStageInfo.pName = "main";
+    fragShaderStageInfo.module = vulkanFragmentShader;  // Модуль
+    fragShaderStageInfo.pName = "main";     // Входная функция
     
-    // Описание настроек глубины и трафарета
+    // Описание настроек глубины и трафарета у пайплайна
+    // Поля depthBoundsTestEnable, minDepthBounds и maxDepthBounds используют для дополнительного теста связанной глубины.
+    // По сути, это позволяет сохранить фрагменты, которые находятся в пределах заданного диапазона глубины, нам не понадобится.
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     memset(&depthStencil, 0, sizeof(VkPipelineDepthStencilStateCreateInfo));
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -871,10 +874,10 @@ void createGraphicsPipeline() {
     depthStencil.minDepthBounds = 0.0f; // Optional
     depthStencil.maxDepthBounds = 1.0f; // Optional
     depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = {}; // Optional
-    depthStencil.back = {}; // Optional
+    depthStencil.front = {}; // Нужно для трафарета
+    depthStencil.back = {};  // Нужно для трафарета
     
-    // Описание вершин
+    // Описание вершин, шага по вершинам и описание данных
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
     std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = Vertex::getAttributeDescriptions();
     
@@ -931,7 +934,7 @@ void createGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;  // Графика рисуется в буффер кадра
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // Заполненные полигоны
     rasterizer.lineWidth = 1.0f;                    // Толщина линии
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;        //  Задняя часть
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;    //  Задняя часть
     rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // Обход по часовой стрелке для фронтальной стороны
     rasterizer.depthBiasEnable = VK_FALSE;          // Смещение по глубине отключено
     
@@ -977,9 +980,10 @@ void createGraphicsPipeline() {
     memset(&pipelineLayoutInfo, 0, sizeof(VkPipelineLayoutCreateInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = setLayouts;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pSetLayouts = setLayouts; // Устанавливаем лаяут
+    pipelineLayoutInfo.pushConstantRangeCount = 0;  // TODO: Пуш-константы??
     pipelineLayoutInfo.pPushConstantRanges = 0;
+    // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам, но без изменения??
     
     if (vkCreatePipelineLayout(vulkanLogicalDevice, &pipelineLayoutInfo, nullptr, &vulkanPipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
@@ -992,20 +996,20 @@ void createGraphicsPipeline() {
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     memset(&pipelineInfo, 0, sizeof(VkGraphicsPipelineCreateInfo));
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.layout = vulkanPipelineLayout;
-    pipelineInfo.renderPass = vulkanRenderPass;
+    pipelineInfo.stageCount = 2;            // 2 стадии, вершинный и фрагментный шейдер
+    pipelineInfo.pStages = shaderStages;    // Шейдеры
+    pipelineInfo.pVertexInputState = &vertexInputInfo;  // Описание входных вершин
+    pipelineInfo.pInputAssemblyState = &inputAssembly;  // Топология вершин (Рисуем треугольниками)
+    pipelineInfo.pViewportState = &viewportState;       // Вьюпорт и scissor отрисовки
+    pipelineInfo.pRasterizationState = &rasterizer;     // Растеризатор (кулинг сторон и режим полигона)
+    pipelineInfo.pDepthStencilState = &depthStencil;    // Настройки работы с глубиной
+    pipelineInfo.pMultisampleState = &multisampling;    // Настройки семплирования для антиалиассинга
+    pipelineInfo.pColorBlendState = &colorBlending;     // Настройка смешивания цветов
+    pipelineInfo.layout = vulkanPipelineLayout;         // Лаяут пайплайна (Описание буфферов юниформов и семплеров)
+    pipelineInfo.renderPass = vulkanRenderPass;         // Рендер-проход
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;   // Родительский пайплайн
-    pipelineInfo.pDepthStencilState = &depthStencil; // Optional
-    pipelineInfo.pDynamicState = nullptr; // Optional
+    pipelineInfo.pDynamicState = nullptr;               // Динамическое состояние отрисовки
     
     if (vkCreateGraphicsPipelines(vulkanLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vulkanPipeline) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
@@ -1013,7 +1017,7 @@ void createGraphicsPipeline() {
 }
 
 
-// Создаем фреймбуфферы
+// Создаем фреймбуфферы для вьюшек изображений свопчейна
 void createFramebuffers(){
     // Уничтожаем старые буфферы свопчейнов
     if (vulkanSwapChainFramebuffers.size() > 0) {
@@ -1023,24 +1027,24 @@ void createFramebuffers(){
         vulkanSwapChainFramebuffers.clear();
     }
     
+    // Ресайзим массив с фреймбуфферами свопчейна
     vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
     
+    // Для каждой вьюшки картинки создаем  фреймбуффер
     for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            {vulkanSwapChainImageViews[i],
-                vulkanDepthImageView}
-        };
+        // Список аттачментов
+        std::array<VkImageView, 2> attachments = { {vulkanSwapChainImageViews[i], vulkanDepthImageView}};
         
         // Информация для создания фрейб-буфферов
         VkFramebufferCreateInfo framebufferInfo = {};
         memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = vulkanRenderPass;  // Используем стандартный рендер-проход
-        framebufferInfo.attachmentCount = attachments.size();
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = vulkanSwapChainExtent.width;
-        framebufferInfo.height = vulkanSwapChainExtent.height;
-        framebufferInfo.layers = 1;
+        framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
+        framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
+        framebufferInfo.width = vulkanSwapChainExtent.width;    // Размеры экрана
+        framebufferInfo.height = vulkanSwapChainExtent.height;  // Размеры экрана
+        framebufferInfo.layers = 1; // TODO: ???
         
         if (vkCreateFramebuffer(vulkanLogicalDevice, &framebufferInfo, nullptr, &(vulkanSwapChainFramebuffers[i])) != VK_SUCCESS) {
             throw std::runtime_error("failed to create framebuffer!");
@@ -1054,7 +1058,7 @@ void createCommandPool() {
     VkCommandPoolCreateInfo poolInfo = {};
     memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;
+    poolInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;   // Пулл будет для семейства очередей рендеринга
     poolInfo.flags = 0; // Optional
     
     if (vkCreateCommandPool(vulkanLogicalDevice, &poolInfo, nullptr, &vulkanCommandPool) != VK_SUCCESS) {
@@ -1078,6 +1082,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
+// Создаем изображение
 void createImage(uint32_t width, uint32_t height,
                  VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
                  VkImage& image, VkDeviceMemory& imageMemory) {
@@ -1092,73 +1097,114 @@ void createImage(uint32_t width, uint32_t height,
         imageMemory = VK_NULL_HANDLE;
     }
     
+    // Для поля initialLayout есть только два возможных значения:
+    // VK_IMAGE_LAYOUT_UNDEFINED: Не и используется GPU и первое изменение (transition) отбросит все тексели.
+    // VK_IMAGE_LAYOUT_PREINITIALIZED: Не и используется GPU, но первое изменение (transition) сохранит тексели.
+    // Первый вариант подходит для изображений, которые будут использоваться в качестве вложений, как буфер цвета и глубины.
+    // В таком случае не нужно заботиться о данных инициализации, т.к. они скорее всего будут очищены проходом рендера до начала использования. А если же вы хотите заполнить данные, такие как текстуры, тогда используйте второй вариант:
+    
+    // Информация об изображении
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D; // 2D текстура
+    imageInfo.extent.width = width;     // Ширина
+    imageInfo.extent.height = height;   // Высота
+    imageInfo.extent.depth = 1;         // Глубина
+    imageInfo.mipLevels = 1;            // Без мипмапов
     imageInfo.arrayLayers = 1;
-    imageInfo.format = format;
+    imageInfo.format = format;          // Формат данных текстуры
     imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED; // Текстура заранее с нужными данными
+    imageInfo.usage = usage;    // Флаги использования текстуры
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;  // Семплирование данной текстуры
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Режим междевайного доступа
     
+    // Создаем изображение
     if (vkCreateImage(vulkanLogicalDevice, &imageInfo, nullptr, &image) != VK_SUCCESS) {
         throw std::runtime_error("failed to create image!");
     }
     
+    // Запрашиваем информацию о требованиях памяти для текстуры
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(vulkanLogicalDevice, image, &memRequirements);
     
+    // Подбираем нужный тип аллоцируемой памяти для требований и возможностей
+    uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits, properties);
     VkMemoryAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+    allocInfo.allocationSize = memRequirements.size;    // Размер аллоцируемой памяти
+    allocInfo.memoryTypeIndex = memoryType;             // Тип памяти
     
     if (vkAllocateMemory(vulkanLogicalDevice, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate image memory!");
     }
     
+    // Цепляем к картинке буффер памяти
     vkBindImageMemory(vulkanLogicalDevice, image, imageMemory, 0);
 }
 
+// Запуск коммандного буффера на получение комманд
 VkCommandBuffer beginSingleTimeCommands() {
+    // Параметр level определяет, будет ли выделенный буфер команд первичным или вторичным буфером команд:
+    // VK_COMMAND_BUFFER_LEVEL_PRIMARY: Может быть передан очереди для исполнения, но не может быть вызван из других буферов команд.
+    // VK_COMMAND_BUFFER_LEVEL_SECONDARY: не может быть передан непосредственно, но может быть вызван из первичных буферов команд.
     VkCommandBufferAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = vulkanCommandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // Первичный буффер, которыый будет исполняться сразу
+    allocInfo.commandPool = vulkanCommandPool;      // Пул комманд
     allocInfo.commandBufferCount = 1;
     
+    // Аллоцируем коммандный буффер для задач, который будут закидываться в очередь
     VkCommandBuffer commandBuffer;
     vkAllocateCommandBuffers(vulkanLogicalDevice, &allocInfo, &commandBuffer);
     
+    // Параметр flags определяет, как использовать буфер команд. Возможны следующие значения:
+    // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: Буфер команд будет перезаписан сразу после первого выполнения.
+    // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
+    // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+    
+    // Настройки запуска коммандного буффера
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     
+    // Запускаем буффер комманд
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
     
     return commandBuffer;
 }
 
+// Завершение коммандного буффера
 void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    // Заканчиваем прием комманд
     vkEndCommandBuffer(commandBuffer);
     
+    // Структура с описанием отправки в буффер
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
     
+    // Отправляем задание на отрисовку в буффер отрисовки
     vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(vulkanGraphicsQueue);
     
+    // TODO: Ожидание передачи комманды в очередь на GPU???
+    vkQueueWaitIdle(vulkanGraphicsQueue);
+    /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
+    vkQueueWaitIdle(vulkanGraphicsQueue);
+    std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
+    int64_t elapsedMsec = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+    printf("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmSec\n", elapsedMsec);
+    fflush(stdout);*/
+    
+    // Удаляем коммандный буффер
     vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, 1, &commandBuffer);
 }
 
+// Есть ли поддержка трафарета в формате
 bool hasStencilComponent(VkFormat format) {
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
@@ -1288,7 +1334,12 @@ void createTextureImage() {
     VkImage stagingImage = VK_NULL_HANDLE;
     VkDeviceMemory stagingImageMemory = VK_NULL_HANDLE;
     
-    createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingImage, stagingImageMemory);
+    // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
+    // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
+    createImage(texWidth, texHeight,
+                VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingImage, stagingImageMemory);
     
     VkImageSubresource subresource = {};
     subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
