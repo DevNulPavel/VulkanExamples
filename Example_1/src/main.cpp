@@ -99,6 +99,8 @@ VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
 VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
 std::vector<Vertex> vulkanVertices;
 std::vector<uint32_t> vulkanIndices;
+size_t vulkanTotalVertexesCount = 0;
+size_t vulkanTotalIndexesCount = 0;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1084,7 +1086,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
 
 // Создаем изображение
 void createImage(uint32_t width, uint32_t height,
-                 VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+                 VkFormat format, VkImageTiling tiling, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
                  VkImage& image, VkDeviceMemory& imageMemory) {
     
     // Удаляем старые объекты
@@ -1114,7 +1116,7 @@ void createImage(uint32_t width, uint32_t height,
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;          // Формат данных текстуры
     imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED; // Текстура заранее с нужными данными
+    imageInfo.initialLayout = layout; // Текстура заранее с нужными данными
     imageInfo.usage = usage;    // Флаги использования текстуры
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;  // Семплирование данной текстуры
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Режим междевайного доступа
@@ -1196,8 +1198,8 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkQueueWaitIdle(vulkanGraphicsQueue);
     std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
-    int64_t elapsedMsec = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-    printf("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmSec\n", elapsedMsec);
+    int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+    printf("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmicroSec\n", elapsedMicroSec);
     fflush(stdout);*/
     
     // Удаляем коммандный буффер
@@ -1209,25 +1211,30 @@ bool hasStencilComponent(VkFormat format) {
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
+// Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
 void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    // Создаем коммандный буффер
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
     
+    // Создаем барьер памяти для картинок
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.oldLayout = oldLayout;  // Старый лаяут (способ использования)
+    barrier.newLayout = newLayout;  // Новый лаяут (способ использования)
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
+    barrier.image = image;  // Изображение, которое меняется
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;    // Изображение использовалось для цвета
+    barrier.subresourceRange.baseMipLevel = 0;  // 0 левел мипмапов
+    barrier.subresourceRange.levelCount = 1;    // 1 уровень мипмапов
+    barrier.subresourceRange.baseArrayLayer = 0;    // Базовый уровень
+    barrier.subresourceRange.layerCount = 1;        // 1 уровень
     
+    // Настраиваем условия ожиданий для конвертации
+    // TODO: ???
     if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;       // Ожидание записи хостом данных
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;    // TODO: Дальнейшие действия возможнны после чтения из текстуры???
     } else if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1241,6 +1248,7 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
         throw std::invalid_argument("unsupported layout transition!");
     }
     
+    // TODO: ???
     if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         
@@ -1251,8 +1259,10 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     }
     
+    // Закидываем в очередь барьер конвертации использования для изображения
     vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Закидываем на верх пайплайна
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Закидываем на верх пайплайна
                          0,
                          0, nullptr,
                          0, nullptr,
@@ -1261,16 +1271,23 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     endSingleTimeCommands(commandBuffer);
 }
 
+// Закидываем в очередь операцию копирования текстуры
 void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height) {
+    // TODO: Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
+    // Создаем коммандный буффер
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
     
+    // Описание ресурса
     VkImageSubresourceLayers subResource = {};
-    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResource.baseArrayLayer = 0;
-    subResource.mipLevel = 0;
-    subResource.layerCount = 1;
+    memset(&subResource, 0, sizeof(VkImageSubresourceLayers));
+    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Текстура с цветом
+    subResource.layerCount = 1; // Всего 1н слой
+    subResource.baseArrayLayer = 0; // 0й слой
+    subResource.mipLevel = 0;   // 0й уровень мипмаппинга
     
+    // Регион копирования текстуры
     VkImageCopy region = {};
+    memset(&region, 0, sizeof(VkImageCopy));
     region.srcSubresource = subResource;
     region.dstSubresource = subResource;
     region.srcOffset = {0, 0, 0};
@@ -1279,16 +1296,20 @@ void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t heig
     region.extent.height = height;
     region.extent.depth = 1;
     
+    // Создаем задачу на копирование данных
     vkCmdCopyImage(commandBuffer,
                    srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                    dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    1, &region);
     
+    // Завершаем буффер комманд
     endSingleTimeCommands(commandBuffer);
 }
 
+// Подбираем формат текстуры в зависимости от доступных на устройстве
 VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
+        // Запрашиваем информацию для формата
         VkFormatProperties props;
         vkGetPhysicalDeviceFormatProperties(vulkanPhysicalDevice, format, &props);
         
@@ -1302,21 +1323,30 @@ VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTil
     throw std::runtime_error("failed to find supported format!");
 }
 
+// Подбираем нужный формат глубины
 VkFormat findDepthFormat() {
-    vulkanDepthFormat = findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
-                               VK_IMAGE_TILING_OPTIMAL,
-                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+    vulkanDepthFormat = findSupportedFormat(candidates,
+                                            VK_IMAGE_TILING_OPTIMAL,
+                                            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     return vulkanDepthFormat;
 }
 
 // Создаем буфферы для глубины
 void createDepthResources() {
-    createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height, vulkanDepthFormat,
-                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height,
+                vulkanDepthFormat,                                  // Формат текстуры
+                VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,   // Используем сразу правильный лаяут для текстуры
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
                 vulkanDepthImage, vulkanDepthImageMemory);
+    
+    // Создаем вью для изображения буффера глубины
     createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
     
-    transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // Наверное нужно? Но и так работает
+    //transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 // Создание текстуры из изображения
@@ -1331,27 +1361,36 @@ void createTextureImage() {
         throw std::runtime_error("failed to load texture image!");
     }
     
+    // Указатели на временную текстуру и целевую
     VkImage stagingImage = VK_NULL_HANDLE;
     VkDeviceMemory stagingImageMemory = VK_NULL_HANDLE;
     
     // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
     // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
     createImage(texWidth, texHeight,
-                VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                stagingImage, stagingImageMemory);
+                VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
+                VK_IMAGE_TILING_LINEAR,             // Тайлинг
+                VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
+                stagingImage,
+                stagingImageMemory);
     
+    // Описание подресурса для изображения
     VkImageSubresource subresource = {};
     subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subresource.mipLevel = 0;
     subresource.arrayLayer = 0;
     
+    // Создание лаяута для подресурса
     VkSubresourceLayout stagingImageLayout;
     vkGetImageSubresourceLayout(vulkanLogicalDevice, stagingImage, &subresource, &stagingImageLayout);
-
+    
+    // Мапим данные текстуры в адресное пространство CPU
     void* data = nullptr;
     vkMapMemory(vulkanLogicalDevice, stagingImageMemory, 0, imageSize, 0, &data);
     
+    // Копируем целиком или построчно в зависимости от размера и выравнивания на GPU
     if (stagingImageLayout.rowPitch == texWidth * 4) {
         memcpy(data, pixels, (size_t) imageSize);
     } else {
@@ -1364,19 +1403,34 @@ void createTextureImage() {
         }
     }
     
+    // Размапим данные
     vkUnmapMemory(vulkanLogicalDevice, stagingImageMemory);
     
+    // Создаем рабочее изображение для последующего использования
     createImage(texWidth, texHeight,
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                VK_FORMAT_R8G8B8A8_UNORM,   // Формат картинки
+                VK_IMAGE_TILING_OPTIMAL,    // тайлинг
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // Лаяут использования - принимает данные из другой текстуры
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                 vulkanTextureImage,
                 vulkanTextureImageMemory);
     
-    transitionImageLayout(stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    transitionImageLayout(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    // Конвертирование исходной буфферной текстуры с данными в формат копирования на GPU
+    transitionImageLayout(stagingImage,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_PREINITIALIZED,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    //transitionImageLayout(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    
+    // Копируем данные в пределах GPU из временной текстуры в целевую
     copyImage(stagingImage, vulkanTextureImage, texWidth, texHeight);
+    
+    // Конвертируем использование текстуры в оптимальное для рендеринга
+    transitionImageLayout(vulkanTextureImage,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
     // Удаляем временные объекты
     vkDestroyImage(vulkanLogicalDevice, stagingImage, nullptr);
@@ -1386,21 +1440,23 @@ void createTextureImage() {
     stbi_image_free(pixels);
 }
 
+// Создаем вью текстуры
 void createTextureImageView() {
     createImageView(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, vulkanTextureImageView);
 }
 
 // Создание семплера для картинки
 void createTextureSampler() {
+    // Описание семплирования для текстуры
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 16;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;   // Линейное
+    samplerInfo.minFilter = VK_FILTER_LINEAR;   // Линейное
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
+    samplerInfo.anisotropyEnable = VK_FALSE;    // Анизотропная фильтрация
+    samplerInfo.maxAnisotropy = 1;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;
@@ -1410,11 +1466,13 @@ void createTextureSampler() {
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;
     
+    // Создаем семплер
     if (vkCreateSampler(vulkanLogicalDevice, &samplerInfo, nullptr, &vulkanTextureSampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler!");
     }
 }
 
+// Грузим данные для модели
 void loadModel(){
     printf("Model loading started\n");
     fflush(stdout);
@@ -1446,6 +1504,10 @@ void loadModel(){
             vulkanIndices.push_back(vulkanIndices.size());
         }
     }
+    
+    vulkanTotalVertexesCount = vulkanVertices.size();
+    vulkanTotalIndexesCount = vulkanIndices.size();
+    
     printf("Model loading complete\n");
     fflush(stdout);
 }
@@ -1462,13 +1524,16 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
         vulkanVertexBuffer = VK_NULL_HANDLE;
     }
     
+    // VK_SHARING_MODE_EXCLUSIVE: изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
+    // VK_SHARING_MODE_CONCURRENT: изображение может быть использовано несколькими семействами без явной передачи.
+    
     // Описание формата буффера
     VkBufferCreateInfo bufferInfo = {};
     memset(&bufferInfo, 0, sizeof(VkBufferCreateInfo));
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.size = size;     // Размер буффера
+    bufferInfo.usage = usage;   // Использование данного буффера
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
     
     // Непосредственно создание буффера
     if (vkCreateBuffer(vulkanLogicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
@@ -1551,6 +1616,9 @@ void createVertexBuffer(){
         vkDestroyBuffer(vulkanLogicalDevice, stagingBuffer, nullptr);
         stagingBuffer = VK_NULL_HANDLE;
     }
+    
+    // Чистим исходные данные
+    vulkanVertices.clear();
 }
 
 // Создание буффера индексов
@@ -1592,6 +1660,9 @@ void createIndexBuffer() {
         vkDestroyBuffer(vulkanLogicalDevice, stagingBuffer, nullptr);
         stagingBuffer = VK_NULL_HANDLE;
     }
+    
+    // Чистим исходные данные
+    vulkanIndices.clear();
 }
 
 // Создаем буффер юниформов
@@ -1745,7 +1816,7 @@ void createCommandBuffers() {
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         //vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-        vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanIndices.size(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanTotalIndexesCount, 1, 0, 0, 0);
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
