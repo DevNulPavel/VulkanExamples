@@ -132,6 +132,36 @@ void VulkanDevice::createVulkanInstance(){
     }
 }
 
+// Отладочный коллбек
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
+                                                    VkDebugReportObjectTypeEXT objType,
+                                                    uint64_t obj,
+                                                    size_t location,
+                                                    int32_t code,
+                                                    const char* layerPrefix,
+                                                    const char* msg,
+                                                    void* userData) {
+    printf("Validation layer message %s: %s\n", layerPrefix, msg);
+    fflush(stdout);
+    return VK_FALSE;
+}
+
+// Устанавливаем коллбек для отладки
+void VulkanDevice::setupDebugCallback() {
+#ifdef VALIDATION_LAYERS_ENABLED
+    // Структура с описанием коллбека
+    VkDebugReportCallbackCreateInfoEXT createInfo = {};
+    memset(&createInfo, 0, sizeof(VkDebugReportCallbackCreateInfoEXT));
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+    createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT; // Выводим только ошибки и варнинги
+    createInfo.pfnCallback = debugCallback;
+
+    if (createDebugReportCallbackEXT(vulkanInstance, &createInfo, nullptr, &vulkanDebugCallback) != VK_SUCCESS) {
+        throw std::runtime_error("failed to set up debug callback!");
+    }
+#endif
+}
+
 void VulkanDevice::createSwapchain(){
     std::array<const char*, 1> deviceExtensions;
     deviceExtensions[0] = "VK_KHR_swapchain";

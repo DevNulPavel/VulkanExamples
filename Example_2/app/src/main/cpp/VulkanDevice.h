@@ -9,9 +9,11 @@ struct VulkanDevice {
 public:
     VkInstance vulkanInstance;
 
+public:
     VulkanDevice();
     ~VulkanDevice();
-    void createVulkanInstance();
+    void createVulkanInstance();    // Создание инстанса
+    void setupDebugCallback();      // Устанавливаем коллбек для отладки
     void createSwapchain();
 
 private:

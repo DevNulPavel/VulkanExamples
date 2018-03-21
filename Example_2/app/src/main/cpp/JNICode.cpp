@@ -28,6 +28,7 @@ void Java_com_example_devnul_vulkanexample_MainActivity_init(JNIEnv *env, jobjec
 
     vulkanDevice = new VulkanDevice();
     vulkanDevice->createVulkanInstance();
+    vulkanDevice->setupDebugCallback();
 }
 
 JNICALL
