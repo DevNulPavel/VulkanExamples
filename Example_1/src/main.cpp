@@ -45,7 +45,11 @@
 
 
 #define VALIDATION_LAYERS_COUNT 1
+#ifdef __APPLE__
+const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "MoltenVK" };
+#else
 const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_standard_validation" };
+#endif
 
 #define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -224,6 +228,19 @@ bool checkValidationLayerSupport() {
         }
     #endif
     return true;
+}
+
+// Получаем все доступные слои валидации устройства
+std::vector<VkLayerProperties> getAllValidationLayers(){
+    // Количество уровней валидации
+    uint32_t layerCount = 0;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    
+    // Получаем доступные слои валидации
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+    
+    return availableLayers;
 }
 
 // Создание инстанса Vulkan
@@ -1995,6 +2012,13 @@ int local_main(int argc, char** argv) {
         printf("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
 		fflush(stdout);
         throw std::runtime_error("Vulkan support not found!");
+    }
+    
+    // Список доступных слоев валидации
+    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
+    for(const VkLayerProperties& layerInfo: allValidationLayers){
+        printf("Validation layer available: %s\n", layerInfo.layerName);
+        fflush(stdout);
     }
     
     // Создание инстанса Vulkan

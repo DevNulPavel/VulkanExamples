@@ -14,8 +14,7 @@ VulkanDevice* vulkanDevice = nullptr;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-extern "C" // Экспорт функций в C стиле
-
+extern "C" {
 
 JNICALL
 void Java_com_example_devnul_vulkanexample_MainActivity_init(JNIEnv *env, jobject) {
@@ -32,10 +31,12 @@ void Java_com_example_devnul_vulkanexample_MainActivity_init(JNIEnv *env, jobjec
 }
 
 JNICALL
-void Java_com_example_devnul_vulkanexample_MainActivity_draw(JNIEnv *env) {
+void Java_com_example_devnul_vulkanexample_MainActivity_draw(JNIEnv *env, jobject) {
 }
 
 JNICALL
-void Java_com_example_devnul_vulkanexample_MainActivity_destroy(JNIEnv *env) {
+void Java_com_example_devnul_vulkanexample_MainActivity_destroy(JNIEnv *env, jobject) {
     delete vulkanDevice;
+}
+
 }

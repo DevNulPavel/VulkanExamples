@@ -5,11 +5,15 @@
 #include <set>
 #include <array>
 #include <vector>
+#include <android/log.h>
 #include "SupportFunctions.h"
 
 
 #define VALIDATION_LAYERS_ENABLED
 
+#define  LOG_TAG    "VulkanTest"
+#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
 
 VulkanDevice::VulkanDevice():
@@ -33,26 +37,56 @@ std::vector<VkLayerProperties> VulkanDevice::getAllValidationLayers(){
     return availableLayers;
 }
 
+// Проверяем, что все запрошенные слои нам доступны
+bool checkAllLayersAvailable(const std::vector<VkLayerProperties>& allLayers, const std::vector<const char*>& testLayers){
+    for(int i = 0; i < testLayers.size(); i++) {
+        const char* layerName = testLayers[i];
+        bool layerFound = false;
+
+        for (const auto& layerProperties : allLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if (!layerFound) {
+            LOGD("Layer %s not available!\n", layerName);
+            fflush(stdout);
+            return false;
+        }
+    }
+    return true;
+}
+
 // Получаем доступные слои валидации устройства
 std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
 #ifdef VALIDATION_LAYERS_ENABLED
-    std::vector<const char*> result;
+    // Список всех слоев
+    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
+    for(const VkLayerProperties& layerInfo: allValidationLayers){
+        LOGD("Validation layer available: %s\n", layerInfo.layerName);
+        fflush(stdout);
+    }
 
-    /*result.push_back("VK_LAYER_LUNARG_standard_validation");
-    if (!demo_check_layers(info.instance_layer_properties, info.instance_layer_names)) {
+    std::vector<const char*> result;
+    result.push_back("VK_LAYER_LUNARG_standard_validation");
+    if (!checkAllLayersAvailable(allValidationLayers, result)) {
         result.clear();
+        result.push_back("VK_LAYER_LUNARG_image");
         result.push_back("VK_LAYER_GOOGLE_threading");
         result.push_back("VK_LAYER_LUNARG_parameter_validation");
         result.push_back("VK_LAYER_LUNARG_object_tracker");
         result.push_back("VK_LAYER_LUNARG_core_validation");
         result.push_back("VK_LAYER_GOOGLE_unique_objects");
+        result.push_back("VK_LAYER_LUNARG_swapchain");
 
-        if (!demo_check_layers(info.instance_layer_properties, info.instance_layer_names)) {
-            printf("Failed to get validation layers\n");
+        if (!checkAllLayersAvailable(allValidationLayers, result)) {
+            LOGD("Failed to get validation layers!\n");
             fflush(stdout);
             throw std::runtime_error("Failed to create instance!");
         }
-    }*/
+    }
     return result;
 #else
     return std::vector<const char*>();
@@ -86,20 +120,13 @@ void VulkanDevice::createVulkanInstance(){
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());  // Включаем расширения
     createInfo.ppEnabledExtensionNames = instanceExtensions.data();
-    createInfo.enabledLayerCount = validationLayers.size();     // Включаем стандартные слои валидации
+    createInfo.enabledLayerCount = (uint32_t)validationLayers.size();     // Включаем стандартные слои валидации
     createInfo.ppEnabledLayerNames = validationLayers.data();
-
-
-    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
-    for(const VkLayerProperties& layerInfo: allValidationLayers){
-        printf("Validation layer available: %s\n", layerInfo.layerName);
-    }
-
 
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
     if (createStatus != VK_SUCCESS) {
-        printf("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
+        LOGD("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
         fflush(stdout);
         throw std::runtime_error("Failed to create instance!");
     }
