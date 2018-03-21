@@ -5,6 +5,7 @@
 #include <set>
 #include <array>
 #include <vector>
+#include <map>
 #include <android/log.h>
 #include <dlfcn.h>  // For dlopen
 #include "SupportFunctions.h"
@@ -71,7 +72,7 @@ bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLa
         }
 
         if (!layerFound) {
-            LOGD("Layer %s not available!\n", layerName);
+            LOGE("Layer %s not available!\n", layerName);
             fflush(stdout);
             return false;
         }
@@ -80,8 +81,8 @@ bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLa
 }
 
 // Список необходимых расширений инстанса приложения
-std::vector<VkExtensionProperties> VulkanDevice::getAllExtentionsNames(const std::vector<const char *>& layersNames){
-    std::vector<VkExtensionProperties> result;
+std::map<std::string, std::vector<VkExtensionProperties>> VulkanDevice::getAllExtentionsNames(const std::vector<const char *>& layersNames){
+    std::map<std::string, std::vector<VkExtensionProperties>> result;
 
     for (const char* layerName: layersNames) {
         std::vector<VkExtensionProperties> layerExtentions;
@@ -94,20 +95,26 @@ std::vector<VkExtensionProperties> VulkanDevice::getAllExtentionsNames(const std
         layerExtentions.resize(extensionCount);
         vkEnumerateInstanceExtensionProperties(layerName, &extensionCount, layerExtentions.data());
 
-        result.insert(result.end(), layerExtentions.begin(), layerExtentions.end());
+        std::vector<VkExtensionProperties>& propsArray = result[layerName];
+        propsArray.insert(propsArray.end(), layerExtentions.begin(), layerExtentions.end());
     }
 
     return result;
 }
 
-// Список необходимых расширений инстанса приложения
-std::vector<const char*> VulkanDevice::getRequiredExtentionNames(const std::vector<const char *>& layersNames){
-    std::vector<VkExtensionProperties> allExtentions = getAllExtentionsNames(layersNames);
-    for(const VkExtensionProperties& extentionInfo: allExtentions){
-        LOGD("Extention available: %s\n", extentionInfo.extensionName);
-        fflush(stdout);
+// Список всех расширений в леерах
+void VulkanDevice::printAllExtentionsAtLayers(const std::vector<const char *>& layersNames){
+    std::map<std::string, std::vector<VkExtensionProperties>> allExtentions = getAllExtentionsNames(layersNames);
+    for(const std::pair<std::string, std::vector<VkExtensionProperties>>& extentionInfo: allExtentions){
+        for (const VkExtensionProperties& property: extentionInfo.second) {
+            LOGE("Extention at layer %s available: %s\n", extentionInfo.first.c_str(), property.extensionName);
+            fflush(stdout);
+        }
     }
+}
 
+// Список необходимых расширений инстанса приложения
+std::vector<const char*> VulkanDevice::getRequiredExtentionNames(){
     std::vector<const char*> result;
     result.push_back("VK_KHR_surface");
     result.push_back("VK_KHR_android_surface");
@@ -123,7 +130,7 @@ std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
     // Список всех слоев
     std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
     for(const VkLayerProperties& layerInfo: allValidationLayers){
-        LOGD("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
+        LOGE("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
         fflush(stdout);
     }
 
@@ -155,6 +162,15 @@ std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
 
 void VulkanDevice::createVulkanInstance(){
 
+    // Запрашиваем возможные слои валидации
+    std::vector<const char*> validationLayers = getPossibleDebugValidationLayers();
+
+    // Выводим расширения в слоях валидации
+    printAllExtentionsAtLayers(validationLayers);
+
+    // Список требуемых расширений
+    std::vector<const char*> instanceExtensions = getRequiredExtentionNames();
+
     // Структура с настройками приложения Vulkan
     VkApplicationInfo appInfo = {};
     memset(&appInfo, 0, sizeof(VkApplicationInfo));
@@ -164,10 +180,6 @@ void VulkanDevice::createVulkanInstance(){
     appInfo.pEngineName = "NoEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;  // Указываем используемую версию Vulkan
-
-    // Запрашиваем возможные слои валидации
-    std::vector<const char*> validationLayers = getPossibleDebugValidationLayers();
-    std::vector<const char*> instanceExtensions = getRequiredExtentionNames(validationLayers);
 
     // Структура настроек создания инстанса
     VkInstanceCreateInfo createInfo = {};

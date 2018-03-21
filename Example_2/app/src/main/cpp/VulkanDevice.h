@@ -2,6 +2,8 @@
 #define EXAMPLE_2_VULKANDEVICE_H
 
 #include <vector>
+#include <map>
+#include <string>
 #include "VulkanCodeWrapper/vulkan_wrapper.h"
 
 
@@ -20,9 +22,11 @@ private:
     // Получаем все доступные слои валидации устройства
     std::vector<VkLayerProperties> getAllValidationLayers();
     // Список необходимых расширений инстанса приложения
-    std::vector<VkExtensionProperties> getAllExtentionsNames(const std::vector<const char *>& layersNames);
+    std::map<std::string, std::vector<VkExtensionProperties>> getAllExtentionsNames(const std::vector<const char *>& layersNames);
+    // Список всех расширений в леерах
+    void printAllExtentionsAtLayers(const std::vector<const char *>& layersNames);
     // Список необходимых расширений инстанса приложения
-    std::vector<const char*> getRequiredExtentionNames(const std::vector<const char *>& layersNames);
+    std::vector<const char*> getRequiredExtentionNames();
     // Получаем доступные слои валидации устройства
     std::vector<const char*> getPossibleDebugValidationLayers();
     // К методам расширениям может не быть прямого доступа, поэтому создаем коллбек вручную
