@@ -371,7 +371,7 @@ FamiliesQueueIndexes findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
 // Проверяем, поддерживает ли девайс цепочку свопинга
 bool checkDeviceRequiredExtensionSupport(VkPhysicalDevice device) {
     // Получаем количество расширений
-    uint32_t extensionCount;
+    uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
     
     // Получаем расширения
