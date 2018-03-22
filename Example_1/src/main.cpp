@@ -559,7 +559,9 @@ void pickPhysicalDevice() {
     if (candidates.begin()->first > 0) {
         vulkanPhysicalDevice = candidates.begin()->second.first;
         vulkanRenderQueueFamilyIndex = candidates.begin()->second.second.renderQueueFamilyIndex;
+		vulkanRenderQueueFamilyQueuesCount = candidates.begin()->second.second.renderQueueFamilyQueuesCount;
         vulkanPresentQueueFamilyIndex = candidates.begin()->second.second.presentQueueFamilyIndex;
+		vulkanPresentQueueFamilyQueuesCount = candidates.begin()->second.second.presentQueueFamilyQueuesCount;
     } else {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
