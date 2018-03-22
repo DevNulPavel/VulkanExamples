@@ -6,6 +6,7 @@
 #include <array>
 #include <vector>
 #include <map>
+#include <tuple>
 #include "SupportFunctions.h"
 
 
@@ -30,13 +31,21 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VulkanDevice::VulkanDevice():
+VulkanDevice::VulkanDevice(ANativeWindow* androidNativeWindow, uint32_t windowW, uint32_t windowH):
+    windowWidth(windowW),
+    windowHeight(windowH),
     vulkanInstance(VK_NULL_HANDLE),
     vulkanDebugCallback(VK_NULL_HANDLE),
     vulkanPhysicalDevice(VK_NULL_HANDLE),
     vulkanLogicalDevice(VK_NULL_HANDLE),
     vulkanGraphicsQueue(VK_NULL_HANDLE),
     vulkanPresentQueue(VK_NULL_HANDLE){
+
+    createVulkanInstance();
+    setupDebugCallback();
+    createSurface(androidNativeWindow);
+    selectPhysicalDevice();
+    createLogicalDeviceAndQueue();
 }
 
 VulkanDevice::~VulkanDevice() {
@@ -417,7 +426,7 @@ void VulkanDevice::selectPhysicalDevice(){
     vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, devices.data());
 
     // Используем Map для автоматической сортировки по производительности
-    std::map<int, std::pair<VkPhysicalDevice, FamiliesQueueIndexes>> candidates;
+    std::map<int, std::tuple<VkPhysicalDevice, FamiliesQueueIndexes, SwapChainSupportDetails>> candidates;
 
     // Перебираем GPU для поиска подходящего устройства
     for (const VkPhysicalDevice& device: devices) {
@@ -439,7 +448,7 @@ void VulkanDevice::selectPhysicalDevice(){
         if (familiesInfo.isComplete()) {
             // Оцениваем возможности устройства
             int score = ratePhysicalDeviceScore(device);
-            candidates[score] = std::pair<VkPhysicalDevice,FamiliesQueueIndexes>(device, familiesInfo);
+            candidates[score] = std::tuple<VkPhysicalDevice, FamiliesQueueIndexes, SwapChainSupportDetails>(device, familiesInfo, swapChainSupport);
         }
     }
 
@@ -450,8 +459,9 @@ void VulkanDevice::selectPhysicalDevice(){
 
     // Получаем наилучший вариант GPU
     if (candidates.begin()->first > 0) {
-        vulkanPhysicalDevice = candidates.begin()->second.first;
-        vulkanFamiliesQueueIndexes = candidates.begin()->second.second;
+        vulkanPhysicalDevice = std::get<0>(candidates.begin()->second);
+        vulkanFamiliesQueueIndexes = std::get<1>(candidates.begin()->second);
+        vulkanSwapChainSupportDetails = std::get<2>(candidates.begin()->second);
     } else {
         throw std::runtime_error("failed to find a suitable GPU!");
     }

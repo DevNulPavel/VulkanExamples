@@ -37,6 +37,8 @@ struct SwapChainSupportDetails {
 
 struct VulkanDevice {
 public:
+    uint32_t windowWidth;
+    uint32_t windowHeight;
     std::vector<const char*> vulkanValidationLayers;
     std::vector<const char*> vulkanInstanceExtensions;
     VkInstance vulkanInstance;
@@ -44,21 +46,25 @@ public:
     VkSurfaceKHR vulkanSurface;
     VkPhysicalDevice vulkanPhysicalDevice;
     FamiliesQueueIndexes vulkanFamiliesQueueIndexes;
+    SwapChainSupportDetails vulkanSwapChainSupportDetails;
     VkDevice vulkanLogicalDevice;
     VkQueue vulkanGraphicsQueue;
     VkQueue vulkanPresentQueue;
 
-
 public:
-    VulkanDevice();
+    VulkanDevice(ANativeWindow* androidNativeWindow, uint32_t windowW, uint32_t windowH);
     ~VulkanDevice();
-    void createVulkanInstance();    // Создание инстанса
-    void setupDebugCallback();      // Устанавливаем коллбек для отладки
-    void createSurface(ANativeWindow* androidNativeWindow); // Создаем плоскость отрисовки
-    void selectPhysicalDevice();    // Инициализация физического устройства
-    void createLogicalDeviceAndQueue(); // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
 
 private:
+    // Стадии загрузки
+    void createVulkanInstance();                        // Создание инстанса
+    void setupDebugCallback();                          // Устанавливаем коллбек для отладки
+    void createSurface(ANativeWindow* androidNativeWindow); // Создаем плоскость отрисовки
+    void selectPhysicalDevice();                        // Инициализация физического устройства
+    void createLogicalDeviceAndQueue();                 // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
     // Получаем все доступные слои валидации устройства
     std::vector<VkLayerProperties> getAllValidationLayers();
     // Проверяем, что все запрошенные слои нам доступны

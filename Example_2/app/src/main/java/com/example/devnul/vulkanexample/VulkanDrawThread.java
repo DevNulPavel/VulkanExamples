@@ -26,9 +26,10 @@ public class VulkanDrawThread extends Thread{
     @Override
     public void run() {
         // TODO: самая простая реализация, на сворачивание игры рушится контекст, на запуск - заново все создается
-
         Surface surface = surfaceHolder.getSurface();
-        vulkanInit(surface);
+        int width = surfaceHolder.getSurfaceFrame().width();
+        int height = surfaceHolder.getSurfaceFrame().height();
+        vulkanInit(surface, width, height);
 
         while (runFlag) {
             Canvas canvas = null;
@@ -49,7 +50,7 @@ public class VulkanDrawThread extends Thread{
     }
 
     // Нативные методы
-    public native void vulkanInit(Object surface);
+    public native void vulkanInit(Object surface, int width, int height);
     public native void vulkanDraw();
     public native void vulkanDestroy();
 }
