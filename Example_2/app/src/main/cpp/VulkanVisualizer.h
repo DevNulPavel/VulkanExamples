@@ -14,6 +14,9 @@ public:
     VkFormat vulkanDepthFormat;
     VkExtent2D vulkanSwapChainExtent;
     std::vector<VkImageView> vulkanSwapChainImageViews;
+    VkImage vulkanDepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
+    VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
 
 public:
     VulkanSwapchain(VulkanDevice* device);
@@ -21,9 +24,11 @@ public:
 
 private:
     // Стадии инициализации
-    void createSwapChain();     // Создание логики смены кадров
-    void createImageViews();    // Создание вьюшек изображений буффера кадра свопчейна
-    VkFormat findDepthFormat(); // Подбираем нужный формат глубины
+    void createSwapChain();         // Создание логики смены кадров
+    void getSwapchainImages();      // Получаем изображения из свопчейна
+    void createSwapchainImageViews();    // Создание вьюшек изображений буффера кадра свопчейна
+    VkFormat findDepthFormat();     // Подбираем нужный формат глубины
+    void createDepthResources();    // Создаем буфферы для глубины
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +42,14 @@ private:
     void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView);
     // Подбираем формат текстуры в зависимости от доступных на устройстве
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+    // Подбираем тип памяти под свойства
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    // Создаем изображение
+    void createImage(uint32_t width, uint32_t height,
+                     VkFormat format, VkImageTiling tiling,
+                     VkImageLayout layout, VkImageUsageFlags usage,
+                     VkMemoryPropertyFlags properties,
+                     VkImage& image, VkDeviceMemory& imageMemory);
 };
 
 

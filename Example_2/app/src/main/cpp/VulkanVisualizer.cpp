@@ -10,14 +10,22 @@ VulkanSwapchain::VulkanSwapchain(VulkanDevice* device):
     vulkanSwapchain(VK_NULL_HANDLE),
     vulkanSwapChainImageFormat(VK_FORMAT_UNDEFINED),
     vulkanDepthFormat(VK_FORMAT_UNDEFINED),
-    vulkanSwapChainExtent(VkExtent2D{0, 0}){
+    vulkanSwapChainExtent(VkExtent2D{0, 0}),
+    vulkanDepthImage(VK_NULL_HANDLE),
+    vulkanDepthImageMemory(VK_NULL_HANDLE),
+    vulkanDepthImageView(VK_NULL_HANDLE){
 
     createSwapChain();
-    createImageViews();
+    getSwapchainImages();
+    createSwapchainImageViews();
     findDepthFormat();
+    createDepthResources();
 }
 
 VulkanSwapchain::~VulkanSwapchain(){
+    vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanDepthImageMemory, nullptr);
+    vkDestroyImage(vulkanDevice->vulkanLogicalDevice, vulkanDepthImage, nullptr);
+    vkDestroyImageView(vulkanDevice->vulkanLogicalDevice, vulkanDepthImageView, nullptr);
     for(const auto& imageView: vulkanSwapChainImageViews){
         vkDestroyImageView(vulkanDevice->vulkanLogicalDevice, imageView, nullptr);
     }
@@ -140,16 +148,19 @@ void VulkanSwapchain::createSwapChain() {
         oldSwapChain = VK_NULL_HANDLE;
     }
 
+    // Сохраняем формат и размеры изображения
+    vulkanSwapChainImageFormat = surfaceFormat.format;
+    vulkanSwapChainExtent = extent;
+}
+
+// Получаем изображения из свопчейна
+void VulkanSwapchain::getSwapchainImages(){
     // Получаем изображения для отображения
     uint32_t imagesCount = 0;
     vkGetSwapchainImagesKHR(vulkanDevice->vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
 
-    vulkanSwapChainImages.resize(imageCount);
+    vulkanSwapChainImages.resize(imagesCount);
     vkGetSwapchainImagesKHR(vulkanDevice->vulkanLogicalDevice, vulkanSwapchain, &imagesCount, vulkanSwapChainImages.data());
-
-    // Сохраняем формат и размеры изображения
-    vulkanSwapChainImageFormat = surfaceFormat.format;
-    vulkanSwapChainExtent = extent;
 }
 
 // Создание вью для изображения
@@ -185,7 +196,7 @@ void VulkanSwapchain::createImageView(VkImage image, VkFormat format, VkImageAsp
 }
 
 // Создание вьюшек изображений буффера кадра свопчейна
-void VulkanSwapchain::createImageViews() {
+void VulkanSwapchain::createSwapchainImageViews() {
     // Удаляем старые, если есть
     if(vulkanSwapChainImageViews.size() > 0){
         for(const auto& imageView: vulkanSwapChainImageViews){
@@ -228,4 +239,98 @@ VkFormat VulkanSwapchain::findDepthFormat() {
                                             VK_IMAGE_TILING_OPTIMAL,
                                             VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     return vulkanDepthFormat;
+}
+
+// Подбираем тип памяти под свойства
+uint32_t VulkanSwapchain::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    // Запрашиваем типы памяти физического устройства
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(vulkanDevice->vulkanPhysicalDevice, &memProperties);
+
+    // Найдем тип памяти, который подходит для самого буфера
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+// Создаем изображение
+void VulkanSwapchain::createImage(uint32_t width, uint32_t height,
+                                  VkFormat format, VkImageTiling tiling,
+                                  VkImageLayout layout, VkImageUsageFlags usage,
+                                  VkMemoryPropertyFlags properties,
+                                  VkImage& image, VkDeviceMemory& imageMemory) {
+
+    // Удаляем старые объекты
+    if (image != VK_NULL_HANDLE) {
+        vkDestroyImage(vulkanDevice->vulkanLogicalDevice, image, nullptr);
+        image = VK_NULL_HANDLE;
+    }
+    if (imageMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(vulkanDevice->vulkanLogicalDevice, imageMemory, nullptr);
+        imageMemory = VK_NULL_HANDLE;
+    }
+
+    // Для поля initialLayout есть только два возможных значения:
+    // VK_IMAGE_LAYOUT_UNDEFINED: Не и используется GPU и первое изменение (transition) отбросит все тексели.
+    // VK_IMAGE_LAYOUT_PREINITIALIZED: Не и используется GPU, но первое изменение (transition) сохранит тексели.
+    // Первый вариант подходит для изображений, которые будут использоваться в качестве вложений, как буфер цвета и глубины.
+    // В таком случае не нужно заботиться о данных инициализации, т.к. они скорее всего будут очищены проходом рендера до начала использования. А если же вы хотите заполнить данные, такие как текстуры, тогда используйте второй вариант:
+
+    // Информация об изображении
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D; // 2D текстура
+    imageInfo.extent.width = width;     // Ширина
+    imageInfo.extent.height = height;   // Высота
+    imageInfo.extent.depth = 1;         // Глубина
+    imageInfo.mipLevels = 1;            // Без мипмапов
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;          // Формат данных текстуры
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = layout; // Текстура заранее с нужными данными
+    imageInfo.usage = usage;    // Флаги использования текстуры
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;  // Семплирование данной текстуры
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Режим междевайного доступа
+
+    // Создаем изображение
+    if (vkCreateImage(vulkanDevice->vulkanLogicalDevice, &imageInfo, nullptr, &image) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create image!");
+    }
+
+    // Запрашиваем информацию о требованиях памяти для текстуры
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(vulkanDevice->vulkanLogicalDevice, image, &memRequirements);
+
+    // Подбираем нужный тип аллоцируемой памяти для требований и возможностей
+    uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits, properties);
+    VkMemoryAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;    // Размер аллоцируемой памяти
+    allocInfo.memoryTypeIndex = memoryType;             // Тип памяти
+
+    if (vkAllocateMemory(vulkanDevice->vulkanLogicalDevice, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate image memory!");
+    }
+
+    // Цепляем к картинке буффер памяти
+    vkBindImageMemory(vulkanDevice->vulkanLogicalDevice, image, imageMemory, 0);
+}
+
+// Создаем буфферы для глубины
+void VulkanSwapchain::createDepthResources() {
+    createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height,
+                vulkanDepthFormat,                                  // Формат текстуры
+                VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,   // Используем сразу правильный лаяут для текстуры
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
+                vulkanDepthImage, vulkanDepthImageMemory);
+
+    // Создаем вью для изображения буффера глубины
+    createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
 }

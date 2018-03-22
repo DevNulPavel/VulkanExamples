@@ -54,7 +54,7 @@ const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_stan
 #define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-#define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
+#define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_4_BIT
 
 struct FamiliesQueueIndexes;
 
@@ -696,15 +696,19 @@ void createSwapChain() {
         oldSwapChain = VK_NULL_HANDLE;
     }
     
+    // Сохраняем формат и размеры изображения
+    vulkanSwapChainImageFormat = surfaceFormat.format;
+    vulkanSwapChainExtent = extent;
+}
+
+// Получаем изображения из свопчейна
+void getSwapchainImages(){
     // Получаем изображения для отображения
     uint32_t imagesCount = 0;
     vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
     
-    vulkanSwapChainImages.resize(imageCount);
+    vulkanSwapChainImages.resize(imagesCount);
     vkGetSwapchainImagesKHR(vulkanLogicalDevice, vulkanSwapchain, &imagesCount, vulkanSwapChainImages.data());
-    
-    vulkanSwapChainImageFormat = surfaceFormat.format;
-    vulkanSwapChainExtent = extent;
 }
 
 // Создание вью для изображения
@@ -1922,6 +1926,7 @@ void recreateSwapChain() {
     
     // Заново пересоздаем свопчейны, старые удалятся внутри
     createSwapChain();
+    getSwapchainImages();
     createImageViews();
     createDepthResources();
     createFramebuffers();
@@ -2069,6 +2074,9 @@ int local_main(int argc, char** argv) {
     
     // Создание логики смены кадров
     createSwapChain();
+    
+    // Берем изображения из свопчейна
+    getSwapchainImages();
     
     // Создание вьюшек изображений буффера кадра
     createImageViews();
