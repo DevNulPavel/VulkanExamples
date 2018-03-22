@@ -1,32 +1,20 @@
 package com.example.devnul.vulkanexample;
 
-import android.support.v7.app.AppCompatActivity;
+import android.app.Activity;
 import android.os.Bundle;
 
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
+    private VulkanSurfaceView vulkanView = null;
 
-    // Used to load the 'native-lib' library on application startup.
-    static {
-        System.loadLibrary("native-lib");
-    }
+    ////////////////////////////////////////////////////////////////////////////////////
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        init();
-        draw();
-        destroy();
+        vulkanView = new VulkanSurfaceView(this.getApplicationContext());
+        setContentView(vulkanView);
     }
-
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    public native void init();
-    public native void draw();
-    public native void destroy();
 }

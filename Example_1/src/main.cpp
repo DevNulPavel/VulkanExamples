@@ -2001,6 +2001,8 @@ int local_main(int argc, char** argv) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     // Окно без изменения размера
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    // Мультисемплинг
+    //glfwWindowHint(GLFW_SAMPLES, 4);
     
     // Создаем окно
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);

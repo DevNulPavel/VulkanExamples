@@ -11,12 +11,15 @@ struct VulkanDevice {
 public:
     VkInstance vulkanInstance;
     VkDebugReportCallbackEXT vulkanDebugCallback;
+    VkSurfaceKHR vulkanSurface;
 
 public:
     VulkanDevice();
     ~VulkanDevice();
     void createVulkanInstance();    // Создание инстанса
     void setupDebugCallback();      // Устанавливаем коллбек для отладки
+    void createSurface(ANativeWindow* androidNativeWindow); // Создаем плоскость отрисовки
+    void selectPhysicalDevice();    // Инициализация физического устройства
 
 private:
     // Получаем все доступные слои валидации устройства

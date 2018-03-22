@@ -6,16 +6,10 @@
 #include <array>
 #include <vector>
 #include <map>
-#include <android/log.h>
-#include <dlfcn.h>  // For dlopen
 #include "SupportFunctions.h"
 
 
 #define VALIDATION_LAYERS_ENABLED
-
-#define  LOG_TAG    "VulkanTest"
-#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
-#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
 
 // Отладочный коллбек
@@ -27,8 +21,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
                                                     const char* layerPrefix,
                                                     const char* msg,
                                                     void* userData) {
-    printf("Validation layer message %s: %s\n", layerPrefix, msg);
-    fflush(stdout);
+    LOGE("Validation layer message %s: %s\n", layerPrefix, msg);
     return VK_FALSE;
 }
 
@@ -39,10 +32,13 @@ VulkanDevice::VulkanDevice():
 }
 
 VulkanDevice::~VulkanDevice() {
-#ifdef VALIDATION_LAYERS_ENABLED
-    destroyDebugReportCallbackEXT(vulkanDebugCallback, nullptr);
-#endif
+    vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
+    #ifdef VALIDATION_LAYERS_ENABLED
+        destroyDebugReportCallbackEXT(vulkanDebugCallback, nullptr);
+    #endif
     vkDestroyInstance(vulkanInstance, nullptr);
+
+    LOGE("Vulkan device destroyed");
 }
 
 // Получаем все доступные слои валидации устройства
@@ -73,7 +69,6 @@ bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLa
 
         if (!layerFound) {
             LOGE("Layer %s not available!\n", layerName);
-            fflush(stdout);
             return false;
         }
     }
@@ -108,7 +103,6 @@ void VulkanDevice::printAllExtentionsAtLayers(const std::vector<const char *>& l
     for(const std::pair<std::string, std::vector<VkExtensionProperties>>& extentionInfo: allExtentions){
         for (const VkExtensionProperties& property: extentionInfo.second) {
             LOGE("Extention at layer %s available: %s\n", extentionInfo.first.c_str(), property.extensionName);
-            fflush(stdout);
         }
     }
 }
@@ -118,46 +112,45 @@ std::vector<const char*> VulkanDevice::getRequiredExtentionNames(){
     std::vector<const char*> result;
     result.push_back("VK_KHR_surface");
     result.push_back("VK_KHR_android_surface");
-#ifdef VALIDATION_LAYERS_ENABLED
-    result.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-#endif
+    #ifdef VALIDATION_LAYERS_ENABLED
+        result.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    #endif
     return result;
 }
 
 // Получаем доступные слои валидации устройства
 std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
-#ifdef VALIDATION_LAYERS_ENABLED
-    // Список всех слоев
-    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
-    for(const VkLayerProperties& layerInfo: allValidationLayers){
-        LOGE("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
-        fflush(stdout);
-    }
-
-    // Возможные отладочные слои
-    std::vector<const char*> result;
-    result.push_back("VK_LAYER_LUNARG_standard_validation");
-    if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
-        result.clear();
-        result.push_back("VK_LAYER_LUNARG_image");
-        result.push_back("VK_LAYER_GOOGLE_threading");
-        result.push_back("VK_LAYER_LUNARG_parameter_validation");
-        result.push_back("VK_LAYER_LUNARG_object_tracker");
-        result.push_back("VK_LAYER_LUNARG_core_validation");
-        result.push_back("VK_LAYER_GOOGLE_unique_objects");
-        result.push_back("VK_LAYER_LUNARG_swapchain");
-
-        if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
-            LOGE("Failed to get validation layers!\n");
+    #ifdef VALIDATION_LAYERS_ENABLED
+        // Список всех слоев
+        std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
+        for(const VkLayerProperties& layerInfo: allValidationLayers){
+            LOGE("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
             fflush(stdout);
-            throw std::runtime_error("Failed to create instance!");
         }
-    }
 
-    return result;
-#else
-    return std::vector<const char*>();
-#endif
+        // Возможные отладочные слои
+        std::vector<const char*> result;
+        result.push_back("VK_LAYER_LUNARG_standard_validation");
+        if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+            result.clear();
+            result.push_back("VK_LAYER_LUNARG_image");
+            result.push_back("VK_LAYER_GOOGLE_threading");
+            result.push_back("VK_LAYER_LUNARG_parameter_validation");
+            result.push_back("VK_LAYER_LUNARG_object_tracker");
+            result.push_back("VK_LAYER_LUNARG_core_validation");
+            result.push_back("VK_LAYER_GOOGLE_unique_objects");
+            result.push_back("VK_LAYER_LUNARG_swapchain");
+
+            if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+                LOGE("Failed to get validation layers!\n");
+                throw std::runtime_error("Failed to create instance!");
+            }
+        }
+
+        return result;
+    #else
+        return std::vector<const char*>();
+    #endif
 }
 
 void VulkanDevice::createVulkanInstance(){
@@ -195,7 +188,6 @@ void VulkanDevice::createVulkanInstance(){
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
     if (createStatus != VK_SUCCESS) {
         LOGE("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
-        fflush(stdout);
         throw std::runtime_error("Failed to create instance!");
     }
 }
@@ -228,22 +220,44 @@ void VulkanDevice::destroyDebugReportCallbackEXT(VkDebugReportCallbackEXT callba
 
 // Устанавливаем коллбек для отладки
 void VulkanDevice::setupDebugCallback() {
-#ifdef VALIDATION_LAYERS_ENABLED
-    // Структура с описанием коллбека
-    VkDebugReportCallbackCreateInfoEXT createInfo = {};
-    memset(&createInfo, 0, sizeof(VkDebugReportCallbackCreateInfoEXT));
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    createInfo.flags =  VK_DEBUG_REPORT_ERROR_BIT_EXT |
-                        VK_DEBUG_REPORT_WARNING_BIT_EXT |
-                        VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
-                        VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT; // Что выводим в коллбек
-    createInfo.pfnCallback = debugCallback;
+    #ifdef VALIDATION_LAYERS_ENABLED
+        // Структура с описанием коллбека
+        VkDebugReportCallbackCreateInfoEXT createInfo = {};
+        memset(&createInfo, 0, sizeof(VkDebugReportCallbackCreateInfoEXT));
+        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+        createInfo.flags =  VK_DEBUG_REPORT_ERROR_BIT_EXT |
+                            VK_DEBUG_REPORT_WARNING_BIT_EXT |
+                            VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+                            VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT; // Что выводим в коллбек
+        createInfo.pfnCallback = debugCallback;
 
-    VkResult createCallbackStatus = createDebugReportCallbackEXT(&createInfo, nullptr, &vulkanDebugCallback);
-    if (createCallbackStatus != VK_SUCCESS) {
-        throw std::runtime_error("failed to set up debug callback!");
+        VkResult createCallbackStatus = createDebugReportCallbackEXT(&createInfo, nullptr, &vulkanDebugCallback);
+        if (createCallbackStatus != VK_SUCCESS) {
+            LOGE("Failed to set up debug callback!");
+            throw std::runtime_error("Failed to set up debug callback!");
+        }
+    #endif
+}
+
+// Создаем плоскость отрисовки
+void VulkanDevice::createSurface(ANativeWindow* androidNativeWindow){
+    VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
+    memset(&surfaceCreateInfo, 0, sizeof(VkAndroidSurfaceCreateInfoKHR));
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+    surfaceCreateInfo.pNext = nullptr;
+    surfaceCreateInfo.flags = 0;
+    surfaceCreateInfo.window = androidNativeWindow; // Нативный Surface на андроиде
+
+    VkResult status = vkCreateAndroidSurfaceKHR(vulkanInstance, &surfaceCreateInfo, nullptr, &vulkanSurface);
+    if (status != VK_SUCCESS) {
+        LOGE("Failed to create surface!");
+        throw std::runtime_error("Failed to create surface!");
     }
-#endif
+}
+
+// Инициализация физического устройства
+void VulkanDevice::selectPhysicalDevice(){
+
 }
 
 /*void VulkanDevice::createSwapchain(){
