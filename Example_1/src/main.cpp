@@ -54,7 +54,7 @@ const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_stan
 #define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-#define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_4_BIT
+#define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
 
 struct FamiliesQueueIndexes;
 
@@ -1091,7 +1091,7 @@ void createFramebuffers(){
         VkFramebufferCreateInfo framebufferInfo = {};
         memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = vulkanRenderPass;  // Используем стандартный рендер-проход
+        framebufferInfo.renderPass = vulkanRenderPass;  // Совместимый рендер-проход
         framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
         framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
         framebufferInfo.width = vulkanSwapChainExtent.width;    // Размеры экрана
@@ -1929,8 +1929,8 @@ void recreateSwapChain() {
     getSwapchainImages();
     createImageViews();
     createDepthResources();
-    createFramebuffers();
     createRenderPass();
+    createFramebuffers();
     createGraphicsPipeline();
     createCommandBuffers();
 }
@@ -2087,11 +2087,11 @@ int local_main(int argc, char** argv) {
     // Создаем ресурсы для глубины
     createDepthResources();
     
-    // Создаем фреймбуфферы
-    createFramebuffers();
-    
     // Создание рендер-прохода
     createRenderPass();
+    
+    // Создаем фреймбуфферы
+    createFramebuffers();
     
     // Создаем дескриптор для буффера юниформов
     createDescriptorSetLayout();

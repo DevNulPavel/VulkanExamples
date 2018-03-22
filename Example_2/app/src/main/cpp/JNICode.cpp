@@ -7,6 +7,7 @@
 #include "VulkanCodeWrapper/vulkan_wrapper.h"
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
+#include "VulkanRenderInfo.h"
 #include "SupportFunctions.h"
 
 //JNIEXPORT jstring
@@ -15,7 +16,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////////
 VulkanDevice* vulkanDevice = nullptr;
-VulkanSwapchain* vulkanSwapchain = nullptr;
+VulkanVisualizer* vulkanVisualizer = nullptr;
+VulkanRenderInfo* vulkanRenderInfo = nullptr;
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +39,13 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *e
     vulkanDevice = new VulkanDevice(androidNativeWindow, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 
     // Создание свопчейна
-    vulkanSwapchain = new VulkanSwapchain(vulkanDevice);
+    vulkanVisualizer = new VulkanVisualizer(vulkanDevice);
+
+    // Рендер инфо
+    vulkanRenderInfo = new VulkanRenderInfo(vulkanDevice, vulkanVisualizer);
+
+    // Создаем фреймбуфферы для рендер-прохода
+    vulkanVisualizer->createFramebuffers(vulkanRenderInfo);
 }
 
 JNICALL
@@ -46,10 +54,12 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDraw(JNIEnv *e
 
 JNICALL
 void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDestroy(JNIEnv *env, jobject thisObj) {
-    delete vulkanSwapchain;
+    delete vulkanRenderInfo;
+    delete vulkanVisualizer;
     delete vulkanDevice;
 
-    vulkanSwapchain = nullptr;
+    vulkanRenderInfo = nullptr;
+    vulkanVisualizer = nullptr;
     vulkanDevice = nullptr;
 }
 

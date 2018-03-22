@@ -1,11 +1,14 @@
 #ifndef VULKANSWAPCHAIN_H
 #define VULKANSWAPCHAIN_H
 
+#include <vector>
+#include "VulkanCodeWrapper/vulkan_wrapper.h"
 
-#include "VulkanDevice.h"
+struct VulkanDevice;
+struct VulkanRenderInfo;
 
 
-struct VulkanSwapchain {
+struct VulkanVisualizer {
 public:
     VulkanDevice* vulkanDevice;
     VkSwapchainKHR vulkanSwapchain;
@@ -15,12 +18,14 @@ public:
     VkExtent2D vulkanSwapChainExtent;
     std::vector<VkImageView> vulkanSwapChainImageViews;
     VkImage vulkanDepthImage = VK_NULL_HANDLE;
-    VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
-    VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
+    VkDeviceMemory vulkanDepthImageMemory;
+    VkImageView vulkanDepthImageView;
+    std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
 
 public:
-    VulkanSwapchain(VulkanDevice* device);
-    ~VulkanSwapchain();
+    VulkanVisualizer(VulkanDevice* device);
+    ~VulkanVisualizer();
+    void createFramebuffers(VulkanRenderInfo* renderInfo);      // Создаем фреймбуфферы для вьюшек изображений свопчейна
 
 private:
     // Стадии инициализации

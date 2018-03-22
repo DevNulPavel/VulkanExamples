@@ -12,6 +12,8 @@ add_library( # Sets the name of the library.
              src/main/cpp/VulkanDevice.cpp
              src/main/cpp/VulkanVisualizer.h
              src/main/cpp/VulkanVisualizer.cpp
+             src/main/cpp/VulkanRenderInfo.h
+             src/main/cpp/VulkanRenderInfo.cpp
              src/main/cpp/SupportFunctions.h
              src/main/cpp/SupportFunctions.cpp
              src/main/cpp/VulkanCodeWrapper/vulkan_wrapper.h

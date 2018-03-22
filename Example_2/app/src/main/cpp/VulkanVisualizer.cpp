@@ -1,11 +1,13 @@
 #include "VulkanVisualizer.h"
-#include <limits>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
+#include "VulkanDevice.h"
+#include "VulkanRenderInfo.h"
 #include "SupportFunctions.h"
 
 
-VulkanSwapchain::VulkanSwapchain(VulkanDevice* device):
+VulkanVisualizer::VulkanVisualizer(VulkanDevice* device):
     vulkanDevice(device),
     vulkanSwapchain(VK_NULL_HANDLE),
     vulkanSwapChainImageFormat(VK_FORMAT_UNDEFINED),
@@ -22,7 +24,10 @@ VulkanSwapchain::VulkanSwapchain(VulkanDevice* device):
     createDepthResources();
 }
 
-VulkanSwapchain::~VulkanSwapchain(){
+VulkanVisualizer::~VulkanVisualizer(){
+    for (const auto& buffer: vulkanSwapChainFramebuffers) {
+        vkDestroyFramebuffer(vulkanDevice->vulkanLogicalDevice, buffer, nullptr);
+    }
     vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanDepthImageMemory, nullptr);
     vkDestroyImage(vulkanDevice->vulkanLogicalDevice, vulkanDepthImage, nullptr);
     vkDestroyImageView(vulkanDevice->vulkanLogicalDevice, vulkanDepthImageView, nullptr);
@@ -33,7 +38,7 @@ VulkanSwapchain::~VulkanSwapchain(){
 }
 
 // Выбираем нужный формат кадра
-VkSurfaceFormatKHR VulkanSwapchain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+VkSurfaceFormatKHR VulkanVisualizer::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     if (availableFormats.size() == 0) {
         LOGE("No available color formats!");
         throw std::runtime_error("No available color formats!");
@@ -57,7 +62,7 @@ VkSurfaceFormatKHR VulkanSwapchain::chooseSwapSurfaceFormat(const std::vector<Vk
 }
 
 // Выбор режима представления кадров из буффера
-VkPresentModeKHR VulkanSwapchain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
+VkPresentModeKHR VulkanVisualizer::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
     // Проверяем, можно ли использовать тройную буфферизацию??
     for (const auto& availablePresentMode : availablePresentModes) {
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -70,7 +75,7 @@ VkPresentModeKHR VulkanSwapchain::chooseSwapPresentMode(const std::vector<VkPres
 }
 
 // Выбираем размер кадра-свопа
-VkExtent2D VulkanSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+VkExtent2D VulkanVisualizer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     }
@@ -84,7 +89,7 @@ VkExtent2D VulkanSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& cap
 }
 
 // Создание логики смены кадров
-void VulkanSwapchain::createSwapChain() {
+void VulkanVisualizer::createSwapChain() {
     // Выбираем подходящие форматы пикселя, режима смены кадров, размеры кадра
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(vulkanDevice->vulkanSwapChainSupportDetails.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(vulkanDevice->vulkanSwapChainSupportDetails.presentModes);
@@ -154,7 +159,7 @@ void VulkanSwapchain::createSwapChain() {
 }
 
 // Получаем изображения из свопчейна
-void VulkanSwapchain::getSwapchainImages(){
+void VulkanVisualizer::getSwapchainImages(){
     // Получаем изображения для отображения
     uint32_t imagesCount = 0;
     vkGetSwapchainImagesKHR(vulkanDevice->vulkanLogicalDevice, vulkanSwapchain, &imagesCount, nullptr);
@@ -164,7 +169,7 @@ void VulkanSwapchain::getSwapchainImages(){
 }
 
 // Создание вью для изображения
-void VulkanSwapchain::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView) {
+void VulkanVisualizer::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView) {
     // Удаляем старый объект, если есть
     if(imageView != VK_NULL_HANDLE){
         vkDestroyImageView(vulkanDevice->vulkanLogicalDevice, imageView, nullptr);
@@ -196,7 +201,7 @@ void VulkanSwapchain::createImageView(VkImage image, VkFormat format, VkImageAsp
 }
 
 // Создание вьюшек изображений буффера кадра свопчейна
-void VulkanSwapchain::createSwapchainImageViews() {
+void VulkanVisualizer::createSwapchainImageViews() {
     // Удаляем старые, если есть
     if(vulkanSwapChainImageViews.size() > 0){
         for(const auto& imageView: vulkanSwapChainImageViews){
@@ -216,7 +221,7 @@ void VulkanSwapchain::createSwapchainImageViews() {
 }
 
 // Подбираем формат текстуры в зависимости от доступных на устройстве
-VkFormat VulkanSwapchain::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+VkFormat VulkanVisualizer::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
         // Запрашиваем информацию для формата
         VkFormatProperties props;
@@ -233,7 +238,7 @@ VkFormat VulkanSwapchain::findSupportedFormat(const std::vector<VkFormat>& candi
 }
 
 // Подбираем нужный формат глубины
-VkFormat VulkanSwapchain::findDepthFormat() {
+VkFormat VulkanVisualizer::findDepthFormat() {
     std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
     vulkanDepthFormat = findSupportedFormat(candidates,
                                             VK_IMAGE_TILING_OPTIMAL,
@@ -242,7 +247,7 @@ VkFormat VulkanSwapchain::findDepthFormat() {
 }
 
 // Подбираем тип памяти под свойства
-uint32_t VulkanSwapchain::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t VulkanVisualizer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     // Запрашиваем типы памяти физического устройства
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(vulkanDevice->vulkanPhysicalDevice, &memProperties);
@@ -258,7 +263,7 @@ uint32_t VulkanSwapchain::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFl
 }
 
 // Создаем изображение
-void VulkanSwapchain::createImage(uint32_t width, uint32_t height,
+void VulkanVisualizer::createImage(uint32_t width, uint32_t height,
                                   VkFormat format, VkImageTiling tiling,
                                   VkImageLayout layout, VkImageUsageFlags usage,
                                   VkMemoryPropertyFlags properties,
@@ -322,7 +327,7 @@ void VulkanSwapchain::createImage(uint32_t width, uint32_t height,
 }
 
 // Создаем буфферы для глубины
-void VulkanSwapchain::createDepthResources() {
+void VulkanVisualizer::createDepthResources() {
     createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height,
                 vulkanDepthFormat,                                  // Формат текстуры
                 VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
@@ -333,4 +338,41 @@ void VulkanSwapchain::createDepthResources() {
 
     // Создаем вью для изображения буффера глубины
     createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
+}
+
+// Создаем фреймбуфферы для вьюшек изображений свопчейна
+void VulkanVisualizer::createFramebuffers(VulkanRenderInfo* renderInfo){
+    // Уничтожаем старые буфферы свопчейнов
+    if (vulkanSwapChainFramebuffers.size() > 0) {
+        for (const auto& buffer: vulkanSwapChainFramebuffers) {
+            vkDestroyFramebuffer(vulkanDevice->vulkanLogicalDevice, buffer, nullptr);
+        }
+        vulkanSwapChainFramebuffers.clear();
+    }
+
+    // Ресайзим массив с фреймбуфферами свопчейна
+    vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
+
+    // Для каждой вьюшки картинки создаем  фреймбуффер
+    for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
+        // Список аттачментов
+        std::array<VkImageView, 2> attachments = {{vulkanSwapChainImageViews[i], vulkanDepthImageView}};
+
+        // Информация для создания фрейб-буфферов
+        VkFramebufferCreateInfo framebufferInfo = {};
+        memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderInfo->vulkanRenderPass;  // TODO: !!!! Совместимый рендер-проход (было vulkanRenderPass)
+        framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
+        framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
+        framebufferInfo.width = vulkanSwapChainExtent.width;    // Размеры экрана
+        framebufferInfo.height = vulkanSwapChainExtent.height;  // Размеры экрана
+        framebufferInfo.layers = 1; // TODO: ???
+
+        VkResult createStatus = vkCreateFramebuffer(vulkanDevice->vulkanLogicalDevice, &framebufferInfo, nullptr, &(vulkanSwapChainFramebuffers[i]));
+        if (createStatus != VK_SUCCESS) {
+            LOGE("Failed to create framebuffer!");
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
 }
