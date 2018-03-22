@@ -662,8 +662,8 @@ void createSwapChain() {
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;    // Картинки используются в качестве буффера цвета
     
     // Если у нас разные очереди для рендеринга и отображения -
+    uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
     if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
-        uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
         // Изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
@@ -753,6 +753,7 @@ void createImageViews() {
     
     for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
         // Создаем вьюшку с типом использования цвета
+        vulkanSwapChainImageViews[i] = VK_NULL_HANDLE;
         createImageView(vulkanSwapChainImages[i], vulkanSwapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, vulkanSwapChainImageViews[i]);
     }
 }
@@ -1922,10 +1923,10 @@ void recreateSwapChain() {
     // Заново пересоздаем свопчейны, старые удалятся внутри
     createSwapChain();
     createImageViews();
-    createRenderPass();
-    createGraphicsPipeline();
     createDepthResources();
     createFramebuffers();
+    createRenderPass();
+    createGraphicsPipeline();
     createCommandBuffers();
 }
 
@@ -2075,6 +2076,12 @@ int local_main(int argc, char** argv) {
     // Ищем формат буффера глубины
     findDepthFormat();
     
+    // Создаем ресурсы для глубины
+    createDepthResources();
+    
+    // Создаем фреймбуфферы
+    createFramebuffers();
+    
     // Создание рендер-прохода
     createRenderPass();
     
@@ -2086,12 +2093,6 @@ int local_main(int argc, char** argv) {
     
     // Создаем пулл комманд
     createCommandPool();
-
-    // Создаем ресурсы для глубины
-    createDepthResources();
-    
-    // Создаем фреймбуфферы
-    createFramebuffers();
     
     // Создание текстуры из изображения
     createTextureImage();

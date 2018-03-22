@@ -361,7 +361,7 @@ FamiliesQueueIndexes VulkanDevice::findPhysicalDeviceQueueFamiliesIndex(VkPhysic
         }
 
         // Провеяем, может является ли данная очередь - очередью отображения
-        VkBool32 presentSupport = false;
+        VkBool32 presentSupport = 0;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vulkanSurface, &presentSupport);
         if ((queueFamily.queueCount > 0) && presentSupport) {
             result.presentQueueFamilyIndex = i;
@@ -432,14 +432,14 @@ void VulkanDevice::selectPhysicalDevice(){
     for (const VkPhysicalDevice& device: devices) {
         // Смотрим - есть ли у данного устройства поддержка свопа кадров в виде расширения?
         bool swapchainExtentionSupported = checkPhysicalDeviceRequiredExtensionSupport(device);
-        if(swapchainExtentionSupported == false){
+        if(!swapchainExtentionSupported){
             continue;
         }
 
         // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
         SwapChainSupportDetails swapChainSupport = queryPhysicalDeviceSwapChainSupport(device);
         bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-        if (swapChainValid == false) {
+        if (!swapChainValid) {
             continue;
         }
 

@@ -10,9 +10,10 @@ public:
     VulkanDevice* vulkanDevice;
     VkSwapchainKHR vulkanSwapchain;
     std::vector<VkImage> vulkanSwapChainImages;
-    VkFormat vulkanSwapChainImageFormat = VK_FORMAT_UNDEFINED;
-    VkFormat vulkanDepthFormat = VK_FORMAT_UNDEFINED;
-    VkExtent2D vulkanSwapChainExtent = {0, 0};
+    VkFormat vulkanSwapChainImageFormat;
+    VkFormat vulkanDepthFormat;
+    VkExtent2D vulkanSwapChainExtent;
+    std::vector<VkImageView> vulkanSwapChainImageViews;
 
 public:
     VulkanSwapchain(VulkanDevice* device);
@@ -20,7 +21,9 @@ public:
 
 private:
     // Стадии инициализации
-    void createSwapChain(); // Создание логики смены кадров
+    void createSwapChain();     // Создание логики смены кадров
+    void createImageViews();    // Создание вьюшек изображений буффера кадра свопчейна
+    VkFormat findDepthFormat(); // Подбираем нужный формат глубины
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,6 +33,10 @@ private:
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
     // Выбираем размер кадра-свопа
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+    // Создание вью для изображения
+    void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView);
+    // Подбираем формат текстуры в зависимости от доступных на устройстве
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 };
 
 
