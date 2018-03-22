@@ -36,6 +36,7 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *e
     vulkanDevice->setupDebugCallback();
     vulkanDevice->createSurface(androidNativeWindow);
     vulkanDevice->selectPhysicalDevice();
+    vulkanDevice->createLogicalDeviceAndQueue();
 }
 
 JNICALL

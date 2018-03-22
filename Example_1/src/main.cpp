@@ -56,6 +56,8 @@ const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_
 
 #define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
 
+struct FamiliesQueueIndexes;
+
 
 GLFWwindow* window = nullptr;
 VkInstance vulkanInstance = VK_NULL_HANDLE;
@@ -63,7 +65,9 @@ VkSurfaceKHR vulkanSurface = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vulkanDebugCallback = VK_NULL_HANDLE;
 VkPhysicalDevice vulkanPhysicalDevice = VK_NULL_HANDLE;
 int vulkanRenderQueueFamilyIndex = -1;
+int vulkanRenderQueueFamilyQueuesCount = 0;
 int vulkanPresentQueueFamilyIndex = -1;
+int vulkanPresentQueueFamilyQueuesCount = 0;
 VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
 VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
 VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
@@ -115,11 +119,15 @@ float rotateAngle = 0.0f;
 
 struct FamiliesQueueIndexes {
     int renderQueueFamilyIndex;     // Индекс семейства очередей отрисовки
+    int renderQueueFamilyQueuesCount;// Количество очередей в семействе
     int presentQueueFamilyIndex;    // Индекс семейства очередей отображения
+    int presentQueueFamilyQueuesCount;// Количество очередей в семействе
     
     FamiliesQueueIndexes(){
         renderQueueFamilyIndex = -1;
+        renderQueueFamilyQueuesCount = 0;
         presentQueueFamilyIndex = -1;
+        presentQueueFamilyQueuesCount = 0;
     }
     bool isComplete(){
         return (renderQueueFamilyIndex >= 0) && (presentQueueFamilyIndex >= 0);
@@ -348,6 +356,7 @@ FamiliesQueueIndexes findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
         // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
         if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             result.renderQueueFamilyIndex = i;
+            result.renderQueueFamilyQueuesCount = queueFamily.queueCount;
         }
         
         // Провеяем, может является ли данная очередь - очередью отображения
@@ -355,6 +364,7 @@ FamiliesQueueIndexes findQueueFamiliesIndexInDevice(VkPhysicalDevice device) {
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vulkanSurface, &presentSupport);
         if ((queueFamily.queueCount > 0) && presentSupport) {
             result.presentQueueFamilyIndex = i;
+            result.presentQueueFamilyQueuesCount = queueFamily.queueCount;
         }
         
         // Нашли очереди
@@ -524,7 +534,7 @@ void pickPhysicalDevice() {
             continue;
         }
         
-        // Проверяем, поддержку свопчейна у девайса
+        // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
         bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         if (swapChainValid == false) {
@@ -560,6 +570,19 @@ void createLogicalDeviceAndQueue() {
     // Только уникальные индексы очередей
     std::set<int> uniqueQueueFamilies = {vulkanRenderQueueFamilyIndex, vulkanPresentQueueFamilyIndex};
     
+    // Определяем количество создаваемых очередей
+    uint32_t createQueuesCount = 1;
+    if (vulkanRenderQueueFamilyIndex == vulkanPresentQueueFamilyIndex) {
+        // Если в одном семействе больше одной очереди - берем разные, иначе одну
+        if (vulkanRenderQueueFamilyQueuesCount > 1) {
+            createQueuesCount = 2;
+        }else{
+            createQueuesCount = 1;
+        }
+    }else{
+        createQueuesCount = 1;
+    }
+    
     // Создаем экземпляры настроек создания очереди
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     float queuePriority = 1.0f;
@@ -568,7 +591,7 @@ void createLogicalDeviceAndQueue() {
         memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.queueCount = createQueuesCount;
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
@@ -599,9 +622,14 @@ void createLogicalDeviceAndQueue() {
         throw std::runtime_error("Failed to create logical device!");
     }
     
-    // Создаем очередь из девайса
-    vkGetDeviceQueue(vulkanLogicalDevice, vulkanRenderQueueFamilyIndex, 0, &vulkanGraphicsQueue);
-    vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 0, &vulkanPresentQueue);
+    // Если в одном семействе больше одной очереди - берем разные, иначе одну
+    if (createQueuesCount >= 2) {
+        vkGetDeviceQueue(vulkanLogicalDevice, vulkanRenderQueueFamilyIndex, 0, &vulkanGraphicsQueue);
+        vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 1, &vulkanPresentQueue);
+    }else{
+        vkGetDeviceQueue(vulkanLogicalDevice, vulkanRenderQueueFamilyIndex, 0, &vulkanGraphicsQueue);
+        vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 0, &vulkanPresentQueue);
+    }
 }
 
 // Создание логики смены кадров

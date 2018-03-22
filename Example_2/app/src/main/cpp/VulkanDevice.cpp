@@ -11,6 +11,9 @@
 
 #define VALIDATION_LAYERS_ENABLED
 
+#define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
+const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
 
 // Отладочный коллбек
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
@@ -25,13 +28,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
     return VK_FALSE;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 VulkanDevice::VulkanDevice():
-   vulkanInstance(VK_NULL_HANDLE),
-   vulkanDebugCallback(VK_NULL_HANDLE){
+    vulkanInstance(VK_NULL_HANDLE),
+    vulkanDebugCallback(VK_NULL_HANDLE),
+    vulkanPhysicalDevice(VK_NULL_HANDLE),
+    vulkanLogicalDevice(VK_NULL_HANDLE),
+    vulkanGraphicsQueue(VK_NULL_HANDLE),
+    vulkanPresentQueue(VK_NULL_HANDLE){
 }
 
 VulkanDevice::~VulkanDevice() {
+    vkDestroyDevice(vulkanLogicalDevice, nullptr);
     vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
         destroyDebugReportCallbackEXT(vulkanDebugCallback, nullptr);
@@ -55,7 +64,7 @@ std::vector<VkLayerProperties> VulkanDevice::getAllValidationLayers(){
 }
 
 // Проверяем, что все запрошенные слои нам доступны
-bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLayers, const std::vector<const char*>& testLayers){
+bool VulkanDevice::checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLayers, const std::vector<const char*>& testLayers){
     for(int i = 0; i < testLayers.size(); i++) {
         const char* layerName = testLayers[i];
         bool layerFound = false;
@@ -73,6 +82,41 @@ bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLa
         }
     }
     return true;
+}
+
+// Получаем доступные слои валидации устройства
+std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
+#ifdef VALIDATION_LAYERS_ENABLED
+    // Список всех слоев
+    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
+    for(const VkLayerProperties& layerInfo: allValidationLayers){
+        LOGE("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
+        fflush(stdout);
+    }
+
+    // Возможные отладочные слои
+    std::vector<const char*> result;
+    result.push_back("VK_LAYER_LUNARG_standard_validation");
+    if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+        result.clear();
+        result.push_back("VK_LAYER_LUNARG_image");
+        result.push_back("VK_LAYER_GOOGLE_threading");
+        result.push_back("VK_LAYER_LUNARG_parameter_validation");
+        result.push_back("VK_LAYER_LUNARG_object_tracker");
+        result.push_back("VK_LAYER_LUNARG_core_validation");
+        result.push_back("VK_LAYER_GOOGLE_unique_objects");
+        result.push_back("VK_LAYER_LUNARG_swapchain");
+
+        if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+            LOGE("Failed to get validation layers!\n");
+            throw std::runtime_error("Failed to create instance!");
+        }
+    }
+
+    return result;
+#else
+    return std::vector<const char*>();
+#endif
 }
 
 // Список необходимых расширений инстанса приложения
@@ -108,7 +152,7 @@ void VulkanDevice::printAllExtentionsAtLayers(const std::vector<const char *>& l
 }
 
 // Список необходимых расширений инстанса приложения
-std::vector<const char*> VulkanDevice::getRequiredExtentionNames(){
+std::vector<const char*> VulkanDevice::getRequiredInstanceExtentionNames(){
     std::vector<const char*> result;
     result.push_back("VK_KHR_surface");
     result.push_back("VK_KHR_android_surface");
@@ -118,51 +162,16 @@ std::vector<const char*> VulkanDevice::getRequiredExtentionNames(){
     return result;
 }
 
-// Получаем доступные слои валидации устройства
-std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
-    #ifdef VALIDATION_LAYERS_ENABLED
-        // Список всех слоев
-        std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
-        for(const VkLayerProperties& layerInfo: allValidationLayers){
-            LOGE("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
-            fflush(stdout);
-        }
-
-        // Возможные отладочные слои
-        std::vector<const char*> result;
-        result.push_back("VK_LAYER_LUNARG_standard_validation");
-        if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
-            result.clear();
-            result.push_back("VK_LAYER_LUNARG_image");
-            result.push_back("VK_LAYER_GOOGLE_threading");
-            result.push_back("VK_LAYER_LUNARG_parameter_validation");
-            result.push_back("VK_LAYER_LUNARG_object_tracker");
-            result.push_back("VK_LAYER_LUNARG_core_validation");
-            result.push_back("VK_LAYER_GOOGLE_unique_objects");
-            result.push_back("VK_LAYER_LUNARG_swapchain");
-
-            if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
-                LOGE("Failed to get validation layers!\n");
-                throw std::runtime_error("Failed to create instance!");
-            }
-        }
-
-        return result;
-    #else
-        return std::vector<const char*>();
-    #endif
-}
-
 void VulkanDevice::createVulkanInstance(){
 
     // Запрашиваем возможные слои валидации
-    std::vector<const char*> validationLayers = getPossibleDebugValidationLayers();
+    vulkanValidationLayers = getPossibleDebugValidationLayers();
 
     // Выводим расширения в слоях валидации
-    printAllExtentionsAtLayers(validationLayers);
+    printAllExtentionsAtLayers(vulkanValidationLayers);
 
     // Список требуемых расширений
-    std::vector<const char*> instanceExtensions = getRequiredExtentionNames();
+    vulkanInstanceExtensions = getRequiredInstanceExtentionNames();
 
     // Структура с настройками приложения Vulkan
     VkApplicationInfo appInfo = {};
@@ -179,10 +188,10 @@ void VulkanDevice::createVulkanInstance(){
     memset(&createInfo, 0, sizeof(VkInstanceCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());  // Включаем расширения
-    createInfo.ppEnabledExtensionNames = instanceExtensions.data();
-    createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());     // Включаем стандартные слои валидации
-    createInfo.ppEnabledLayerNames = validationLayers.data();
+    createInfo.enabledLayerCount = static_cast<uint32_t>(vulkanValidationLayers.size());     // Включаем стандартные слои валидации
+    createInfo.ppEnabledLayerNames = vulkanValidationLayers.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanInstanceExtensions.size());  // Включаем расширения
+    createInfo.ppEnabledExtensionNames = vulkanInstanceExtensions.data();
 
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
@@ -255,9 +264,263 @@ void VulkanDevice::createSurface(ANativeWindow* androidNativeWindow){
     }
 }
 
+// Все возможные расширения физического устройства
+std::vector<VkExtensionProperties> VulkanDevice::getAllPhysicalDeviceExtentions(VkPhysicalDevice device){
+    // Получаем количество расширений
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+    // Получаем расширения
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+    return availableExtensions;
+}
+
+// Проверяем, поддерживает ли девайс цепочку свопинга
+bool VulkanDevice::checkPhysicalDeviceRequiredExtensionSupport(VkPhysicalDevice device) {
+    std::vector<VkExtensionProperties> availableExtensions = getAllPhysicalDeviceExtentions(device);
+
+    // Список требуемых расширений - смена кадров
+    std::set<std::string> requiredExtensions(DEVICE_REQUIRED_EXTENTIONS,
+                                             DEVICE_REQUIRED_EXTENTIONS + DEVICE_REQUIRED_EXTENTIONS_COUNT);
+
+    // Пытаемся убрать из списка требуемых расширений возможные
+    for (const auto& extension : availableExtensions) {
+        LOGE("Available physical device extention: %s\n", extension.extensionName);
+        requiredExtensions.erase(extension.extensionName);
+    }
+
+    // Если пусто, значит поддерживается
+    return requiredExtensions.empty();
+}
+
+// Запрашиваем поддержку свопачейна изображений на экране
+SwapChainSupportDetails VulkanDevice::queryPhysicalDeviceSwapChainSupport(VkPhysicalDevice device) {
+
+    SwapChainSupportDetails details;
+
+    // Получаем возможности
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, vulkanSurface, &details.capabilities);
+
+    // Запрашиваем поддерживаемые форматы буффера цвета
+    uint32_t formatCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, nullptr);
+    if (formatCount != 0) {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, vulkanSurface, &formatCount, details.formats.data());
+    }
+
+    // Запрашиваем поддерживаемые типы отображения кадра
+    uint32_t presentModeCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, nullptr);
+    if (presentModeCount != 0) {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, vulkanSurface, &presentModeCount, details.presentModes.data());
+    }
+
+    return details;
+}
+
+// Список семейств очередей на конкретном физическом устройстве
+std::vector<VkQueueFamilyProperties> VulkanDevice::getPhysicalDeviceAllQueueFamilies(VkPhysicalDevice device){
+    // Запрашиваем количество возможных семейств очередей в устройстве
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    // Запрашиваем список семейств очередей устройства
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    return queueFamilies;
+}
+
+// Для данного устройства ищем семейства очередей отрисовки
+FamiliesQueueIndexes VulkanDevice::findPhysicalDeviceQueueFamiliesIndex(VkPhysicalDevice device) {
+    std::vector<VkQueueFamilyProperties> queueFamilies = getPhysicalDeviceAllQueueFamilies(device);
+
+    FamiliesQueueIndexes result;
+
+    // Подбираем информацию об очередях
+    uint32_t i = 0;
+    for (const VkQueueFamilyProperties& queueFamily: queueFamilies) {
+
+        // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
+        if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+            result.renderQueueFamilyIndex = i;
+            result.renderQueueFamilyQueuesCount = queueFamily.queueCount;
+        }
+
+        // Провеяем, может является ли данная очередь - очередью отображения
+        VkBool32 presentSupport = false;
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, vulkanSurface, &presentSupport);
+        if ((queueFamily.queueCount > 0) && presentSupport) {
+            result.presentQueueFamilyIndex = i;
+            result.presentQueueFamilyQueuesCount = queueFamily.queueCount;
+        }
+
+        // Нашли очереди
+        if (result.isComplete()) {
+            return result;
+        }
+
+        i++;
+    }
+
+    return result;
+}
+
+// Оценка производительности и пригодности конкретной GPU
+int VulkanDevice::ratePhysicalDeviceScore(VkPhysicalDevice device) {
+    // Свойства физического устройства
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+    // Фичи физического устройства
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+    LOGE("Test GPU with name: %s, API version: %d\n", deviceProperties.deviceName, deviceProperties.apiVersion);
+
+    int score = 0;
+
+    // Дискретная карта обычно имеет большую производительность
+    if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        score += 1000;
+    }
+
+    // Максимальный размер текстур
+    score += deviceProperties.limits.maxImageDimension2D;
+
+    // Нету геометрического шейдера??
+    /*if (!deviceFeatures.geometryShader) {
+        return 0;
+    }*/
+
+    return score;
+}
+
 // Инициализация физического устройства
 void VulkanDevice::selectPhysicalDevice(){
+    // Получаем количество GPU
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, nullptr);
 
+    // Есть ли вообще карты?
+    if (deviceCount == 0) {
+        LOGE("Failed to find GPUs with Vulkan support!");
+        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+    }
+
+    // Получаем список устройств
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(vulkanInstance, &deviceCount, devices.data());
+
+    // Используем Map для автоматической сортировки по производительности
+    std::map<int, std::pair<VkPhysicalDevice, FamiliesQueueIndexes>> candidates;
+
+    // Перебираем GPU для поиска подходящего устройства
+    for (const VkPhysicalDevice& device: devices) {
+        // Смотрим - есть ли у данного устройства поддержка свопа кадров в виде расширения?
+        bool swapchainExtentionSupported = checkPhysicalDeviceRequiredExtensionSupport(device);
+        if(swapchainExtentionSupported == false){
+            continue;
+        }
+
+        // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
+        SwapChainSupportDetails swapChainSupport = queryPhysicalDeviceSwapChainSupport(device);
+        bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        if (swapChainValid == false) {
+            continue;
+        }
+
+        // Получаем индекс группы очередй отрисовки
+        FamiliesQueueIndexes familiesInfo = findPhysicalDeviceQueueFamiliesIndex(device);
+        if (familiesInfo.isComplete()) {
+            // Оцениваем возможности устройства
+            int score = ratePhysicalDeviceScore(device);
+            candidates[score] = std::pair<VkPhysicalDevice,FamiliesQueueIndexes>(device, familiesInfo);
+        }
+    }
+
+    // Есть ли вообще карты?
+    if (candidates.size() == 0) {
+        throw std::runtime_error("No picked GPU physical devices!");
+    }
+
+    // Получаем наилучший вариант GPU
+    if (candidates.begin()->first > 0) {
+        vulkanPhysicalDevice = candidates.begin()->second.first;
+        vulkanFamiliesQueueIndexes = candidates.begin()->second.second;
+    } else {
+        throw std::runtime_error("failed to find a suitable GPU!");
+    }
+}
+
+// Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+void VulkanDevice::createLogicalDeviceAndQueue() {
+    // Только уникальные индексы семейств очередей
+    std::set<int32_t> uniqueQueueFamilies;
+    uniqueQueueFamilies.insert(vulkanFamiliesQueueIndexes.presentQueueFamilyIndex);
+    uniqueQueueFamilies.insert(vulkanFamiliesQueueIndexes.renderQueueFamilyIndex);
+
+    // Определяем количество создаваемых очередей
+    uint32_t createQueuesCount = 1;
+    if (vulkanFamiliesQueueIndexes.renderQueueFamilyIndex == vulkanFamiliesQueueIndexes.presentQueueFamilyIndex) {
+        // Если в одном семействе больше одной очереди - берем разные, иначе одну
+        if (vulkanFamiliesQueueIndexes.renderQueueFamilyQueuesCount > 1) {
+            createQueuesCount = 2;
+        }else{
+            createQueuesCount = 1;
+        }
+    }else{
+        createQueuesCount = 1;
+    }
+
+    // Создаем экземпляры настроек создания очереди
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    const float queuePriority = 1.0f;
+    for (int32_t queueFamily : uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = static_cast<uint32_t>(queueFamily);  // Индекс семейства очередей
+        queueCreateInfo.queueCount = createQueuesCount;                     // Количество очередей
+        queueCreateInfo.pQueuePriorities = &queuePriority;  // Приоритет очереди
+
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
+    // Нужные фичи устройства (ничего не указываем)
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+    memset(&deviceFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
+
+    // Конфиг создания девайса
+    VkDeviceCreateInfo createInfo = {};
+    memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+    createInfo.pQueueCreateInfos = queueCreateInfos.data(); // Информация о создаваемых на девайсе очередях
+    createInfo.pEnabledFeatures = &deviceFeatures;          // Информация о фичах устройства
+    createInfo.enabledExtensionCount = DEVICE_REQUIRED_EXTENTIONS_COUNT;
+    createInfo.ppEnabledExtensionNames = DEVICE_REQUIRED_EXTENTIONS;     // Список требуемых расширений устройства
+    createInfo.enabledLayerCount = static_cast<uint32_t>(vulkanValidationLayers.size());
+    createInfo.ppEnabledLayerNames = vulkanValidationLayers.data();
+
+    // Пробуем создать логический девайс на конкретном физическом
+    VkResult createStatus = vkCreateDevice(vulkanPhysicalDevice, &createInfo, nullptr, &vulkanLogicalDevice);
+    if (createStatus != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create logical device!");
+    }
+
+    // Если в одном семействе больше одной очереди - берем разные, иначе одну
+    if (createQueuesCount >= 2) {
+        vkGetDeviceQueue(vulkanLogicalDevice, static_cast<uint32_t>(vulkanFamiliesQueueIndexes.renderQueueFamilyIndex), 0, &vulkanGraphicsQueue);
+        vkGetDeviceQueue(vulkanLogicalDevice, static_cast<uint32_t>(vulkanFamiliesQueueIndexes.presentQueueFamilyIndex), 1, &vulkanPresentQueue);
+    }else{
+        vkGetDeviceQueue(vulkanLogicalDevice, static_cast<uint32_t>(vulkanFamiliesQueueIndexes.renderQueueFamilyIndex), 0, &vulkanGraphicsQueue);
+        vkGetDeviceQueue(vulkanLogicalDevice, static_cast<uint32_t>(vulkanFamiliesQueueIndexes.presentQueueFamilyIndex), 0, &vulkanPresentQueue);
+    }
 }
 
 /*void VulkanDevice::createSwapchain(){
