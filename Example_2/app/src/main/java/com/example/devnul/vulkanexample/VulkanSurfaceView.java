@@ -1,16 +1,19 @@
 package com.example.devnul.vulkanexample;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 
 
 public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
     private VulkanDrawThread vulkanDrawThread = null;
+    private AssetManager assetManager = null;
 
 
-    public VulkanSurfaceView(Context context) {
+    public VulkanSurfaceView(Context context, AssetManager inAssetManager) {
         super(context);
+        assetManager = inAssetManager;
         getHolder().addCallback(this);
     }
 
@@ -20,7 +23,7 @@ public class VulkanSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        vulkanDrawThread = new VulkanDrawThread(getHolder());
+        vulkanDrawThread = new VulkanDrawThread(getHolder(), assetManager);
         vulkanDrawThread.setRunning(true);
         vulkanDrawThread.start();
     }

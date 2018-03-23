@@ -4,6 +4,8 @@
 #include <android/native_activity.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include <vulkan_wrapper.h>
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
@@ -25,7 +27,11 @@ VulkanRenderInfo* vulkanRenderInfo = nullptr;
 extern "C" {
 
 JNICALL
-void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *env, jobject thisObj, jobject surface, jint width, jint height) {
+void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *env,
+                                                                       jobject thisObj,
+                                                                       jobject surface,
+                                                                       jint width, jint height,
+                                                                       jobject assetManager) {
     // Инициализируем указатели на функции Vulkan
     int status = InitVulkan();
     if (status == 0){
@@ -34,6 +40,7 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *e
     }
 
     ANativeWindow* androidNativeWindow = ANativeWindow_fromSurface(env, surface);
+    AAssetManager* androidNativeAssetManager = AAssetManager_fromJava(env, assetManager);
 
     // Создание устройства
     vulkanDevice = new VulkanDevice(androidNativeWindow, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
@@ -42,7 +49,7 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *e
     vulkanVisualizer = new VulkanVisualizer(vulkanDevice);
 
     // Рендер инфо
-    vulkanRenderInfo = new VulkanRenderInfo(vulkanDevice, vulkanVisualizer);
+    vulkanRenderInfo = new VulkanRenderInfo(vulkanDevice, vulkanVisualizer, androidNativeAssetManager);
 
     // Создаем фреймбуфферы для рендер-прохода
     vulkanVisualizer->createFramebuffers(vulkanRenderInfo);

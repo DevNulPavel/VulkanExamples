@@ -14,7 +14,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        vulkanView = new VulkanSurfaceView(this.getApplicationContext());
+        this.vulkanView = new VulkanSurfaceView(this.getApplicationContext(), getAssets());
         setContentView(vulkanView);
     }
 }

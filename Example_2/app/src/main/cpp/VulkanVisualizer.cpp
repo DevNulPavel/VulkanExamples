@@ -363,7 +363,7 @@ void VulkanVisualizer::createFramebuffers(VulkanRenderInfo* renderInfo){
         memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderInfo->vulkanRenderPass;  // TODO: !!!! Совместимый рендер-проход (было vulkanRenderPass)
-        framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());   // Аттачменты
         framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
         framebufferInfo.width = vulkanSwapChainExtent.width;    // Размеры экрана
         framebufferInfo.height = vulkanSwapChainExtent.height;  // Размеры экрана
