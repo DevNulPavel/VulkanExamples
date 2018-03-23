@@ -136,9 +136,6 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDraw(JNIEnv *e
     vulkanModelInfo->updateUniformBuffer(static_cast<float>(lastFrameDuration));
     drawFrame();
 
-    std::chrono::milliseconds duration(10000);
-    std::this_thread::sleep_for( duration );
-
     // Стабилизация времени кадра
     std::chrono::high_resolution_clock::duration curFrameDuration = std::chrono::high_resolution_clock::now() - lastDrawTime;
     std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - curFrameDuration;

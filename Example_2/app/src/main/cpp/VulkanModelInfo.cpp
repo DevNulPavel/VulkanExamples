@@ -606,7 +606,7 @@ void VulkanModelInfo::updateUniformBuffer(float delta){
     UniformBufferObject ubo = {};
     memset(&ubo, 0, sizeof(UniformBufferObject));
     ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 5.0f, 3.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), vulkanVisualizer->vulkanSwapChainExtent.width / (float)vulkanVisualizer->vulkanSwapChainExtent.height, 0.1f, 10.0f);
 
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,

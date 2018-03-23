@@ -131,6 +131,7 @@ void VulkanVisualizer::createSwapChain() {
         createInfo.pQueueFamilyIndices = nullptr; // Optional
     }
 
+    //createInfo.preTransform = VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR;
     createInfo.preTransform = vulkanDevice->vulkanSwapChainSupportDetails.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
     createInfo.presentMode = presentMode;

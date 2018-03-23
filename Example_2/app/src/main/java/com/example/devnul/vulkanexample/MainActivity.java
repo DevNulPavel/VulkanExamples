@@ -2,7 +2,7 @@ package com.example.devnul.vulkanexample;
 
 import android.app.Activity;
 import android.os.Bundle;
-
+import android.content.pm.ActivityInfo;
 
 
 public class MainActivity extends Activity {
