@@ -50,6 +50,8 @@ public:
     VkDevice vulkanLogicalDevice;
     VkQueue vulkanGraphicsQueue;
     VkQueue vulkanPresentQueue;
+    VkSemaphore vulkanImageAvailableSemaphore;
+    VkSemaphore vulkanRenderFinishedSemaphore;
 
 public:
     VulkanDevice(ANativeWindow* androidNativeWindow, uint32_t windowW, uint32_t windowH);
@@ -62,6 +64,7 @@ private:
     void createSurface(ANativeWindow* androidNativeWindow); // Создаем плоскость отрисовки
     void selectPhysicalDevice();                        // Инициализация физического устройства
     void createLogicalDeviceAndQueue();                 // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+    void createSemaphores();                            // Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 

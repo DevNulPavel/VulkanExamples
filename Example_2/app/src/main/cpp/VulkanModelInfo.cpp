@@ -10,9 +10,16 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+// GLM
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
 #include "VulkanRenderInfo.h"
+#include "UniformBuffer.h"
 #include "SupportFunctions.h"
 
 
@@ -28,7 +35,14 @@ VulkanModelInfo::VulkanModelInfo(VulkanDevice* device, VulkanVisualizer* visuali
     vulkanVertexBuffer(VK_NULL_HANDLE),
     vulkanVertexBufferMemory(VK_NULL_HANDLE),
     vulkanIndexBuffer(VK_NULL_HANDLE),
-    vulkanIndexBufferMemory(VK_NULL_HANDLE){
+    vulkanIndexBufferMemory(VK_NULL_HANDLE),
+    vulkanUniformStagingBuffer(VK_NULL_HANDLE),
+    vulkanUniformStagingBufferMemory(VK_NULL_HANDLE),
+    vulkanUniformBuffer(VK_NULL_HANDLE),
+    vulkanUniformBufferMemory(VK_NULL_HANDLE),
+    vulkanDescriptorPool(VK_NULL_HANDLE),
+    vulkanDescriptorSet(VK_NULL_HANDLE),
+    rotateAngle(0.0f){
 
     createTextureImage();
     createTextureImageView();
@@ -36,9 +50,20 @@ VulkanModelInfo::VulkanModelInfo(VulkanDevice* device, VulkanVisualizer* visuali
     loadModel();
     createVertexBuffer();
     createIndexBuffer();
+    createUniformBuffer();
+    createDescriptorPool();
+    createDescriptorSet();
+    createCommandBuffers();
 }
 
 VulkanModelInfo::~VulkanModelInfo(){
+    vkFreeCommandBuffers(vulkanDevice->vulkanLogicalDevice, vulkanRenderInfo->vulkanCommandPool,
+                         static_cast<uint32_t>(vulkanCommandBuffers.size()), vulkanCommandBuffers.data());
+    vkDestroyDescriptorPool(vulkanDevice->vulkanLogicalDevice, vulkanDescriptorPool, nullptr);
+    vkDestroyBuffer(vulkanDevice->vulkanLogicalDevice, vulkanUniformStagingBuffer, nullptr);
+    vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanUniformStagingBufferMemory, nullptr);
+    vkDestroyBuffer(vulkanDevice->vulkanLogicalDevice, vulkanUniformBuffer, nullptr);
+    vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanUniformBufferMemory, nullptr);
     vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanIndexBufferMemory, nullptr);
     vkDestroyBuffer(vulkanDevice->vulkanLogicalDevice, vulkanIndexBuffer, nullptr);
     vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
@@ -385,4 +410,214 @@ void VulkanModelInfo::createIndexBuffer() {
 
     // Чистим исходные данные
     vulkanIndices.clear();
+}
+
+// Создаем буффер юниформов
+void VulkanModelInfo::createUniformBuffer() {
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    // Буффер для юниформов для CPU
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,  // Используется как исходник для передачи на отрисовку
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Доступно для изменения на GPU
+                 vulkanUniformStagingBuffer, vulkanUniformStagingBufferMemory);
+    // Буффер для юниформов на GPU
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, // Испольузется как получаетель + юниформ буффер
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                 vulkanUniformBuffer, vulkanUniformBufferMemory);
+}
+
+// Создаем пул дескрипторов ресурсов
+void VulkanModelInfo::createDescriptorPool() {
+    // Структура с типами пулов
+    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+    // Юниформ буффер
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1;
+    // Семплер для текстуры
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
+
+    // Создаем пул
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    memset(&poolInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1;
+
+    if (vkCreateDescriptorPool(vulkanDevice->vulkanLogicalDevice, &poolInfo, nullptr, &vulkanDescriptorPool) != VK_SUCCESS) {
+        LOGE("Failed to create descriptor pool!");
+        throw std::runtime_error("Failed to create descriptor pool!");
+    }
+}
+
+// Создаем набор дескрипторов ресурсов
+void VulkanModelInfo::createDescriptorSet() {
+    // Настройки аллокатора для дескрипторов ресурсов
+    VkDescriptorSetLayout layouts[] = { vulkanRenderInfo->vulkanDescriptorSetLayout};
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = vulkanDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    // Аллоцируем дескрипторы в пуле
+    if (vkAllocateDescriptorSets(vulkanDevice->vulkanLogicalDevice, &allocInfo, &vulkanDescriptorSet) != VK_SUCCESS) {
+        LOGE("Failed to allocate descriptor set!");
+        throw std::runtime_error("Failed to allocate descriptor set!");
+    }
+
+    // Описание дескриптора юниформа
+    VkDescriptorBufferInfo bufferInfo = {};
+    memset(&bufferInfo, 0, sizeof(VkDescriptorBufferInfo));
+    bufferInfo.buffer = vulkanUniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    // Описание дескриптора семплера
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = vulkanTextureImageView;
+    imageInfo.sampler = vulkanTextureSampler;
+
+    // НАстройки дескрипторов
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = vulkanDescriptorSet;   // Набор дескрипторов из пула
+    descriptorWrites[0].dstBinding = 0;                 // Биндится на 0м значении в шейдере
+    descriptorWrites[0].dstArrayElement = 0;            // 0 элемент
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
+    descriptorWrites[0].descriptorCount = 1;            // 1н дескриптор
+    descriptorWrites[0].pBufferInfo = &bufferInfo;      // Описание буффера
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = vulkanDescriptorSet;   // Набор дескрипторов из пула
+    descriptorWrites[1].dstBinding = 1;                 // Биндится на 1м значении в шейдере
+    descriptorWrites[1].dstArrayElement = 0;            // 0 элемент
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // Тип - семплер
+    descriptorWrites[1].descriptorCount = 1;            // 1н дескриптор
+    descriptorWrites[1].pImageInfo = &imageInfo;        // Описание изображения
+
+    // Обновляем описание дескрипторов на устройстве
+    vkUpdateDescriptorSets(vulkanDevice->vulkanLogicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
+// Создаем коммандные буфферы
+void VulkanModelInfo::createCommandBuffers() {
+
+    // Очистка старых буфферов комманд
+    if (vulkanCommandBuffers.size() > 0) {
+        vkFreeCommandBuffers(vulkanDevice->vulkanLogicalDevice, vulkanRenderInfo->vulkanCommandPool,
+                             static_cast<uint32_t>(vulkanCommandBuffers.size()), vulkanCommandBuffers.data());
+        vulkanCommandBuffers.clear();
+    }
+
+    // Ресайзим массив
+    vulkanCommandBuffers.resize(vulkanVisualizer->vulkanSwapChainFramebuffers.size());
+
+    // Настройки создания коммандного буффера
+    VkCommandBufferAllocateInfo allocInfo = {};
+    memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = vulkanRenderInfo->vulkanCommandPool;  // Создаем в общем пуле комманд
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // Первичный буффер
+    allocInfo.commandBufferCount = (uint32_t)vulkanCommandBuffers.size();
+
+    // Аллоцируем память под коммандные буфферы
+    if (vkAllocateCommandBuffers(vulkanDevice->vulkanLogicalDevice, &allocInfo, vulkanCommandBuffers.data()) != VK_SUCCESS) {
+        LOGE("Failed to allocate command buffers!");
+        throw std::runtime_error("Failed to allocate command buffers!");
+    }
+
+    for (size_t i = 0; i < vulkanCommandBuffers.size(); i++) {
+        // Параметр flags определяет, как использовать буфер команд. Возможны следующие значения:
+        // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: Буфер команд будет перезаписан сразу после первого выполнения.
+        // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
+        // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+
+        // Информация о запуске коммандного буффера
+        VkCommandBufferBeginInfo beginInfo = {};
+        memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT; // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+        beginInfo.pInheritanceInfo = nullptr; // Optional
+
+        // Запуск коммандного буффера
+        vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
+
+        // Информация о запуске рендер-прохода
+        std::array<VkClearValue, 2> clearValues = {};
+        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+
+        VkRenderPassBeginInfo renderPassInfo = {};
+        memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = vulkanRenderInfo->vulkanRenderPass;   // Рендер проход
+        renderPassInfo.framebuffer = vulkanVisualizer->vulkanSwapChainFramebuffers[i];    // Фреймбуффер смены кадров
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = vulkanVisualizer->vulkanSwapChainExtent;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        // Запуск рендер-прохода
+        // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
+        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
+        vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        // Устанавливаем пайплайн у коммандного буффера
+        vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderInfo->vulkanPipeline);
+
+        // Привязываем вершинный буффер к пайлпайну
+        VkBuffer vertexBuffers[] = {vulkanVertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+        // Привязываем индексный буффер к пайплайну
+        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        // Подключаем дескрипторы ресурсов для юниформ буффера
+        vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderInfo->vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
+
+        // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
+        // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        vkCmdDrawIndexed(vulkanCommandBuffers[i], static_cast<uint32_t>(vulkanTotalIndexesCount), 1, 0, 0, 0);
+
+        // Заканчиваем рендер проход
+        vkCmdEndRenderPass(vulkanCommandBuffers[i]);
+
+        // Заканчиваем подготовку коммандного буффера
+        if (vkEndCommandBuffer(vulkanCommandBuffers[i]) != VK_SUCCESS) {
+            LOGE("Failed to record command buffer!");
+            throw std::runtime_error("Failed to record command buffer!");
+        }
+    }
+}
+
+// Обновляем юниформ буффер
+void VulkanModelInfo::updateUniformBuffer(float delta){
+    rotateAngle += delta * 30.0f;
+
+    UniformBufferObject ubo = {};
+    memset(&ubo, 0, sizeof(UniformBufferObject));
+    ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), vulkanVisualizer->vulkanSwapChainExtent.width / (float)vulkanVisualizer->vulkanSwapChainExtent.height, 0.1f, 10.0f);
+
+    // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
+    // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
+    //ubo.proj[1][1] *= -1;
+
+    void* data = nullptr;
+    vkMapMemory(vulkanDevice->vulkanLogicalDevice, vulkanUniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(vulkanDevice->vulkanLogicalDevice, vulkanUniformStagingBufferMemory);
+
+    // Закидываем задачу на копирование буффера
+    vulkanRenderInfo->queueCopyBuffer(vulkanUniformStagingBuffer, vulkanUniformBuffer, sizeof(ubo));
 }

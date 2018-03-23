@@ -43,7 +43,7 @@ public class VulkanDrawThread extends Thread{
             try {
                 canvas = this.surfaceHolder.lockCanvas(null);
                 synchronized (this) {
-
+                    vulkanDraw();
                 }
             } finally {
                 if (canvas != null) {

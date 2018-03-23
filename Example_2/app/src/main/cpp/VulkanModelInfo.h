@@ -29,10 +29,19 @@ public:
     VkDeviceMemory vulkanVertexBufferMemory;
     VkBuffer vulkanIndexBuffer;
     VkDeviceMemory vulkanIndexBufferMemory;
+    VkBuffer vulkanUniformStagingBuffer;
+    VkDeviceMemory vulkanUniformStagingBufferMemory;
+    VkBuffer vulkanUniformBuffer;
+    VkDeviceMemory vulkanUniformBufferMemory;
+    VkDescriptorPool vulkanDescriptorPool;
+    VkDescriptorSet vulkanDescriptorSet;
+    std::vector<VkCommandBuffer> vulkanCommandBuffers;
+    float rotateAngle;
 
 public:
     VulkanModelInfo(VulkanDevice* device, VulkanVisualizer* visualizer, VulkanRenderInfo* renderInfo, AAssetManager* assetManager);
     ~VulkanModelInfo();
+    void updateUniformBuffer(float delta); // Обновляем юниформ буффер
 
 private:
     // Стадии инициализации
@@ -42,6 +51,10 @@ private:
     void loadModel();                 // Грузим данные для модели
     void createVertexBuffer();        // Создание буфферов вершин
     void createIndexBuffer();         // Создание буффера индексов
+    void createUniformBuffer();       // Создаем буффер юниформов
+    void createDescriptorPool();      // Создаем пул дескрипторов ресурсов
+    void createDescriptorSet();       // Создаем набор дескрипторов ресурсов
+    void createCommandBuffers();      // Создаем коммандные буфферы
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -2193,6 +2193,7 @@ int local_main(int argc, char** argv) {
     
     // Очищаем Vulkan
     // Удаляем старые объекты
+    vkFreeCommandBuffers(vulkanLogicalDevice, vulkanCommandPool, vulkanCommandBuffers.size(), vulkanCommandBuffers.data());
     vkDestroyImage(vulkanLogicalDevice, vulkanDepthImage, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanDepthImageMemory, nullptr);
     vkDestroyImageView(vulkanLogicalDevice, vulkanDepthImageView, nullptr);

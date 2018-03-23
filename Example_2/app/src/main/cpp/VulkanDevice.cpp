@@ -41,16 +41,21 @@ VulkanDevice::VulkanDevice(ANativeWindow* androidNativeWindow, uint32_t windowW,
     vulkanPhysicalDevice(VK_NULL_HANDLE),
     vulkanLogicalDevice(VK_NULL_HANDLE),
     vulkanGraphicsQueue(VK_NULL_HANDLE),
-    vulkanPresentQueue(VK_NULL_HANDLE){
+    vulkanPresentQueue(VK_NULL_HANDLE),
+    vulkanImageAvailableSemaphore(VK_NULL_HANDLE),
+    vulkanRenderFinishedSemaphore(VK_NULL_HANDLE){
 
     createVulkanInstance();
     setupDebugCallback();
     createSurface(androidNativeWindow);
     selectPhysicalDevice();
     createLogicalDeviceAndQueue();
+    createSemaphores();
 }
 
 VulkanDevice::~VulkanDevice() {
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanRenderFinishedSemaphore, nullptr);
     vkDestroyDevice(vulkanLogicalDevice, nullptr);
     vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
@@ -491,7 +496,7 @@ void VulkanDevice::createLogicalDeviceAndQueue() {
 
     // Создаем экземпляры настроек создания очереди
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    const float queuePriority = 1.0f;
+    const float queuePriority = 0.9f;
     for (int32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
@@ -535,7 +540,16 @@ void VulkanDevice::createLogicalDeviceAndQueue() {
     }
 }
 
-/*void VulkanDevice::createSwapchain(){
-    std::array<const char*, 1> deviceExtensions;
-    deviceExtensions[0] = "VK_KHR_swapchain";
-}*/
+// Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
+void VulkanDevice::createSemaphores(){
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    memset(&semaphoreInfo, 0, sizeof(VkSemaphoreCreateInfo));
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    // Создаем семафор для отображения и для кодирования графики
+    if (vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanRenderFinishedSemaphore) != VK_SUCCESS) {
+        LOGE("Failed to create semaphores!");
+        throw std::runtime_error("Failed to create semaphores!");
+    }
+}
