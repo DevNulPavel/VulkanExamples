@@ -4,7 +4,7 @@
 #include <android/native_activity.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
-#include "VulkanCodeWrapper/vulkan_wrapper.h"
+#include <vulkan_wrapper.h>
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
 #include "VulkanRenderInfo.h"

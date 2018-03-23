@@ -2,7 +2,7 @@
 #define VULKANSWAPCHAIN_H
 
 #include <vector>
-#include "VulkanCodeWrapper/vulkan_wrapper.h"
+#include <vulkan_wrapper.h>
 
 struct VulkanDevice;
 struct VulkanRenderInfo;

@@ -1,7 +1,7 @@
 #ifndef VULKANRENDERINFO_H
 #define VULKANRENDERINFO_H
 
-#include "VulkanCodeWrapper/vulkan_wrapper.h"
+#include <vulkan_wrapper.h>
 
 
 struct VulkanDevice;
