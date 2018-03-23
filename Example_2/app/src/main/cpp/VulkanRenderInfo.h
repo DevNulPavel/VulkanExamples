@@ -22,6 +22,10 @@ public:
     VkShaderModule vulkanFragmentShader;
     VkPipelineLayout vulkanPipelineLayout;
     VkPipeline vulkanPipeline;
+    VkCommandPool vulkanCommandPool;
+    VkImage vulkanTextureImage;
+    VkDeviceMemory vulkanTextureImageMemory;
+    VkImageView vulkanTextureImageView;
 
 public:
     VulkanRenderInfo(VulkanDevice* device, VulkanVisualizer* visualizer, AAssetManager* assetManager);
@@ -32,13 +36,13 @@ private:
     void createRenderPass();    // Создание рендер-прохода
     void createUniformDescriptorSetLayout(); // Создаем дескриптор для буффера юниформов
     void createGraphicsPipeline();    // Создание пайплайна отрисовки
+    void createRenderCommandPool();   // Создаем пулл комманд
+    void createTextureImage();        // Создание текстуры из изображения
 
     ////////////////
 
     // Из байткода исходника создаем шейдерный модуль
-    void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule);
-    // Читаем побайтово файлик
-    std::vector<char> readFile(const std::string& filename);
+    void createShaderModule(const std::vector<unsigned char>& code, VkShaderModule& shaderModule);
 };
 
 

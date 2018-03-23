@@ -1,6 +1,10 @@
 #include "VulkanRenderInfo.h"
 #include <cstring>
 #include <stdexcept>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
 #include "Vertex.h"
@@ -16,14 +20,24 @@ VulkanRenderInfo::VulkanRenderInfo(VulkanDevice* device, VulkanVisualizer* visua
     vulkanVertexShader(VK_NULL_HANDLE),
     vulkanFragmentShader(VK_NULL_HANDLE),
     vulkanPipelineLayout(VK_NULL_HANDLE),
-    vulkanPipeline(VK_NULL_HANDLE){
+    vulkanPipeline(VK_NULL_HANDLE),
+    vulkanCommandPool(VK_NULL_HANDLE),
+    vulkanTextureImage(VK_NULL_HANDLE),
+    vulkanTextureImageMemory(VK_NULL_HANDLE),
+    vulkanTextureImageView(VK_NULL_HANDLE){
 
     createRenderPass();
     createUniformDescriptorSetLayout();
     createGraphicsPipeline();
+    createRenderCommandPool();
+    createTextureImage();
 }
 
 VulkanRenderInfo::~VulkanRenderInfo(){
+    vkDestroyImageView(vulkanDevice->vulkanLogicalDevice, vulkanTextureImageView, nullptr);
+    vkDestroyImage(vulkanDevice->vulkanLogicalDevice, vulkanTextureImage, nullptr);
+    vkFreeMemory(vulkanDevice->vulkanLogicalDevice, vulkanTextureImageMemory, nullptr);
+    vkDestroyCommandPool(vulkanDevice->vulkanLogicalDevice, vulkanCommandPool, nullptr);
     vkDestroyPipeline(vulkanDevice->vulkanLogicalDevice, vulkanPipeline, nullptr);
     vkDestroyPipelineLayout(vulkanDevice->vulkanLogicalDevice, vulkanPipelineLayout, nullptr);
     vkDestroyShaderModule(vulkanDevice->vulkanLogicalDevice, vulkanVertexShader, nullptr);
@@ -136,28 +150,8 @@ void VulkanRenderInfo::createUniformDescriptorSetLayout() {
     }
 }
 
-// Читаем побайтово файлик
-std::vector<char> VulkanRenderInfo::readFile(const std::string& filename) {
-    AAsset* file = AAssetManager_open(androidAssetManager, filename.c_str(), AASSET_MODE_BUFFER);
-    if(file == NULL){
-        LOGE("Failed to read file %s", filename.c_str());
-        throw std::runtime_error("Failed to read shader file!");
-    }
-
-    off_t fileLength = AAsset_getLength(file);
-
-    std::vector<char> buffer;
-    buffer.resize(static_cast<size_t >(fileLength));
-
-    AAsset_read(file, buffer.data(), buffer.size());
-
-    AAsset_close(file);
-
-    return buffer;
-}
-
 // Из байткода исходника создаем шейдерный модуль
-void VulkanRenderInfo::createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule) {
+void VulkanRenderInfo::createShaderModule(const std::vector<unsigned char>& code, VkShaderModule& shaderModule) {
     VkShaderModuleCreateInfo createInfo = {};
     memset(&createInfo, 0, sizeof(VkShaderModuleCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -183,12 +177,16 @@ void VulkanRenderInfo::createGraphicsPipeline() {
     }
 
     // Читаем байт-код шейдеров
-    std::vector<char> vertShaderCode = readFile("shaders/vert.spv");
-    std::vector<char> fragShaderCode = readFile("shaders/frag.spv");
+    std::vector<unsigned char> vertShaderCode = readFile(androidAssetManager, "shaders/vert.spv");
+    std::vector<unsigned char> fragShaderCode = readFile(androidAssetManager, "shaders/frag.spv");
 
     // Создаем шейдерный модуль
     createShaderModule(vertShaderCode, vulkanVertexShader);
     createShaderModule(fragShaderCode, vulkanFragmentShader);
+
+    // Удаляем данные
+    vertShaderCode.clear();
+    fragShaderCode.clear();
 
     // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -357,6 +355,120 @@ void VulkanRenderInfo::createGraphicsPipeline() {
     pipelineInfo.pDynamicState = nullptr;               // Динамическое состояние отрисовки
 
     if (vkCreateGraphicsPipelines(vulkanDevice->vulkanLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vulkanPipeline) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create graphics pipeline!");
+        LOGE("Failed to create graphics pipeline!");
+        throw std::runtime_error("Failed to create graphics pipeline!");
     }
+}
+
+// Создаем пулл комманд
+void VulkanRenderInfo::createRenderCommandPool() {
+    // Информация о пуле коммандных буфферов
+    VkCommandPoolCreateInfo poolInfo = {};
+    memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = static_cast<uint32_t>(vulkanDevice->vulkanFamiliesQueueIndexes.presentQueueFamilyIndex);   // Пулл будет для семейства очередей рендеринга
+    poolInfo.flags = 0; // Optional
+
+    if (vkCreateCommandPool(vulkanDevice->vulkanLogicalDevice, &poolInfo, nullptr, &vulkanCommandPool) != VK_SUCCESS) {
+        LOGE("Failed to create command pool!");
+        throw std::runtime_error("Failed to create command pool!");
+    }
+}
+
+// Создание текстуры из изображения
+void VulkanRenderInfo::createTextureImage() {
+    std::vector<unsigned char> imageData = readFile(androidAssetManager, "textures/chalet.jpg");
+
+    int texWidth = 0;
+    int texHeight = 0;
+    int texChannels = 0;
+    stbi_uc* pixels = stbi_load_from_memory((stbi_uc*)imageData.data(), static_cast<int>(imageData.size()), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha); // STBI_rgb_alpha STBI_default
+    VkDeviceSize imageSize = static_cast<VkDeviceSize>(texWidth * texHeight * 4);
+
+    imageData.clear();
+
+    if (!pixels) {
+        LOGE("Failed to load texture image!");
+        throw std::runtime_error("Failed to load texture image!");
+    }
+
+    // Указатели на временную текстуру и целевую
+    VkImage stagingImage = VK_NULL_HANDLE;
+    VkDeviceMemory stagingImageMemory = VK_NULL_HANDLE;
+
+    // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
+    // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
+    createImage(vulkanDevice->vulkanLogicalDevice, vulkanDevice->vulkanPhysicalDevice,
+                static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight),
+                VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
+                VK_IMAGE_TILING_LINEAR,             // Тайлинг
+                VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
+                stagingImage,
+                stagingImageMemory);
+
+    // Описание подресурса для изображения
+    VkImageSubresource subresource = {};
+    subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresource.mipLevel = 0;
+    subresource.arrayLayer = 0;
+
+    // Создание лаяута для подресурса
+    VkSubresourceLayout stagingImageLayout;
+    vkGetImageSubresourceLayout(vulkanDevice->vulkanLogicalDevice, stagingImage, &subresource, &stagingImageLayout);
+
+    // Мапим данные текстуры в адресное пространство CPU
+    void* data = nullptr;
+    vkMapMemory(vulkanDevice->vulkanLogicalDevice, stagingImageMemory, 0, imageSize, 0, &data);
+
+    // Копируем целиком или построчно в зависимости от размера и выравнивания на GPU
+    if (stagingImageLayout.rowPitch == texWidth * 4) {
+        memcpy(data, pixels, (size_t) imageSize);
+    } else {
+        uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
+
+        for (int y = 0; y < texHeight; y++) {
+            memcpy(&dataBytes[y * stagingImageLayout.rowPitch],
+                   &pixels[y * texWidth * 4],
+                   static_cast<size_t>(texWidth * 4));
+        }
+    }
+
+    // Размапим данные
+    vkUnmapMemory(vulkanDevice->vulkanLogicalDevice, stagingImageMemory);
+
+    // Создаем рабочее изображение для последующего использования
+    createImage(vulkanDevice->vulkanLogicalDevice, vulkanDevice->vulkanPhysicalDevice,
+                static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight),
+                VK_FORMAT_R8G8B8A8_UNORM,   // Формат картинки
+                VK_IMAGE_TILING_OPTIMAL,    // тайлинг
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // Лаяут использования - принимает данные из другой текстуры
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
+                vulkanTextureImage,
+                vulkanTextureImageMemory);
+
+    /*// Конвертирование исходной буфферной текстуры с данными в формат копирования на GPU
+    transitionImageLayout(stagingImage,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_PREINITIALIZED,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    //transitionImageLayout(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Копируем данные в пределах GPU из временной текстуры в целевую
+    copyImage(stagingImage, vulkanTextureImage, texWidth, texHeight);
+
+    // Конвертируем использование текстуры в оптимальное для рендеринга
+    transitionImageLayout(vulkanTextureImage,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // Удаляем временные объекты
+    vkDestroyImage(vulkanDevice->vulkanLogicalDevice, stagingImage, nullptr);
+    vkFreeMemory(vulkanDevice->vulkanLogicalDevice, stagingImageMemory, nullptr);*/
+
+    // Учищаем буффер данных картинки
+    stbi_image_free(pixels);
 }

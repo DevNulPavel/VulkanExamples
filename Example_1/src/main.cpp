@@ -1290,14 +1290,19 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     } else if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    }else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     } else {
-        throw std::invalid_argument("unsupported layout transition!");
+        printf("Unsupported layout transition!");
+        fflush(stdout);
+        throw std::invalid_argument("Unsupported layout transition!");
     }
     
     // TODO: ???
@@ -1389,16 +1394,19 @@ void createDepthResources() {
     createImage(vulkanSwapChainExtent.width, vulkanSwapChainExtent.height,
                 vulkanDepthFormat,                                  // Формат текстуры
                 VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,   // Используем сразу правильный лаяут для текстуры
+                VK_IMAGE_LAYOUT_UNDEFINED,  // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
                 vulkanDepthImage, vulkanDepthImageMemory);
     
     // Создаем вью для изображения буффера глубины
     createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
-    
-    // Наверное нужно? Но и так работает
-    //transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+}
+
+// Обновляем лаяут текстуры глубины на правильный
+void updateDepthTextureLayout(){
+    // Конвертируем в формат, пригодный для глубины
+    transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 // Создание текстуры из изображения
@@ -1422,7 +1430,7 @@ void createTextureImage() {
     createImage(texWidth, texHeight,
                 VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
                 VK_IMAGE_TILING_LINEAR,             // Тайлинг
-                VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED
+                VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
                 stagingImage,
@@ -1462,7 +1470,7 @@ void createTextureImage() {
     createImage(texWidth, texHeight,
                 VK_FORMAT_R8G8B8A8_UNORM,   // Формат картинки
                 VK_IMAGE_TILING_OPTIMAL,    // тайлинг
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // Лаяут использования - принимает данные из другой текстуры
+                VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                 vulkanTextureImage,
@@ -1473,7 +1481,11 @@ void createTextureImage() {
                           VK_FORMAT_R8G8B8A8_UNORM,
                           VK_IMAGE_LAYOUT_PREINITIALIZED,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    //transitionImageLayout(vulkanTextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    // Конвертирование конечной буфферной текстуры с данными в формат получателя
+    transitionImageLayout(vulkanTextureImage,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     
     // Копируем данные в пределах GPU из временной текстуры в целевую
     copyImage(stagingImage, vulkanTextureImage, texWidth, texHeight);
@@ -1931,6 +1943,7 @@ void recreateSwapChain() {
     getSwapchainImages();
     createImageViews();
     createDepthResources();
+    updateDepthTextureLayout();
     createRenderPass();
     createFramebuffers();
     createGraphicsPipeline();
@@ -2103,6 +2116,9 @@ int local_main(int argc, char** argv) {
     
     // Создаем пулл комманд
     createCommandPool();
+    
+    // Обновляем лаяут текстуры глубины на правильный
+    updateDepthTextureLayout();
     
     // Создание текстуры из изображения
     createTextureImage();

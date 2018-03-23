@@ -16,6 +16,8 @@
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Отладочный коллбек
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
                                                     VkDebugReportObjectTypeEXT objType,
@@ -245,7 +247,7 @@ void VulkanDevice::setupDebugCallback() {
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
         createInfo.flags =  VK_DEBUG_REPORT_ERROR_BIT_EXT |
                             VK_DEBUG_REPORT_WARNING_BIT_EXT |
-                            VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+                            //VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
                             VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT; // Что выводим в коллбек
         createInfo.pfnCallback = debugCallback;
 
