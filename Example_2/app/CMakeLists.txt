@@ -11,6 +11,8 @@ add_library(vulkan_cpp_code
              src/main/cpp/VulkanVisualizer.cpp
              src/main/cpp/VulkanRenderInfo.h
              src/main/cpp/VulkanRenderInfo.cpp
+             src/main/cpp/VulkanModelInfo.h
+             src/main/cpp/VulkanModelInfo.cpp
              src/main/cpp/SupportFunctions.h
              src/main/cpp/SupportFunctions.cpp
              src/main/cpp/UniformBuffer.h

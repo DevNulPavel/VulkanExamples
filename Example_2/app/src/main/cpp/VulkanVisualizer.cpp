@@ -220,7 +220,7 @@ void VulkanVisualizer::createDepthResources() {
                 vulkanSwapChainExtent.width, vulkanSwapChainExtent.height,
                 vulkanDepthFormat,                                  // Формат текстуры
                 VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,   // Используем сразу правильный лаяут для текстуры
+                VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
                 vulkanDepthImage, vulkanDepthImageMemory);

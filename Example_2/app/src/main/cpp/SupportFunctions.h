@@ -29,6 +29,7 @@ void createImage(VkDevice vulkanLogicalDevice, VkPhysicalDevice physDevice,
 // Создание вью для изображения
 void createImageView(VkDevice vulkanLogicalDevice, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView);
 
-
+// Есть ли поддержка трафарета в формате
+bool hasStencilComponent(VkFormat format);
 
 #endif

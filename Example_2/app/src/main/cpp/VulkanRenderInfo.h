@@ -23,13 +23,21 @@ public:
     VkPipelineLayout vulkanPipelineLayout;
     VkPipeline vulkanPipeline;
     VkCommandPool vulkanCommandPool;
-    VkImage vulkanTextureImage;
-    VkDeviceMemory vulkanTextureImageMemory;
-    VkImageView vulkanTextureImageView;
 
 public:
     VulkanRenderInfo(VulkanDevice* device, VulkanVisualizer* visualizer, AAssetManager* assetManager);
     ~VulkanRenderInfo();
+
+    // Запуск коммандного буффера на получение комманд
+    VkCommandBuffer beginSingleTimeCommands();
+    // Завершение коммандного буффера
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+    // Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    // Закидываем в очередь операцию копирования текстуры
+    void queueCopyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height);
+    // Копирование буффера
+    void queueCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 private:
     // Стадии загрузки
@@ -37,7 +45,7 @@ private:
     void createUniformDescriptorSetLayout(); // Создаем дескриптор для буффера юниформов
     void createGraphicsPipeline();    // Создание пайплайна отрисовки
     void createRenderCommandPool();   // Создаем пулл комманд
-    void createTextureImage();        // Создание текстуры из изображения
+    void updateDepthTextureLayout();  // Обновляем лаяут текстуры глубины на правильный
 
     ////////////////
 

@@ -1291,7 +1291,7 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
         barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     }else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1572,7 +1572,7 @@ void loadModel(){
     vulkanTotalVertexesCount = vulkanVertices.size();
     vulkanTotalIndexesCount = vulkanIndices.size();
     
-    printf("Model loading complete\n");
+    printf("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n", vulkanTotalVertexesCount, vulkanTotalVertexesCount/3, vulkanTotalIndexesCount);
     fflush(stdout);
 }
 
@@ -1581,11 +1581,11 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     // Удаляем старое, если есть
     if(bufferMemory != VK_NULL_HANDLE){
         vkFreeMemory(vulkanLogicalDevice, bufferMemory, nullptr);
-        vulkanVertexBufferMemory = VK_NULL_HANDLE;
+        bufferMemory = VK_NULL_HANDLE;
     }
     if (buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(vulkanLogicalDevice, buffer, nullptr);
-        vulkanVertexBuffer = VK_NULL_HANDLE;
+        buffer = VK_NULL_HANDLE;
     }
     
     // VK_SHARING_MODE_EXCLUSIVE: изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.

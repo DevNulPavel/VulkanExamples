@@ -35,19 +35,24 @@ public class VulkanDrawThread extends Thread{
         vulkanInit(surface, width, height, this.assetManager);
 
         while (runFlag) {
-            Canvas canvas = null;
+            vulkanDraw();
+        }
+
+        /*Canvas canvas = null;
+        while (runFlag) {
             try {
                 canvas = this.surfaceHolder.lockCanvas(null);
                 synchronized (this) {
-                    vulkanDraw();
+
                 }
             } finally {
                 if (canvas != null) {
                     // отрисовка выполнена. выводим результат на экран
                     this.surfaceHolder.unlockCanvasAndPost(canvas);
+                    canvas = null;
                 }
             }
-        }
+        }*/
 
         vulkanDestroy();
     }

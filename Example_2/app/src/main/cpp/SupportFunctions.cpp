@@ -138,3 +138,8 @@ void createImageView(VkDevice vulkanLogicalDevice, VkImage image, VkFormat forma
         throw std::runtime_error("Failed to create texture image view!");
     }
 }
+
+// Есть ли поддержка трафарета в формате
+bool hasStencilComponent(VkFormat format) {
+    return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}

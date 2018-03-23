@@ -10,6 +10,7 @@
 #include "VulkanDevice.h"
 #include "VulkanVisualizer.h"
 #include "VulkanRenderInfo.h"
+#include "VulkanModelInfo.h"
 #include "SupportFunctions.h"
 
 //JNIEXPORT jstring
@@ -20,6 +21,7 @@
 VulkanDevice* vulkanDevice = nullptr;
 VulkanVisualizer* vulkanVisualizer = nullptr;
 VulkanRenderInfo* vulkanRenderInfo = nullptr;
+VulkanModelInfo* vulkanModelInfo = nullptr;
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +55,9 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanInit(JNIEnv *e
 
     // Создаем фреймбуфферы для рендер-прохода
     vulkanVisualizer->createFramebuffers(vulkanRenderInfo);
+
+    // Данные о модели
+    vulkanModelInfo = new VulkanModelInfo(vulkanDevice, vulkanVisualizer, vulkanRenderInfo, androidNativeAssetManager);
 }
 
 JNICALL
@@ -61,10 +66,12 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDraw(JNIEnv *e
 
 JNICALL
 void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDestroy(JNIEnv *env, jobject thisObj) {
+    delete vulkanModelInfo;
     delete vulkanRenderInfo;
     delete vulkanVisualizer;
     delete vulkanDevice;
 
+    vulkanModelInfo = nullptr;
     vulkanRenderInfo = nullptr;
     vulkanVisualizer = nullptr;
     vulkanDevice = nullptr;
