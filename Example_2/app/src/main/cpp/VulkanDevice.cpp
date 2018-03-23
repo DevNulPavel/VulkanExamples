@@ -10,7 +10,9 @@
 #include "SupportFunctions.h"
 
 
-#define VALIDATION_LAYERS_ENABLED
+#ifndef NDEBUG
+    #define VALIDATION_LAYERS_ENABLED
+#endif
 
 #define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
 const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -19,6 +21,7 @@ const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Отладочный коллбек
+#ifdef VALIDATION_LAYERS_ENABLED
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
                                                     VkDebugReportObjectTypeEXT objType,
                                                     uint64_t obj,
@@ -30,6 +33,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
     LOGE("Validation layer message %s: %s\n", layerPrefix, msg);
     return VK_FALSE;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -264,7 +264,9 @@ void VulkanModelInfo::loadModel(){
     vulkanTotalVertexesCount = vulkanVertices.size();
     vulkanTotalIndexesCount = vulkanIndices.size();
 
-    LOGE("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n", vulkanTotalVertexesCount, vulkanTotalVertexesCount/3, vulkanTotalIndexesCount);
+    LOGE("Model loading complete: %d vertexes, %d triangles, %d indexes\n", static_cast<uint32_t>(vulkanTotalVertexesCount),
+                 static_cast<uint32_t>(vulkanTotalVertexesCount/3),
+                 static_cast<uint32_t>(vulkanTotalIndexesCount));
 }
 
 // Создаем буффер нужного размера

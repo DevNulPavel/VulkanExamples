@@ -27,13 +27,13 @@ android {
         }
     }
     // Для слоев валидации Vulkan
-    sourceSets {
-        main {
-            jniLibs {
-                srcDir "${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs"
-            }
-        }
-    }
+//    sourceSets {
+//        main {
+//            jniLibs {
+//                srcDir "${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs"
+//            }
+//        }
+//    }
 }
 
 dependencies {
