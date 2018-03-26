@@ -500,14 +500,14 @@ void VulkanDevice::createLogicalDeviceAndQueue() {
 
     // Создаем экземпляры настроек создания очереди
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    const float queuePriority = 0.9f;
+    const float queuePriority[2] = {0.9f, 0.9f};
     for (int32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = static_cast<uint32_t>(queueFamily);  // Индекс семейства очередей
         queueCreateInfo.queueCount = createQueuesCount;                     // Количество очередей
-        queueCreateInfo.pQueuePriorities = &queuePriority;  // Приоритет очереди
+        queueCreateInfo.pQueuePriorities = queuePriority;  // Приоритет очереди
 
         queueCreateInfos.push_back(queueCreateInfo);
     }

@@ -37,7 +37,8 @@ add_library(vulkan_wrapper
 include_directories(src/main/cpp_libs/vulkan_wrapper/)
 
 # Flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR -DNDEBUG")
+#  -DNDEBUG
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
 
 # System libs search
 find_library(LOG_LIB log)

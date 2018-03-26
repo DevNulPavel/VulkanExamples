@@ -587,14 +587,14 @@ void createLogicalDeviceAndQueue() {
     
     // Создаем экземпляры настроек создания очереди
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    float queuePriority = 1.0f;
+    float queuePriority[2] = {1.0f, 1.0f};
     for (int queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
         queueCreateInfo.queueCount = createQueuesCount;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfo.pQueuePriorities = queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
     
