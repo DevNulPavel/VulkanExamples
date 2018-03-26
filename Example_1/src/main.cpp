@@ -71,6 +71,9 @@ int vulkanPresentQueueFamilyQueuesCount = 0;
 VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
 VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
 VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
+VkSemaphore vulkanImageAvailableSemaphore = VK_NULL_HANDLE;
+VkSemaphore vulkanRenderFinishedSemaphore = VK_NULL_HANDLE;
+VkFence vulkanFence = VK_NULL_HANDLE;
 VkSwapchainKHR vulkanSwapchain = VK_NULL_HANDLE;
 std::vector<VkImage> vulkanSwapChainImages;
 VkFormat vulkanSwapChainImageFormat = VK_FORMAT_UNDEFINED;
@@ -86,8 +89,6 @@ VkPipeline vulkanPipeline = VK_NULL_HANDLE;
 std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
 VkCommandPool vulkanCommandPool = VK_NULL_HANDLE;
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
-VkSemaphore vulkanImageAvailableSemaphore = VK_NULL_HANDLE;
-VkSemaphore vulkanRenderFinishedSemaphore = VK_NULL_HANDLE;
 VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanIndexBuffer = VK_NULL_HANDLE;
@@ -631,6 +632,35 @@ void createLogicalDeviceAndQueue() {
     }else{
         vkGetDeviceQueue(vulkanLogicalDevice, vulkanRenderQueueFamilyIndex, 0, &vulkanGraphicsQueue);
         vkGetDeviceQueue(vulkanLogicalDevice, vulkanPresentQueueFamilyIndex, 0, &vulkanPresentQueue);
+    }
+}
+
+// Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
+void createSemaphores(){
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    memset(&semaphoreInfo, 0, sizeof(VkSemaphoreCreateInfo));
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    
+    // Создаем семафор для отображения и для кодирования графики
+    if (vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanRenderFinishedSemaphore) != VK_SUCCESS) {
+        
+        throw std::runtime_error("failed to create semaphores!");
+    }
+}
+
+// Создаем преграды для проверки завершения комманд отрисовки
+void createFences(){
+    VkFenceCreateInfo createInfo = {};
+    memset(&createInfo, 0, sizeof(VkFenceCreateInfo));
+    createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    createInfo.pNext = NULL;
+    createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Изначально создаем вытавленным
+    VkResult fenceCreateStatus = vkCreateFence(vulkanLogicalDevice, &createInfo, nullptr, &vulkanFence);
+    if (fenceCreateStatus != VK_SUCCESS) {
+        printf("Failed to create fence!");
+        fflush(stdout);
+        throw std::runtime_error("Failed to create fence!");
     }
 }
 
@@ -1917,20 +1947,6 @@ void createCommandBuffers() {
     }
 }
 
-// Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
-void createSemaphores(){
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    memset(&semaphoreInfo, 0, sizeof(VkSemaphoreCreateInfo));
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    
-    // Создаем семафор для отображения и для кодирования графики
-    if (vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanRenderFinishedSemaphore) != VK_SUCCESS) {
-        
-        throw std::runtime_error("failed to create semaphores!");
-    }
-}
-
 // Вызывается при различных ресайзах окна
 void recreateSwapChain() {
     // Ждем завершения работы Vulkan
@@ -1992,7 +2008,7 @@ void drawFrame() {
     // Настраиваем отправление в очередь комманд отрисовки
     // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
     VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore}; // Семафор ожидания картинки для вывода туда графики
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем возможности вывода в буфер цвета
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем c помощью семафора возможности вывода в буфер цвета
     VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore}; // Семафор оповещения о завершении рендеринга
     VkSubmitInfo submitInfo = {};
     memset(&submitInfo, 0, sizeof(VkSubmitInfo));
@@ -2005,9 +2021,22 @@ void drawFrame() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
     
+    // Синхронизация с ожиданием на CPU завершения очереди выполнения комманд
+    /*
+    //VkResult fenceStatus = vkGetFenceStatus(vulkanLogicalDevice, vulkanFence);
+    //VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
+    VkResult waitStatus = vkWaitForFences(vulkanLogicalDevice, 1, &vulkanFence, VK_TRUE, std::numeric_limits<uint64_t>::max()-1);
+    if (waitStatus == VK_SUCCESS) {
+        VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
+        //printf("Fence waited + reset!\n");
+        //fflush(stdout);
+    }*/
+    
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-    if (vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        throw std::runtime_error("failed to submit draw command buffer!");
+    if (vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo,  VK_NULL_HANDLE/*vulkanFence*/) != VK_SUCCESS) {
+        printf("Failed to submit draw command buffer!\n");
+        fflush(stdout);
+        throw std::runtime_error("Failed to submit draw command buffer!");
     }
 
     // Настраиваем задачу отображения полученного изображения
@@ -2029,6 +2058,7 @@ void drawFrame() {
         recreateSwapChain();
         return;
     } else if (presentResult != VK_SUCCESS) {
+        printf("failed to present swap chain image!\n");
         throw std::runtime_error("failed to present swap chain image!");
     }
 }
@@ -2086,6 +2116,12 @@ int local_main(int argc, char** argv) {
     
     // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
     createLogicalDeviceAndQueue();
+    
+    // Создаем семафоры
+    createSemaphores();
+    
+    // Создаем преграды для проверки завершения комманд отрисовки
+    createFences();
     
     // Создание логики смены кадров
     createSwapChain();
@@ -2150,9 +2186,6 @@ int local_main(int argc, char** argv) {
     // Создаем коммандные буфферы
     createCommandBuffers();
     
-    // Создаем семафоры
-    createSemaphores();
-    
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
     double lastFrameDuration = 1.0/60.0;
@@ -2210,8 +2243,6 @@ int local_main(int argc, char** argv) {
     vkDestroyBuffer(vulkanLogicalDevice, vulkanIndexBuffer, nullptr);
     vkFreeMemory(vulkanLogicalDevice, vulkanVertexBufferMemory, nullptr);
     vkDestroyBuffer(vulkanLogicalDevice, vulkanVertexBuffer, nullptr);
-    vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(vulkanLogicalDevice, vulkanRenderFinishedSemaphore, nullptr);
     vkDestroyCommandPool(vulkanLogicalDevice, vulkanCommandPool, nullptr);
     for (const auto& buffer: vulkanSwapChainFramebuffers) {
         vkDestroyFramebuffer(vulkanLogicalDevice, buffer, nullptr);
@@ -2226,6 +2257,9 @@ int local_main(int argc, char** argv) {
         vkDestroyImageView(vulkanLogicalDevice, imageView, nullptr);
     }
     vkDestroySwapchainKHR(vulkanLogicalDevice, vulkanSwapchain, nullptr);
+    vkDestroyFence(vulkanLogicalDevice, vulkanFence, nullptr);
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanImageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(vulkanLogicalDevice, vulkanRenderFinishedSemaphore, nullptr);
     vkDestroyDevice(vulkanLogicalDevice, nullptr);
     vkDestroySurfaceKHR(vulkanInstance, vulkanSurface, nullptr);
     #ifdef VALIDATION_LAYERS_ENABLED
