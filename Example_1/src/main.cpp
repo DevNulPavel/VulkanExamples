@@ -884,22 +884,31 @@ void createRenderPass() {
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;   // Используется для глубины
     
     // Подпроход, всего один (наверное можно задействовать для постэффектов)
-    VkSubpassDescription subPass = {};
-    memset(&subPass, 0, sizeof(VkSubpassDescription));
-    subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
-    subPass.colorAttachmentCount = 1;    // Один аттачмент цвета
-    subPass.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
-    subPass.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины
+    VkSubpassDescription subPass1 = {};
+    memset(&subPass1, 0, sizeof(VkSubpassDescription));
+    subPass1.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
+    subPass1.colorAttachmentCount = 1;    // Один аттачмент цвета
+    subPass1.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
+    subPass1.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины
+    
+    /*// Подпроход, всего один (наверное можно задействовать для постэффектов)
+    VkSubpassDescription subPass2 = {};
+    memset(&subPass2, 0, sizeof(VkSubpassDescription));
+    subPass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
+    subPass2.colorAttachmentCount = 1;    // Один аттачмент цвета
+    subPass2.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
+    subPass2.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины*/
     
     // Описание создания рендер-прохода
+    std::array<VkSubpassDescription, 1> subpasses = {{subPass1}};
     std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};  // Индексы и использование указаны выше
     VkRenderPassCreateInfo renderPassInfo = {};
     memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = attachments.size();
     renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subPass;
+    renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
+    renderPassInfo.pSubpasses = subpasses.data();
     renderPassInfo.dependencyCount = 0;     // TODO: Зависимости?
     renderPassInfo.pDependencies = nullptr;
     
@@ -1936,6 +1945,30 @@ void createCommandBuffers() {
         // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanTotalIndexesCount, 1, 0, 0, 0);
+        
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        
+        /*// Начинаем вводить комманды для следующего подпрохода рендеринга
+        vkCmdNextSubpass(vulkanCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Устанавливаем пайплайн у коммандного буффера
+        vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
+        
+        // Привязываем вершинный буффер к пайлпайну
+        vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
+        
+        // Привязываем индексный буффер к пайплайну
+        vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        
+        // Подключаем дескрипторы ресурсов для юниформ буффера
+        vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
+        
+        // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
+        // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanTotalIndexesCount/2, 1, 0, 0, 0);*/
+        
+        //////////////////////////////////////////////////////////////////////////////////////////////////
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
