@@ -1178,6 +1178,7 @@ uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
 // Создаем изображение
 void createImage(uint32_t width, uint32_t height,
                  VkFormat format, VkImageTiling tiling, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+                 uint32_t mipmapsCount,
                  VkImage& image, VkDeviceMemory& imageMemory) {
     
     // Удаляем старые объекты
@@ -1203,7 +1204,7 @@ void createImage(uint32_t width, uint32_t height,
     imageInfo.extent.width = width;     // Ширина
     imageInfo.extent.height = height;   // Высота
     imageInfo.extent.depth = 1;         // Глубина
-    imageInfo.mipLevels = 1;            // Без мипмапов
+    imageInfo.mipLevels = mipmapsCount; // Уровней мипмапинга всего?
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;          // Формат данных текстуры
     imageInfo.tiling = tiling;
@@ -1284,6 +1285,7 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkQueueSubmit(vulkanGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     
     // TODO: Ожидание передачи комманды в очередь на GPU???
+    // Как альтернативу - можно использовать Fence
     vkQueueWaitIdle(vulkanGraphicsQueue);
     /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
     vkQueueWaitIdle(vulkanGraphicsQueue);
@@ -1303,9 +1305,18 @@ bool hasStencilComponent(VkFormat format) {
 }
 
 // Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
-void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+void transitionImageLayout(VkCommandBuffer commandBuffer,
+                           VkImage image,
+                           VkFormat format,
+                           VkImageLayout oldLayout,
+                           VkImageLayout newLayout,
+                           VkImageSubresourceRange* mipSubRange,
+                           VkPipelineStageFlagBits srcStage,
+                           VkPipelineStageFlagBits dstStage,
+                           VkAccessFlags srcAccessBarrier,
+                           VkAccessFlags dstAccessBarrier) {
     // Создаем коммандный буффер
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    //VkCommandBuffer commandBuffer = beginSingleTimeCommands();
     
     // Создаем барьер памяти для картинок
     VkImageMemoryBarrier barrier = {};
@@ -1315,34 +1326,20 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
     barrier.image = image;  // Изображение, которое меняется
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;    // Изображение использовалось для цвета
-    barrier.subresourceRange.baseMipLevel = 0;  // 0 левел мипмапов
-    barrier.subresourceRange.levelCount = 1;    // 1 уровень мипмапов
-    barrier.subresourceRange.baseArrayLayer = 0;    // Базовый уровень
-    barrier.subresourceRange.layerCount = 1;        // 1 уровень
+    
+    if (mipSubRange != VK_NULL_HANDLE) {
+        barrier.subresourceRange = *mipSubRange;
+    }else{
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;    // Изображение использовалось для цвета
+        barrier.subresourceRange.baseMipLevel = 0;  // 0 левел мипмапов
+        barrier.subresourceRange.levelCount = 1;    // 1 уровень мипмапов
+        barrier.subresourceRange.baseArrayLayer = 0;    // Базовый уровень
+        barrier.subresourceRange.layerCount = 1;        // 1 уровень
+    }
     
     // Настраиваем условия ожиданий для конвертации
-    // TODO: ???
-    if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;       // Ожидание записи хостом данных
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;    // TODO: Дальнейшие действия возможнны после чтения из текстуры???
-    } else if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    }else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    } else {
-        printf("Unsupported layout transition!");
-        fflush(stdout);
-        throw std::invalid_argument("Unsupported layout transition!");
-    }
+    barrier.srcAccessMask = srcAccessBarrier;
+    barrier.dstAccessMask = dstAccessBarrier;
     
     // TODO: ???
     if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
@@ -1357,14 +1354,14 @@ void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayo
     
     // Закидываем в очередь барьер конвертации использования для изображения
     vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Закидываем на верх пайплайна
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Закидываем на верх пайплайна
+                         srcStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                         dstStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
                          0,
                          0, nullptr,
                          0, nullptr,
                          1, &barrier);
     
-    endSingleTimeCommands(commandBuffer);
+    //endSingleTimeCommands(commandBuffer);
 }
 
 // Закидываем в очередь операцию копирования текстуры
@@ -1436,6 +1433,7 @@ void createDepthResources() {
                 VK_IMAGE_LAYOUT_UNDEFINED,  // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
+                1,
                 vulkanDepthImage, vulkanDepthImageMemory);
     
     // Создаем вью для изображения буффера глубины
@@ -1444,8 +1442,106 @@ void createDepthResources() {
 
 // Обновляем лаяут текстуры глубины на правильный
 void updateDepthTextureLayout(){
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
     // Конвертируем в формат, пригодный для глубины
-    transitionImageLayout(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    transitionImageLayout(commandBuffer,
+                          vulkanDepthImage,
+                          vulkanDepthFormat,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                          nullptr,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          0,
+                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    endSingleTimeCommands(commandBuffer);
+}
+
+void generateMipmapsForImage(VkImage image, uint32_t miplevels, int32_t width, int32_t height){
+    // Generate the mip chain
+    // ---------------------------------------------------------------
+    // We copy down the whole mip chain doing a blit from mip-1 to mip
+    // An alternative way would be to always blit from the first mip level and sample that one down
+    VkCommandBuffer blitCmd = beginSingleTimeCommands();
+
+    // Copy down mips from n-1 to n
+    for (int32_t i = 1; i < miplevels; i++){
+        VkImageBlit imageBlit = {};
+
+        // Source
+        imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlit.srcSubresource.layerCount = 1;
+        imageBlit.srcSubresource.mipLevel = i-1;
+        imageBlit.srcOffsets[1].x = int32_t(width >> (i - 1));
+        imageBlit.srcOffsets[1].y = int32_t(height >> (i - 1));
+        imageBlit.srcOffsets[1].z = 1;
+
+        // Destination
+        imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlit.dstSubresource.layerCount = 1;
+        imageBlit.dstSubresource.mipLevel = i;
+        imageBlit.dstOffsets[1].x = int32_t(width >> i);
+        imageBlit.dstOffsets[1].y = int32_t(height >> i);
+        imageBlit.dstOffsets[1].z = 1;
+
+        VkImageSubresourceRange mipSubRange = {};
+        mipSubRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        mipSubRange.baseMipLevel = i;
+        mipSubRange.levelCount = 1;
+        mipSubRange.layerCount = 1;
+
+        // Transiton current mip level to transfer dest
+        transitionImageLayout(blitCmd,
+                              image,
+                              VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              &mipSubRange,
+                              VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_HOST_BIT,
+                              VK_ACCESS_TRANSFER_READ_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT);
+ 
+        // Blit from previous level
+        vkCmdBlitImage(blitCmd,
+                       image,
+                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                       image,
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                       1,
+                       &imageBlit,
+                       VK_FILTER_LINEAR);
+
+        // Transiton current mip level to transfer source for read in next iteration
+        transitionImageLayout(blitCmd,
+                              image,
+                              VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                              &mipSubRange,
+                              VK_PIPELINE_STAGE_HOST_BIT,
+                              VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT,
+                              VK_ACCESS_TRANSFER_READ_BIT);
+    }
+
+    // After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
+    VkImageSubresourceRange subresourceRange = {};
+    subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresourceRange.layerCount = 1;
+    subresourceRange.levelCount = miplevels;
+    transitionImageLayout(blitCmd,
+                          image,
+                          VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          &subresourceRange,
+                          VK_PIPELINE_STAGE_HOST_BIT,
+                          VK_PIPELINE_STAGE_TRANSFER_BIT,
+                          VK_ACCESS_TRANSFER_WRITE_BIT,
+                          VK_ACCESS_TRANSFER_READ_BIT);
+    
+    endSingleTimeCommands(blitCmd);
 }
 
 // Создание текстуры из изображения
@@ -1472,6 +1568,7 @@ void createTextureImage() {
                 VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
+                1,
                 stagingImage,
                 stagingImageMemory);
     
@@ -1505,6 +1602,8 @@ void createTextureImage() {
     // Размапим данные
     vkUnmapMemory(vulkanLogicalDevice, stagingImageMemory);
     
+    uint32_t mipmapLevels = floor(log2(std::max(texWidth, texHeight))) + 1;
+    
     // Создаем рабочее изображение для последующего использования
     createImage(texWidth, texHeight,
                 VK_FORMAT_R8G8B8A8_UNORM,   // Формат картинки
@@ -1512,28 +1611,63 @@ void createTextureImage() {
                 VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
+                mipmapLevels,
                 vulkanTextureImage,
                 vulkanTextureImageMemory);
     
     // Конвертирование исходной буфферной текстуры с данными в формат копирования на GPU
-    transitionImageLayout(stagingImage,
-                          VK_FORMAT_R8G8B8A8_UNORM,
-                          VK_IMAGE_LAYOUT_PREINITIALIZED,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        transitionImageLayout(commandBuffer,
+                              stagingImage,
+                              VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_PREINITIALIZED,
+                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                              nullptr,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_HOST_WRITE_BIT,
+                              VK_ACCESS_TRANSFER_READ_BIT);
+        endSingleTimeCommands(commandBuffer);
+    }
+    
     // Конвертирование конечной буфферной текстуры с данными в формат получателя
-    transitionImageLayout(vulkanTextureImage,
-                          VK_FORMAT_R8G8B8A8_UNORM,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        transitionImageLayout(commandBuffer,
+                              vulkanTextureImage,
+                              VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+                              nullptr,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_TRANSFER_READ_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT);
+        endSingleTimeCommands(commandBuffer);
+    }
     
     // Копируем данные в пределах GPU из временной текстуры в целевую
     copyImage(stagingImage, vulkanTextureImage, texWidth, texHeight);
     
+    // Генерируем мипмапы для текстуры
+    generateMipmapsForImage(vulkanTextureImage, mipmapLevels, texWidth, texHeight);
+    
     // Конвертируем использование текстуры в оптимальное для рендеринга
-    transitionImageLayout(vulkanTextureImage,
-                          VK_FORMAT_R8G8B8A8_UNORM,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        transitionImageLayout(commandBuffer,
+                              vulkanTextureImage,
+                              VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              nullptr,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
+        endSingleTimeCommands(commandBuffer);
+    }
     
     // Удаляем временные объекты
     vkDestroyImage(vulkanLogicalDevice, stagingImage, nullptr);
