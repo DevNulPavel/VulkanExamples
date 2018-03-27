@@ -2097,12 +2097,25 @@ void createCommandBuffers() {
         // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
         // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
         
+        
+        // Настройка наследования
+        VkCommandBufferInheritanceInfo inheritanceInfo = {};
+        memset(&inheritanceInfo, 0, sizeof(VkCommandBufferInheritanceInfo));
+        inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+        inheritanceInfo.pNext = nullptr;
+        inheritanceInfo.renderPass = vulkanRenderPass;
+        inheritanceInfo.subpass = 0;
+        inheritanceInfo.framebuffer = vulkanSwapChainFramebuffers[i];
+        inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+        inheritanceInfo.queryFlags = 0;
+        inheritanceInfo.pipelineStatistics = 0;
+        
         // Информация о запуске коммандного буффера
         VkCommandBufferBeginInfo beginInfo = {};
         memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT; // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
-        beginInfo.pInheritanceInfo = nullptr; // Optional
+        beginInfo.pInheritanceInfo = &inheritanceInfo; // Optional
         
         // Запуск коммандного буффера
         vkBeginCommandBuffer(vulkanCommandBuffers[i], &beginInfo);
@@ -2173,6 +2186,28 @@ void createCommandBuffers() {
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(vulkanCommandBuffers[i]);
         
+        /*VkImageMemoryBarrier imageMemoryBarrier = {};
+        memset(&imageMemoryBarrier, 0, sizeof(VkImageMemoryBarrier));
+        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageMemoryBarrier.pNext = nullptr;
+        imageMemoryBarrier.srcAccessMask = 0;
+        imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_MEMORY_READ_BIT;
+        imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        imageMemoryBarrier.srcQueueFamilyIndex = 0;
+        imageMemoryBarrier.dstQueueFamilyIndex = 0;
+        imageMemoryBarrier.image = vulkanSwapChainImages[i];
+        imageMemoryBarrier.subresourceRange = {VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        
+        vkCmdPipelineBarrier(vulkanCommandBuffers[i],
+                             VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             0,
+                             0, nullptr,
+                             0, nullptr,
+                             1, &imageMemoryBarrier
+                             );*/
+        
         // Заканчиваем подготовку коммандного буффера
         if (vkEndCommandBuffer(vulkanCommandBuffers[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to record command buffer!");
@@ -2229,13 +2264,20 @@ void drawFrame() {
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain,
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore, // Семафор ожидания доступной картинки
-                                            VK_NULL_HANDLE, &swapchainImageIndex);
+                                            VK_NULL_HANDLE,
+                                            &swapchainImageIndex);
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapChain();
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
+    }
+    
+    // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
+    if (vulkanImageIndex != swapchainImageIndex) {
+        printf("Vulkan image index not equal to swapchain image index!\n");
+        fflush(stdout);
     }
     
     // Настраиваем отправление в очередь комманд отрисовки
@@ -2271,8 +2313,8 @@ void drawFrame() {
         fflush(stdout);
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
-
-    // Можно не получать индекс, а просто делать как в Metal
+    
+    // Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
     vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapChainImageViews.size();
     
     // Настраиваем задачу отображения полученного изображения
@@ -2285,7 +2327,7 @@ void drawFrame() {
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &swapchainImageIndex;
-
+    
     // Закидываем в очередь задачу отображения картинки
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
     
