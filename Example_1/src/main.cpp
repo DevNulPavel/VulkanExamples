@@ -44,22 +44,14 @@
 #include "UniformBuffer.h"
 
 
-#define VALIDATION_LAYERS_COUNT 1
-#ifdef __APPLE__
-const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "MoltenVK" };
-#else
-const char* VALIDATION_LAYERS[VALIDATION_LAYERS_COUNT] = { "VK_LAYER_LUNARG_standard_validation" };
-#endif
-
-#define DEVICE_REQUIRED_EXTENTIONS_COUNT 1
-const char* DEVICE_REQUIRED_EXTENTIONS[DEVICE_REQUIRED_EXTENTIONS_COUNT] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
 #define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
 
 struct FamiliesQueueIndexes;
 
 
 GLFWwindow* window = nullptr;
+std::vector<const char*> vulkanValidationLayers;
+std::vector<const char*> vulkanInstanceExtensions;
 VkInstance vulkanInstance = VK_NULL_HANDLE;
 VkSurfaceKHR vulkanSurface = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vulkanDebugCallback = VK_NULL_HANDLE;
@@ -187,58 +179,6 @@ void destroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT
     }
 }
 
-// Получаем расширения Vulkan
-std::vector<const char*> getRequiredExtensions() {
-    std::vector<const char*> extensions;
-    
-    // Количество требуемых GLFW расширений и список расширений
-    unsigned int glfwExtensionCount = 0;
-    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    
-    // Формируем список расширений
-    for (unsigned int i = 0; i < glfwExtensionCount; i++) {
-        extensions.push_back(glfwExtensions[i]);
-        printf("Required GLFW extention name: %s\n", glfwExtensions[i]);
-        fflush(stdout);
-    }
-    #ifdef VALIDATION_LAYERS_ENABLED
-        extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    #endif
-    
-    return extensions;
-}
-
-// Проверка наличия уровней валидации
-bool checkValidationLayerSupport() {
-    #ifdef VALIDATION_LAYERS_ENABLED
-        // Количество уровней валидации
-        uint32_t layerCount = 0;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-    
-        // Получаем доступные слои валидации
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-    
-        // Проверяем, что запрошенные слои валидации доступны
-        for(int i = 0; i < VALIDATION_LAYERS_COUNT; i++) {
-            const char* layerName = VALIDATION_LAYERS[i];
-            bool layerFound = false;
-            
-            for (const auto& layerProperties : availableLayers) {
-                if (strcmp(layerName, layerProperties.layerName) == 0) {
-                    layerFound = true;
-                    break;
-                }
-            }
-            
-            if (!layerFound) {
-                return false;
-            }
-        }
-    #endif
-    return true;
-}
-
 // Получаем все доступные слои валидации устройства
 std::vector<VkLayerProperties> getAllValidationLayers(){
     // Количество уровней валидации
@@ -252,14 +192,132 @@ std::vector<VkLayerProperties> getAllValidationLayers(){
     return availableLayers;
 }
 
+// Проверяем, что все запрошенные слои нам доступны
+bool checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLayers, const std::vector<const char*>& testLayers){
+    for(int i = 0; i < testLayers.size(); i++) {
+        const char* layerName = testLayers[i];
+        bool layerFound = false;
+        
+        for (const auto& layerProperties : allLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+        
+        if (!layerFound) {
+            printf("Layer %s not available!\n", layerName);
+            return false;
+        }
+    }
+    return true;
+}
+
+// Получаем доступные слои валидации устройства
+std::vector<const char *> getPossibleDebugValidationLayers(){
+#ifdef VALIDATION_LAYERS_ENABLED
+    // Список всех слоев
+    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
+    for(const VkLayerProperties& layerInfo: allValidationLayers){
+        printf("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
+        fflush(stdout);
+    }
+    
+    // Возможные отладочные слои
+    std::vector<const char*> result;
+    result.push_back("VK_LAYER_LUNARG_standard_validation");
+    if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+        result.clear();
+        result.push_back("VK_LAYER_LUNARG_image");
+        result.push_back("VK_LAYER_GOOGLE_threading");
+        result.push_back("VK_LAYER_LUNARG_parameter_validation");
+        result.push_back("VK_LAYER_LUNARG_object_tracker");
+        result.push_back("VK_LAYER_LUNARG_core_validation");
+        result.push_back("VK_LAYER_GOOGLE_unique_objects");
+        result.push_back("VK_LAYER_LUNARG_swapchain");
+        
+        if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
+            printf("Failed to get validation layers!\n");
+            throw std::runtime_error("Failed to create instance!");
+        }
+    }
+    
+    return result;
+#else
+    return std::vector<const char*>();
+#endif
+}
+
+// Список необходимых расширений инстанса приложения
+std::map<std::string, std::vector<VkExtensionProperties>> getAllExtentionsNames(const std::vector<const char *>& layersNames){
+    std::map<std::string, std::vector<VkExtensionProperties>> result;
+    
+    for (const char* layerName: layersNames) {
+        std::vector<VkExtensionProperties> layerExtentions;
+        
+        // Количество расширений доступных
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(layerName, &extensionCount, nullptr);
+        
+        // Получаем расширения
+        layerExtentions.resize(extensionCount);
+        vkEnumerateInstanceExtensionProperties(layerName, &extensionCount, layerExtentions.data());
+        
+        std::vector<VkExtensionProperties>& propsArray = result[layerName];
+        propsArray.insert(propsArray.end(), layerExtentions.begin(), layerExtentions.end());
+    }
+    
+    return result;
+}
+
+// Список всех расширений в леерах
+void printAllExtentionsAtLayers(const std::vector<const char *>& layersNames){
+    std::map<std::string, std::vector<VkExtensionProperties>> allExtentions = getAllExtentionsNames(layersNames);
+    for(const std::pair<std::string, std::vector<VkExtensionProperties>>& extentionInfo: allExtentions){
+        for (const VkExtensionProperties& property: extentionInfo.second) {
+            printf("Extention at layer %s available: %s\n", extentionInfo.first.c_str(), property.extensionName);
+        }
+    }
+}
+
+// Список необходимых расширений инстанса приложения
+std::vector<const char*> getRequiredInstanceExtentionNames(){
+    // Количество требуемых GLFW расширений и список расширений
+    unsigned int glfwExtensionCount = 0;
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    
+    std::vector<const char*> result;
+    // Формируем список расширений
+    for (unsigned int i = 0; i < glfwExtensionCount; i++) {
+        result.push_back(glfwExtensions[i]);
+        printf("Extention - Required GLFW extention name: %s\n", glfwExtensions[i]);
+        fflush(stdout);
+    }
+#ifdef __APPLE__
+    // Optional
+    result.push_back("VK_MVK_moltenvk");
+    printf("Extention - Required MoltenVK extention name: %s\n", "VK_MVK_moltenvk");
+    fflush(stdout);
+#endif
+    
+#ifdef VALIDATION_LAYERS_ENABLED
+    result.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    printf("Extention - Required debug extention name: %s\n", VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    fflush(stdout);
+#endif
+    return result;
+}
+
 // Создание инстанса Vulkan
 void createVulkanInstance(){
-    #ifdef VALIDATION_LAYERS_ENABLED
-        // Проверяем доступность слоев валидации
-        if (!checkValidationLayerSupport()) {
-            throw std::runtime_error("validation layers requested, but not available!");
-        }
-    #endif
+    // Запрашиваем возможные слои валидации
+    vulkanValidationLayers = getPossibleDebugValidationLayers();
+    
+    // Выводим расширения в слоях валидации
+    printAllExtentionsAtLayers(vulkanValidationLayers);
+    
+    // Список требуемых расширений
+    vulkanInstanceExtensions = getRequiredInstanceExtentionNames();
     
     // Структура с настройками приложения Vulkan
     VkApplicationInfo appInfo = {};
@@ -269,27 +327,18 @@ void createVulkanInstance(){
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "NoEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;  // Указываем используемую версию Vulkan
-    
-    // Получаем список требуемых GLFW расширений
-    std::vector<const char*> extensions = getRequiredExtensions();
+    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);  // Указываем используемую версию Vulkan, VK_API_VERSION_1_0
     
     // Структура настроек создания инстанса
     VkInstanceCreateInfo createInfo = {};
     memset(&createInfo, 0, sizeof(VkInstanceCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());  // Включаем расширения
-    createInfo.ppEnabledExtensionNames = extensions.data();
-    #ifdef VALIDATION_LAYERS_ENABLED
-        // Включаем стандартные слои валидации
-        createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
-        createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
-    #else
-        // Не испольузем валидации
-        createInfo.enabledLayerCount = 0;
-    #endif
-    
+    createInfo.enabledLayerCount = static_cast<uint32_t>(vulkanValidationLayers.size());  // Включаем стандартные слои валидации
+    createInfo.ppEnabledLayerNames = vulkanValidationLayers.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanInstanceExtensions.size());  // Включаем расширения
+    createInfo.ppEnabledExtensionNames = vulkanInstanceExtensions.data();
+
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
     if (createStatus != VK_SUCCESS) {
@@ -309,7 +358,20 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
                                                     const char* layerPrefix,
                                                     const char* msg,
                                                     void* userData) {
-    printf("Validation layer: %s\n", msg);
+    std::string messageType;
+    if((flags & VkDebugReportFlagBitsEXT::VK_DEBUG_REPORT_INFORMATION_BIT_EXT) != 0) {
+        messageType = "INFO";
+    }else if((flags & VkDebugReportFlagBitsEXT::VK_DEBUG_REPORT_WARNING_BIT_EXT) != 0) {
+        messageType = "WARNING";
+    } else if((flags & VkDebugReportFlagBitsEXT::VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) != 0){
+        messageType = "PERFORMANCE";
+    } else if((flags & VkDebugReportFlagBitsEXT::VK_DEBUG_REPORT_DEBUG_BIT_EXT) != 0) {
+        messageType = "DEBUG";
+    } else if((flags & VkDebugReportFlagBitsEXT::VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0) {
+        messageType = "ERROR";
+    }
+    
+    printf("Debug message (%s): %s\n", messageType.c_str(), msg);
     fflush(stdout);
     return VK_FALSE;
 }
@@ -322,7 +384,10 @@ void setupDebugCallback() {
         VkDebugReportCallbackCreateInfoEXT createInfo = {};
         memset(&createInfo, 0, sizeof(VkDebugReportCallbackCreateInfoEXT));
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-        createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_INFORMATION_BIT_EXT; // Типы коллбеков
+        createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT |
+                            VK_DEBUG_REPORT_WARNING_BIT_EXT |
+                            VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+                            VK_DEBUG_REPORT_INFORMATION_BIT_EXT; // Типы коллбеков
         createInfo.pfnCallback = debugCallback;
     
         if (createDebugReportCallbackEXT(vulkanInstance, &createInfo, nullptr, &vulkanDebugCallback) != VK_SUCCESS) {
@@ -390,11 +455,11 @@ bool checkDeviceRequiredExtensionSupport(VkPhysicalDevice device) {
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
     
     // Список требуемых расширений - смена кадров
-    std::set<std::string> requiredExtensions(DEVICE_REQUIRED_EXTENTIONS, DEVICE_REQUIRED_EXTENTIONS + DEVICE_REQUIRED_EXTENTIONS_COUNT);
+    std::set<std::string> requiredExtensions(vulkanInstanceExtensions.begin(), vulkanInstanceExtensions.end());
     
     // Пытаемся убрать из списка требуемых расширений возможные
     for (const auto& extension : availableExtensions) {
-        printf("Available extention: %s\n", extension.extensionName);
+        printf("Available extention at logical device: %s\n", extension.extensionName);
         fflush(stdout);
         requiredExtensions.erase(extension.extensionName);
     }
@@ -413,7 +478,11 @@ int rateDeviceScore(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
     
-    printf("Test GPU with name: %s, API version: %d\n", deviceProperties.deviceName, deviceProperties.apiVersion);
+    printf("Test GPU with name: %s, API version: %d.%d.%d,\n",
+           deviceProperties.deviceName,
+           VK_VERSION_MAJOR(deviceProperties.apiVersion),
+           VK_VERSION_MINOR(deviceProperties.apiVersion),
+           VK_VERSION_PATCH(deviceProperties.apiVersion));
     fflush(stdout);
 
     int score = 0;
@@ -610,15 +679,11 @@ void createLogicalDeviceAndQueue() {
     createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     createInfo.pQueueCreateInfos = queueCreateInfos.data(); // Информация о создаваемых на девайсе очередях
     createInfo.pEnabledFeatures = &deviceFeatures;          // Информация о фичах устройства
-    createInfo.enabledExtensionCount = DEVICE_REQUIRED_EXTENTIONS_COUNT;
-    createInfo.ppEnabledExtensionNames = DEVICE_REQUIRED_EXTENTIONS;     // Список требуемых расширений устройства
-    #ifdef VALIDATION_LAYERS_ENABLED
-        createInfo.enabledLayerCount = VALIDATION_LAYERS_COUNT;
-        createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
-    #else
-        createInfo.enabledLayerCount = 0;
-    #endif
-    
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(vulkanInstanceExtensions.size());
+    createInfo.ppEnabledExtensionNames = vulkanInstanceExtensions.data();     // Список требуемых расширений устройства
+    createInfo.enabledLayerCount = static_cast<uint32_t>(vulkanValidationLayers.size());    // Слои валидации что и при создании инстанса
+    createInfo.ppEnabledLayerNames = vulkanValidationLayers.data();
+
     // Пробуем создать логический девайс на конкретном физическом
     VkResult createStatus = vkCreateDevice(vulkanPhysicalDevice, &createInfo, nullptr, &vulkanLogicalDevice);
     if (createStatus != VK_SUCCESS) {
@@ -2260,13 +2325,6 @@ int local_main(int argc, char** argv) {
         printf("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
 		fflush(stdout);
         throw std::runtime_error("Vulkan support not found!");
-    }
-    
-    // Список доступных слоев валидации
-    std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
-    for(const VkLayerProperties& layerInfo: allValidationLayers){
-        printf("Validation layer available: %s\n", layerInfo.layerName);
-        fflush(stdout);
     }
     
     // Создание инстанса Vulkan
