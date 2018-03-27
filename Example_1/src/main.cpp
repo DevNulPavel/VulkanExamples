@@ -102,6 +102,7 @@ std::vector<Vertex> vulkanVertices;
 std::vector<uint32_t> vulkanIndices;
 size_t vulkanTotalVertexesCount = 0;
 size_t vulkanTotalIndexesCount = 0;
+uint32_t vulkanImageIndex = 0;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -773,7 +774,7 @@ void createSwapChain() {
     }
     
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     
@@ -2224,11 +2225,11 @@ void updateUniformBuffer(float delta){
 // Непосредственно отрисовка кадра
 void drawFrame() {
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
-    uint32_t imageIndex = 0;
+    uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice, vulkanSwapchain,
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore, // Семафор ожидания доступной картинки
-                                            VK_NULL_HANDLE, &imageIndex);
+                                            VK_NULL_HANDLE, &swapchainImageIndex);
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreateSwapChain();
@@ -2249,7 +2250,7 @@ void drawFrame() {
     submitInfo.pWaitSemaphores = waitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
     submitInfo.pWaitDstStageMask = waitStages;      // Ждать будем возможности вывода в буфер цвета
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vulkanCommandBuffers[imageIndex]; // Указываем коммандный буффер отрисовки
+    submitInfo.pCommandBuffers = &vulkanCommandBuffers[vulkanImageIndex]; // Указываем коммандный буффер отрисовки
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
     
@@ -2271,6 +2272,9 @@ void drawFrame() {
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
 
+    // Можно не получать индекс, а просто делать как в Metal
+    vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapChainImageViews.size();
+    
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain};
     VkPresentInfoKHR presentInfo = {};
@@ -2280,7 +2284,7 @@ void drawFrame() {
     presentInfo.pWaitSemaphores = signalSemaphores; // Ожидаем окончания подготовки кадра с помощью семафора
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pImageIndices = &swapchainImageIndex;
 
     // Закидываем в очередь задачу отображения картинки
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue, &presentInfo);
