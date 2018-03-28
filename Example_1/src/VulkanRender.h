@@ -30,12 +30,8 @@ private:
     
 public:
     VulkanInstancePtr vulkanInstance;
-    std::vector<const char*> vulkanInstanceValidationLayers;
-    std::vector<const char*> vulkanInstanceExtensions;
     VulkanSurfacePtr vulkanWindowSurface;
     VulkanPhysicalDevicePtr vulkanPhysicalDevice;
-    VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes;
-    VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails;
     VulkanLogicalDevicePtr vulkanLogicalDevice;
     VulkanQueuePtr vulkanRenderQueue;
     VulkanQueuePtr vulkanPresentQueue;

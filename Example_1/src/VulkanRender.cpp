@@ -26,18 +26,18 @@ VulkanRender::VulkanRender(){
 void VulkanRender::init(GLFWwindow* window){
     // Создание инстанса Vulkan
     vulkanInstance = std::make_shared<VulkanInstance>();
-    vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
-    vulkanInstanceExtensions = vulkanInstance->getInstanceExtensions();
     
     // Создаем плоскость отрисовки
     vulkanWindowSurface = std::make_shared<VulkanSurface>(window, vulkanInstance);
     
     // Получаем физическое устройство
+    std::vector<const char*> vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
+    std::vector<const char*> vulkanInstanceExtensions = vulkanInstance->getInstanceExtensions();
     vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanInstanceExtensions, vulkanWindowSurface);
-    vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
-    vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
 
     // Создаем логическое устройство
+    VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
+    VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
     vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanInstanceExtensions);
     vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
@@ -48,6 +48,10 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем свопчейн
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
+
+    
+    VkFormat vulkanSwapChainImageFormat = vulkanSwapchain->getSwapChainImageFormat();
+    VkExtent2D vulkanSwapChainExtent = vulkanSwapchain->getSwapChainExtent();
 }
 
 VulkanRender::~VulkanRender(){

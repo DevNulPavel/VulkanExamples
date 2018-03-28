@@ -55,9 +55,7 @@ GLFWwindow* window = nullptr;
 
 
 VkFence vulkanFence = VK_NULL_HANDLE;
-std::vector<VkImage> vulkanSwapChainImages;
 VkFormat vulkanDepthFormat = VK_FORMAT_UNDEFINED;
-std::vector<VkImageView> vulkanSwapChainImageViews;
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
 VkShaderModule vulkanFragmentShader = VK_NULL_HANDLE;
 VkRenderPass vulkanRenderPass = VK_NULL_HANDLE;
@@ -134,67 +132,6 @@ void createFences(){
         printf("Failed to create fence!");
         fflush(stdout);
         throw std::runtime_error("Failed to create fence!");
-    }
-}
-
-// Получаем изображения из свопчейна
-void getSwapchainImages(){
-    // Получаем изображения для отображения
-    uint32_t imagesCount = 0;
-    vkGetSwapchainImagesKHR(RenderI->vulkanLogicalDevice->getDevice(), RenderI->vulkanSwapchain->getSwapchain(), &imagesCount, nullptr);
-    
-    vulkanSwapChainImages.resize(imagesCount);
-    vkGetSwapchainImagesKHR(RenderI->vulkanLogicalDevice->getDevice(), RenderI->vulkanSwapchain->getSwapchain(), &imagesCount, vulkanSwapChainImages.data());
-}
-
-// Создание вью для изображения
-void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageView& imageView) {
-    // Удаляем старый объект, если есть
-    if(imageView != VK_NULL_HANDLE){
-        vkDestroyImageView(RenderI->vulkanLogicalDevice->getDevice(), imageView, nullptr);
-        imageView = VK_NULL_HANDLE;
-    }
-    
-    // Описание вьюшки
-    VkImageViewCreateInfo viewInfo = {};
-    memset(&viewInfo, 0, sizeof(VkImageViewCreateInfo));
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image; // Изображение
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 2D
-    viewInfo.format = format;   // Формат вьюшки
-    viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
-    viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
-    viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
-    viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдольным компонентам??
-    viewInfo.subresourceRange.aspectMask = aspectFlags; // Использование вью текстуры
-    viewInfo.subresourceRange.baseMipLevel = 0; // 0 мипмаплевел
-    viewInfo.subresourceRange.levelCount = 1;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-    
-    // Создаем имедж вью
-    if (vkCreateImageView(RenderI->vulkanLogicalDevice->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture image view!");
-    }
-}
-
-// Создание вьюшек изображений буффера кадра свопчейна
-void createImageViews() {
-    // Удаляем старые, если есть
-    if(vulkanSwapChainImageViews.size() > 0){
-        for(const auto& imageView: vulkanSwapChainImageViews){
-            vkDestroyImageView(RenderI->vulkanLogicalDevice->getDevice(), imageView, nullptr);
-        }
-        vulkanSwapChainImageViews.clear();
-    }
-    
-    // Ресайз массива
-    vulkanSwapChainImageViews.resize(vulkanSwapChainImages.size());
-    
-    for (uint32_t i = 0; i < vulkanSwapChainImages.size(); i++) {
-        // Создаем вьюшку с типом использования цвета
-        vulkanSwapChainImageViews[i] = VK_NULL_HANDLE;
-        createImageView(vulkanSwapChainImages[i], RenderI->vulkanSwapchain->getSwapChainImageFormat(), VK_IMAGE_ASPECT_COLOR_BIT, vulkanSwapChainImageViews[i]);
     }
 }
 
@@ -525,12 +462,12 @@ void createFramebuffers(){
     }
     
     // Ресайзим массив с фреймбуфферами свопчейна
-    vulkanSwapChainFramebuffers.resize(vulkanSwapChainImageViews.size());
+    vulkanSwapChainFramebuffers.resize(RenderI->vulkanSwapchain->getImageViews().size());
     
     // Для каждой вьюшки картинки создаем  фреймбуффер
-    for (size_t i = 0; i < vulkanSwapChainImageViews.size(); i++) {
+    for (size_t i = 0; i < RenderI->vulkanSwapchain->getImageViews().size(); i++) {
         // Список аттачментов
-        std::array<VkImageView, 2> attachments = { {vulkanSwapChainImageViews[i], vulkanDepthImageView}};
+        std::array<VkImageView, 2> attachments = { {RenderI->vulkanSwapchain->getImageViews()[i]->getImageView(), vulkanDepthImageView} };
         
         // Информация для создания фрейб-буфферов
         VkFramebufferCreateInfo framebufferInfo = {};
@@ -551,7 +488,7 @@ void createFramebuffers(){
 
 // Создаем пулл комманд
 void createCommandPool() {
-    int vulkanRenderQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.renderQueueFamilyIndex;
+    int vulkanRenderQueueFamilyIndex = RenderI->vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueueFamilyIndex;
     //int vulkanPresentQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.presentQueueFamilyIndex;
     
     // Информация о пуле коммандных буфферов
@@ -1565,8 +1502,8 @@ void recreateSwapChain() {
     
     // Заново пересоздаем свопчейны, старые удалятся внутри
     //createSwapChain();
-    getSwapchainImages();
-    createImageViews();
+    //getSwapchainImages();
+    //createImageViews();
     createDepthResources();
     updateDepthTextureLayout();
     createRenderPass();
@@ -1656,7 +1593,7 @@ void drawFrame() {
     }
     
     // Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
-    vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapChainImageViews.size();
+    vulkanImageIndex = (vulkanImageIndex + 1) % RenderI->vulkanSwapchain->getImageViews().size();
     
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {RenderI->vulkanSwapchain->getSwapchain()};
@@ -1719,13 +1656,6 @@ int local_main(int argc, char** argv) {
     
     // Создаем преграды для проверки завершения комманд отрисовки
     createFences();
-
-    
-    // Берем изображения из свопчейна
-    getSwapchainImages();
-    
-    // Создание вьюшек изображений буффера кадра
-    createImageViews();
     
     // Ищем формат буффера глубины
     findDepthFormat();
@@ -1848,9 +1778,6 @@ int local_main(int argc, char** argv) {
     vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexShader, nullptr);
     vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanFragmentShader, nullptr);
     vkDestroyRenderPass(RenderI->vulkanLogicalDevice->getDevice(), vulkanRenderPass, nullptr);
-    for(const auto& imageView: vulkanSwapChainImageViews){
-        vkDestroyImageView(RenderI->vulkanLogicalDevice->getDevice(), imageView, nullptr);
-    }
     
     vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);
         

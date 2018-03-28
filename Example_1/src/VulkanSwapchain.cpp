@@ -22,9 +22,12 @@ VulkanSwapchain::VulkanSwapchain(VulkanSurfacePtr surface,
     _swapChainExtent(VkExtent2D{0, 0}){
         
     createSwapChain();
+    getSwapchainImages();
 }
 
 VulkanSwapchain::~VulkanSwapchain(){
+    _images.clear();
+    _imageViews.clear();
     vkDestroySwapchainKHR(_device->getDevice(), _swapchain, nullptr);
 }
 
@@ -38,6 +41,14 @@ VkFormat VulkanSwapchain::getSwapChainImageFormat() const{
 
 VkExtent2D VulkanSwapchain::getSwapChainExtent() const{
     return _swapChainExtent;
+}
+
+std::vector<VulkanImagePtr> VulkanSwapchain::getImages() const{
+    return _images;
+}
+
+std::vector<VulkanImageViewPtr> VulkanSwapchain::getImageViews() const{
+    return _imageViews;
 }
 
 // Выбираем нужный формат кадра
@@ -153,6 +164,7 @@ void VulkanSwapchain::createSwapChain() {
     // Удаляем старый свопчейн, если был, обазательно удаляется после создания нового
     if (oldSwapChain != VK_NULL_HANDLE) {
         vkDestroySwapchainKHR(_device->getDevice(), oldSwapChain, nullptr);
+        _oldSwapchain = nullptr;
         oldSwapChain = VK_NULL_HANDLE;
     }
     
@@ -160,3 +172,31 @@ void VulkanSwapchain::createSwapChain() {
     _swapChainImageFormat = surfaceFormat.format;
     _swapChainExtent = extent;
 }
+
+// Получаем изображения из свопчейна
+void VulkanSwapchain::getSwapchainImages(){
+    std::vector<VkImage> vulkanSwapChainImages;
+    
+    // Получаем изображения для отображения
+    uint32_t imagesCount = 0;
+    vkGetSwapchainImagesKHR(_device->getDevice(), _swapchain, &imagesCount, nullptr);
+    vulkanSwapChainImages.resize(imagesCount);
+    vkGetSwapchainImagesKHR(_device->getDevice(), _swapchain, &imagesCount, vulkanSwapChainImages.data());
+    
+    // создаем обертку
+    _images.reserve(vulkanSwapChainImages.size());
+    for (const VkImage& image: vulkanSwapChainImages) {
+        VulkanImagePtr imagePtr = std::make_shared<VulkanImage>(image, _swapChainImageFormat, _swapChainExtent);
+        _images.push_back(imagePtr);
+    }
+}
+
+// Получаем изображения из свопчейна
+void VulkanSwapchain::makeSwapchainImageViews(){
+    _imageViews.reserve(_images.size());
+    for (const VulkanImagePtr& image: _images) {
+        VulkanImageViewPtr imageView = std::make_shared<VulkanImageView>(_device, image, VK_IMAGE_ASPECT_COLOR_BIT);
+        _imageViews.push_back(imageView);
+    }
+}
+

@@ -11,6 +11,8 @@
 #include "VulkanQueuesFamiliesIndexes.h"
 #include "VulkanSurface.h"
 #include "VulkanLogicalDevice.h"
+#include "VulkanImage.h"
+#include "VulkanImageView.h"
 
 
 struct VulkanSwapchain {
@@ -24,6 +26,8 @@ public:
     VkSwapchainKHR getSwapchain() const;
     VkFormat getSwapChainImageFormat() const;
     VkExtent2D getSwapChainExtent() const;
+    std::vector<VulkanImagePtr> getImages() const;
+    std::vector<VulkanImageViewPtr> getImageViews() const;
     
 private:
     VulkanSurfacePtr _surface;
@@ -34,6 +38,8 @@ private:
     VkSwapchainKHR _swapchain;
     VkFormat _swapChainImageFormat;
     VkExtent2D _swapChainExtent;
+    std::vector<VulkanImagePtr> _images;
+    std::vector<VulkanImageViewPtr> _imageViews;
     
 private:
     // Создание логики смены кадров
@@ -44,6 +50,10 @@ private:
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
     // Выбираем размер кадра-свопа
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+    // Получаем изображения из свопчейна
+    void getSwapchainImages();
+    // Получаем изображения из свопчейна
+    void makeSwapchainImageViews();
 };
 
 typedef std::shared_ptr<VulkanSwapchain> VulkanSwapchainPtr;

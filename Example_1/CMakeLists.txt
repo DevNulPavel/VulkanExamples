@@ -216,6 +216,10 @@ set(ALL_SOURCES
     src/VulkanSemafore.cpp
     src/VulkanSwapchain.h
     src/VulkanSwapchain.cpp
+    src/VulkanImage.h
+    src/VulkanImage.cpp
+    src/VulkanImageView.h
+    src/VulkanImageView.cpp
     src/CommonDefines.h
     src/CommonConstants.h
     src/Vertex.h
