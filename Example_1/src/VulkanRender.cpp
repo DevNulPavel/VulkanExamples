@@ -39,16 +39,24 @@ void VulkanRender::init(GLFWwindow* window){
 
     // Создаем логическое устройство
     vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanInstanceExtensions);
-    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();  // Получаем очередь рендеринга
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
+    
+    // Создаем семафоры для отображения и ренедринга
+    vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    
+    // Создаем свопчейн
+    vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
 }
 
 VulkanRender::~VulkanRender(){
     // Ждем завершения работы Vulkan
-    vkQueueWaitIdle(vulkanRenderQueue->queue);
-    vkQueueWaitIdle(vulkanPresentQueue->queue);
-    vkDeviceWaitIdle(vulkanLogicalDevice->device);
+    vkQueueWaitIdle(vulkanRenderQueue->getQueue());
+    vkQueueWaitIdle(vulkanPresentQueue->getQueue());
+    vkDeviceWaitIdle(vulkanLogicalDevice->getDevice());
     
+    vulkanSwapchain = nullptr;
     vulkanRenderQueue = nullptr;
     vulkanPresentQueue = nullptr;
     vulkanLogicalDevice = nullptr;

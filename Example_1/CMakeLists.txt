@@ -212,6 +212,10 @@ set(ALL_SOURCES
     src/VulkanLogicalDevice.cpp
     src/VulkanQueue.h
     src/VulkanQueue.cpp
+    src/VulkanSemafore.h
+    src/VulkanSemafore.cpp
+    src/VulkanSwapchain.h
+    src/VulkanSwapchain.cpp
     src/CommonDefines.h
     src/CommonConstants.h
     src/Vertex.h

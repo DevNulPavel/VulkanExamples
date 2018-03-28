@@ -15,17 +15,16 @@
 
 struct VulkanSurface {
 public:
-    VkSurfaceKHR surface;
-    
-public:
     VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance);
     ~VulkanSurface();
+    VkSurfaceKHR getSurface() const;
     
 private:
     // Создаем плоскость отрисовки GLFW
     void createDrawSurface(GLFWwindow* window);
 
 private:
+    VkSurfaceKHR _surface;
     VulkanInstancePtr _instance;
 };
 

@@ -14,17 +14,16 @@
 
 struct VulkanInstance {
 public:
-    VkInstance instance;
-
-public:
     VulkanInstance();
     ~VulkanInstance();
     std::vector<const char*> getValidationLayers();
     std::vector<const char*> getInstanceExtensions();
+    VkInstance getInstance() const;
     
 private:
     std::vector<const char*> _validationLayers;
     std::vector<const char*> _instanceExtensions;
+    VkInstance _instance;
     #ifdef VALIDATION_LAYERS_ENABLED
         VkDebugReportCallbackEXT _debugCallback;
     #endif

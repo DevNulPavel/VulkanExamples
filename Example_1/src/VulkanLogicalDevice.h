@@ -15,14 +15,14 @@ struct VulkanQueue;
 
 struct VulkanLogicalDevice: public std::enable_shared_from_this<VulkanLogicalDevice> {
 public:
-    VkDevice device;
+    
     
 public:
     VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice, VulkanQueuesFamiliesIndexes queuesFamiliesIndexes, std::vector<const char*> validationLayers, std::vector<const char*> extensions);
     ~VulkanLogicalDevice();
     // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
     void createLogicalDeviceAndQueue();
-    
+    VkDevice getDevice();
     std::shared_ptr<VulkanQueue> getRenderQueue();
     std::shared_ptr<VulkanQueue> getPresentQueue();
     
@@ -31,6 +31,7 @@ private:
     VulkanQueuesFamiliesIndexes _queuesFamiliesIndexes;
     std::vector<const char*> _validationLayers;
     std::vector<const char*> _extensions;
+    VkDevice _device;
     std::shared_ptr<VulkanQueue> _renderQueue;
     std::shared_ptr<VulkanQueue> _presentQueue;
     

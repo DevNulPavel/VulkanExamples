@@ -16,18 +16,17 @@
 
 struct VulkanPhysicalDevice {
 public:
-    VkPhysicalDevice physicalDevice;
-    
-public:
     VulkanPhysicalDevice(VulkanInstancePtr instance, std::vector<const char*> extensions, VulkanSurfacePtr surface);
     ~VulkanPhysicalDevice();
-    VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes();
-    VulkanSwapChainSupportDetails getSwapChainSupportDetails();
+    VkPhysicalDevice getDevice() const;
+    VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
+    VulkanSwapChainSupportDetails getSwapChainSupportDetails() const;
 
 private:
     VulkanInstancePtr _vulkanInstance;
     std::vector<const char*> _vulkanExtensions;
     VulkanSurfacePtr _vulkanSurface;
+    VkPhysicalDevice _device;
     VulkanQueuesFamiliesIndexes _queuesFamiliesIndexes;
     VulkanSwapChainSupportDetails _swapchainSuppportDetails;
     

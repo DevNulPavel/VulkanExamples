@@ -5,7 +5,7 @@
 
 
 VulkanInstance::VulkanInstance():
-    instance(VK_NULL_HANDLE)
+    _instance(VK_NULL_HANDLE)
 #ifdef VALIDATION_LAYERS_ENABLED
     , _debugCallback(VK_NULL_HANDLE)
 #endif
@@ -19,7 +19,11 @@ VulkanInstance::~VulkanInstance(){
 #ifdef VALIDATION_LAYERS_ENABLED
     destroyDebugReportCallbackEXT(_debugCallback, nullptr);
 #endif
-    vkDestroyInstance(instance, nullptr);
+    vkDestroyInstance(_instance, nullptr);
+}
+
+VkInstance VulkanInstance::getInstance() const{
+    return _instance;
 }
 
 std::vector<const char*> VulkanInstance::getValidationLayers(){
@@ -191,7 +195,7 @@ void VulkanInstance::createVulkanInstance(){
     createInfo.ppEnabledExtensionNames = _instanceExtensions.data();
     
     // Непосредственно создание инстанса Vulkan
-    VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &instance);
+    VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &_instance);
     if (createStatus != VK_SUCCESS) {
         printf("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
         fflush(stdout);
@@ -204,9 +208,9 @@ VkResult VulkanInstance::createDebugReportCallbackEXT(const VkDebugReportCallbac
                                                       const VkAllocationCallbacks* pAllocator,
                                                       VkDebugReportCallbackEXT* pCallback) {
     // Запрашиваем адрес функции
-    auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugReportCallbackEXT");
     if (func != nullptr) {
-        return func(instance, pCreateInfo, pAllocator, pCallback);
+        return func(_instance, pCreateInfo, pAllocator, pCallback);
     } else {
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
@@ -216,9 +220,9 @@ VkResult VulkanInstance::createDebugReportCallbackEXT(const VkDebugReportCallbac
 void VulkanInstance::destroyDebugReportCallbackEXT(VkDebugReportCallbackEXT callback,
                                                    const VkAllocationCallbacks* pAllocator) {
     // Запрашиваем адрес функции
-    auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(_instance, "vkDestroyDebugReportCallbackEXT");
     if (func != nullptr) {
-        func(instance, callback, pAllocator);
+        func(_instance, callback, pAllocator);
     }
 }
 

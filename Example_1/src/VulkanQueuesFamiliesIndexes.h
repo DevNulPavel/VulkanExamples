@@ -7,15 +7,8 @@ struct VulkanQueuesFamiliesIndexes {
     int presentQueueFamilyIndex;    // Индекс семейства очередей отображения
     int presentQueueFamilyQueuesCount;// Количество очередей в семействе
     
-    VulkanQueuesFamiliesIndexes(){
-        renderQueueFamilyIndex = -1;
-        renderQueueFamilyQueuesCount = 0;
-        presentQueueFamilyIndex = -1;
-        presentQueueFamilyQueuesCount = 0;
-    }
-    bool isComplete(){
-        return (renderQueueFamilyIndex >= 0) && (presentQueueFamilyIndex >= 0);
-    }
+    VulkanQueuesFamiliesIndexes();
+    bool isComplete() const; 
 };
 
 #endif

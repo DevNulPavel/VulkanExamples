@@ -11,20 +11,25 @@ VulkanLogicalDevice::VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice,
                                          VulkanQueuesFamiliesIndexes queuesFamiliesIndexes,
                                          std::vector<const char*> validationLayers,
                                          std::vector<const char*> extensions):
-    device(VK_NULL_HANDLE),
     _physicalDevice(physicalDevice),
     _queuesFamiliesIndexes(queuesFamiliesIndexes),
     _validationLayers(validationLayers),
-    _extensions(extensions){
+    _extensions(extensions),
+    _device(VK_NULL_HANDLE){
         
     // Отложенная инициализация в геттерах
 }
 
 VulkanLogicalDevice::~VulkanLogicalDevice(){
     // Wait
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(_device);
     
-    vkDestroyDevice(device, nullptr);
+    vkDestroyDevice(_device, nullptr);
+}
+
+VkDevice VulkanLogicalDevice::getDevice(){
+    createLogicalDeviceAndQueue();
+    return _device;
 }
 
 std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getRenderQueue(){
@@ -39,7 +44,7 @@ std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getPresentQueue(){
 
 // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
 void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
-    if (device == VK_NULL_HANDLE) {
+    if (_device == VK_NULL_HANDLE) {
         // Только уникальные индексы очередей
         uint32_t vulkanRenderQueueFamilyIndex = _queuesFamiliesIndexes.renderQueueFamilyIndex;
         uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueueFamilyQueuesCount;
@@ -91,8 +96,8 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         createInfo.ppEnabledLayerNames = _validationLayers.data();
         
         // Пробуем создать логический девайс на конкретном физическом
-        VkPhysicalDevice physDevice = _physicalDevice->physicalDevice;
-        VkResult createStatus = vkCreateDevice(physDevice, &createInfo, nullptr, &device);
+        VkPhysicalDevice physDevice = _physicalDevice->getDevice();
+        VkResult createStatus = vkCreateDevice(physDevice, &createInfo, nullptr, &_device);
         if (createStatus != VK_SUCCESS) {
             throw std::runtime_error("Failed to create logical device!");
         }
@@ -109,11 +114,11 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         
         // Очередь рендеринга
         VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
-        vkGetDeviceQueue(device, vulkanRenderQueueFamilyIndex, queuesIndexes[0], &vulkanGraphicsQueue);
+        vkGetDeviceQueue(_device, vulkanRenderQueueFamilyIndex, queuesIndexes[0], &vulkanGraphicsQueue);
         _renderQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[0], vulkanGraphicsQueue));
         // Очередь отображения
         VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
-        vkGetDeviceQueue(device, vulkanPresentQueueFamilyIndex, queuesIndexes[1], &vulkanPresentQueue);
+        vkGetDeviceQueue(_device, vulkanPresentQueueFamilyIndex, queuesIndexes[1], &vulkanPresentQueue);
         _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[1], vulkanGraphicsQueue));
     }
 }

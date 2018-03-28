@@ -10,6 +10,8 @@
 #include "VulkanPhysicalDevice.h"
 #include "VulkanLogicalDevice.h"
 #include "VulkanQueue.h"
+#include "VulkanSemafore.h"
+#include "VulkanSwapchain.h"
 
 
 
@@ -37,6 +39,9 @@ public:
     VulkanLogicalDevicePtr vulkanLogicalDevice;
     VulkanQueuePtr vulkanRenderQueue;
     VulkanQueuePtr vulkanPresentQueue;
+    VulkanSemaforePtr vulkanImageAvailableSemaphore;
+    VulkanSemaforePtr vulkanRenderFinishedSemaphore;
+    VulkanSwapchainPtr vulkanSwapchain;
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
