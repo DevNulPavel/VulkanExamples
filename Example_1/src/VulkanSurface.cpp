@@ -5,8 +5,10 @@
 #include "VulkanRender.h"
 
 
-VulkanSurface::VulkanSurface(GLFWwindow* window):
-    surface(VK_NULL_HANDLE){
+VulkanSurface::VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance):
+    surface(VK_NULL_HANDLE),
+    _instance(instance){
+        
     createDrawSurface(window);
 }
 
@@ -16,7 +18,7 @@ VulkanSurface::~VulkanSurface(){
 
 // Создаем плоскость отрисовки GLFW
 void VulkanSurface::createDrawSurface(GLFWwindow* window) {
-    if (glfwCreateWindowSurface(RenderI->vulkanInstance->instance, window, nullptr, &surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(_instance->instance, window, nullptr, &surface) != VK_SUCCESS) {
         printf("Failed to create window surface!");
         fflush(stdout);
         throw std::runtime_error("Failed to create window surface!");

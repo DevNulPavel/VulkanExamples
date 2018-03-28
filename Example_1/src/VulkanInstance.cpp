@@ -2,12 +2,14 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
-#include "CommonConstants.h"
 
 
 VulkanInstance::VulkanInstance():
-    instance(VK_NULL_HANDLE),
-    debugCallback(VK_NULL_HANDLE){
+    instance(VK_NULL_HANDLE)
+#ifdef VALIDATION_LAYERS_ENABLED
+    , _debugCallback(VK_NULL_HANDLE)
+#endif
+{
     
     createVulkanInstance();
     setupDebugCallback();
@@ -15,9 +17,17 @@ VulkanInstance::VulkanInstance():
 
 VulkanInstance::~VulkanInstance(){
 #ifdef VALIDATION_LAYERS_ENABLED
-    destroyDebugReportCallbackEXT(debugCallback, nullptr);
+    destroyDebugReportCallbackEXT(_debugCallback, nullptr);
 #endif
     vkDestroyInstance(instance, nullptr);
+}
+
+std::vector<const char*> VulkanInstance::getValidationLayers(){
+    return _validationLayers;
+}
+
+std::vector<const char*> VulkanInstance::getInstanceExtensions(){
+    return _instanceExtensions;
 }
 
 // Получаем все доступные слои валидации устройства
@@ -152,13 +162,13 @@ std::vector<const char*> VulkanInstance::getRequiredInstanceExtentionNames(){
 // Создание инстанса Vulkan
 void VulkanInstance::createVulkanInstance(){
     // Запрашиваем возможные слои валидации
-    validationLayers = getPossibleDebugValidationLayers();
+    _validationLayers = getPossibleDebugValidationLayers();
     
     // Выводим расширения в слоях валидации
-    printAllExtentionsAtLayers(validationLayers);
+    printAllExtentionsAtLayers(_validationLayers);
     
     // Список требуемых расширений
-    instanceExtensions = getRequiredInstanceExtentionNames();
+    _instanceExtensions = getRequiredInstanceExtentionNames();
     
     // Структура с настройками приложения Vulkan
     VkApplicationInfo appInfo = {};
@@ -175,10 +185,10 @@ void VulkanInstance::createVulkanInstance(){
     memset(&createInfo, 0, sizeof(VkInstanceCreateInfo));
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());  // Включаем стандартные слои валидации
-    createInfo.ppEnabledLayerNames = validationLayers.data();
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());  // Включаем расширения
-    createInfo.ppEnabledExtensionNames = instanceExtensions.data();
+    createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());  // Включаем стандартные слои валидации
+    createInfo.ppEnabledLayerNames = _validationLayers.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(_instanceExtensions.size());  // Включаем расширения
+    createInfo.ppEnabledExtensionNames = _instanceExtensions.data();
     
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &instance);
@@ -255,7 +265,7 @@ void VulkanInstance::setupDebugCallback() {
     VK_DEBUG_REPORT_INFORMATION_BIT_EXT; // Типы коллбеков
     createInfo.pfnCallback = debugCallbackFunction;
     
-    if (createDebugReportCallbackEXT(&createInfo, nullptr, &debugCallback) != VK_SUCCESS) {
+    if (createDebugReportCallbackEXT(&createInfo, nullptr, &_debugCallback) != VK_SUCCESS) {
         throw std::runtime_error("failed to set up debug callback!");
     }
 #endif

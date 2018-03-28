@@ -208,6 +208,10 @@ set(ALL_SOURCES
     src/VulkanQueuesFamiliesIndexes.cpp
     src/VulkanSwapChainSupportDetails.h
     src/VulkanSwapChainSupportDetails.cpp
+    src/VulkanLogicalDevice.h
+    src/VulkanLogicalDevice.cpp
+    src/VulkanQueue.h
+    src/VulkanQueue.cpp
     src/CommonDefines.h
     src/CommonConstants.h
     src/Vertex.h

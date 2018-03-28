@@ -9,6 +9,8 @@
 
 #include "VulkanQueuesFamiliesIndexes.h"
 #include "VulkanSwapChainSupportDetails.h"
+#include "VulkanInstance.h"
+#include "VulkanSurface.h"
 
 
 
@@ -17,12 +19,15 @@ public:
     VkPhysicalDevice physicalDevice;
     
 public:
-    VulkanPhysicalDevice();
+    VulkanPhysicalDevice(VulkanInstancePtr instance, std::vector<const char*> extensions, VulkanSurfacePtr surface);
     ~VulkanPhysicalDevice();
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes();
     VulkanSwapChainSupportDetails getSwapChainSupportDetails();
 
 private:
+    VulkanInstancePtr _vulkanInstance;
+    std::vector<const char*> _vulkanExtensions;
+    VulkanSurfacePtr _vulkanSurface;
     VulkanQueuesFamiliesIndexes _queuesFamiliesIndexes;
     VulkanSwapChainSupportDetails _swapchainSuppportDetails;
     

@@ -8,6 +8,8 @@
 #include "VulkanInstance.h"
 #include "VulkanSurface.h"
 #include "VulkanPhysicalDevice.h"
+#include "VulkanLogicalDevice.h"
+#include "VulkanQueue.h"
 
 
 
@@ -26,10 +28,15 @@ private:
     
 public:
     VulkanInstancePtr vulkanInstance;
+    std::vector<const char*> vulkanInstanceValidationLayers;
+    std::vector<const char*> vulkanInstanceExtensions;
     VulkanSurfacePtr vulkanWindowSurface;
     VulkanPhysicalDevicePtr vulkanPhysicalDevice;
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes;
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails;
+    VulkanLogicalDevicePtr vulkanLogicalDevice;
+    VulkanQueuePtr vulkanRenderQueue;
+    VulkanQueuePtr vulkanPresentQueue;
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

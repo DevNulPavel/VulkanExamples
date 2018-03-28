@@ -4,11 +4,13 @@
 #include <stdexcept>
 #include <set>
 #include "CommonConstants.h"
-#include "VulkanRender.h"
 
 
-VulkanPhysicalDevice::VulkanPhysicalDevice():
-    physicalDevice(VK_NULL_HANDLE){
+VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, std::vector<const char*> extensions, VulkanSurfacePtr surface):
+    physicalDevice(VK_NULL_HANDLE),
+    _vulkanInstance(instance),
+    _vulkanExtensions(extensions),
+    _vulkanSurface(surface){
         
     pickPhysicalDevice();
 }
@@ -36,7 +38,7 @@ bool VulkanPhysicalDevice::checkDeviceRequiredExtensionSupport(VkPhysicalDevice 
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
     
     // Список требуемых расширений - смена кадров
-    std::set<std::string> requiredExtensions(RenderI->vulkanInstance->instanceExtensions.begin(), RenderI->vulkanInstance->instanceExtensions.end());
+    std::set<std::string> requiredExtensions(_vulkanExtensions.begin(), _vulkanExtensions.end());
     
     // Пытаемся убрать из списка требуемых расширений возможные
     for (const auto& extension : availableExtensions) {
@@ -88,22 +90,22 @@ int VulkanPhysicalDevice::rateDeviceScore(VkPhysicalDevice device) {
 VulkanSwapChainSupportDetails VulkanPhysicalDevice::querySwapChainSupport(VkPhysicalDevice device) {
     // Получаем возможности
     VulkanSwapChainSupportDetails details;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, RenderI->vulkanWindowSurface->surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _vulkanSurface->surface, &details.capabilities);
     
     // Запрашиваем поддерживаемые форматы буффера цвета
     uint32_t formatCount = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, RenderI->vulkanWindowSurface->surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, _vulkanSurface->surface, &formatCount, nullptr);
     if (formatCount != 0) {
         details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, RenderI->vulkanWindowSurface->surface, &formatCount, details.formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, _vulkanSurface->surface, &formatCount, details.formats.data());
     }
     
     // Запрашиваем поддерживаемые типы отображения кадра
     uint32_t presentModeCount = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, RenderI->vulkanWindowSurface->surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, _vulkanSurface->surface, &presentModeCount, nullptr);
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, RenderI->vulkanWindowSurface->surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, _vulkanSurface->surface, &presentModeCount, details.presentModes.data());
     }
     
     return details;
@@ -133,7 +135,7 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
         
         // Провеяем, может является ли данная очередь - очередью отображения
         VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, RenderI->vulkanWindowSurface->surface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _vulkanSurface->surface, &presentSupport);
         if ((queueFamily.queueCount > 0) && presentSupport) {
             result.presentQueueFamilyIndex = i;
             result.presentQueueFamilyQueuesCount = queueFamily.queueCount;
@@ -154,7 +156,7 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
 void VulkanPhysicalDevice::pickPhysicalDevice() {
     // Получаем количество GPU
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(RenderI->vulkanInstance->instance, &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(_vulkanInstance->instance, &deviceCount, nullptr);
     
     // Есть ли вообще карты?
     if (deviceCount == 0) {
@@ -165,7 +167,7 @@ void VulkanPhysicalDevice::pickPhysicalDevice() {
     
     // Получаем список устройств
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(RenderI->vulkanInstance->instance, &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(_vulkanInstance->instance, &deviceCount, devices.data());
     
     // Используем Map для автоматической сортировки по производительности
     std::map<int, std::tuple<VkPhysicalDevice, VulkanQueuesFamiliesIndexes, VulkanSwapChainSupportDetails>> candidates;

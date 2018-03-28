@@ -10,17 +10,24 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "CommonConstants.h"
 
 struct VulkanInstance {
 public:
-    std::vector<const char*> validationLayers;
-    std::vector<const char*> instanceExtensions;
     VkInstance instance;
-    VkDebugReportCallbackEXT debugCallback;
 
 public:
     VulkanInstance();
     ~VulkanInstance();
+    std::vector<const char*> getValidationLayers();
+    std::vector<const char*> getInstanceExtensions();
+    
+private:
+    std::vector<const char*> _validationLayers;
+    std::vector<const char*> _instanceExtensions;
+    #ifdef VALIDATION_LAYERS_ENABLED
+        VkDebugReportCallbackEXT _debugCallback;
+    #endif
     
 private:
     // Создание инстанса Vulkan

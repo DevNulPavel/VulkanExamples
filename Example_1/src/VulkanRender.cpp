@@ -26,18 +26,32 @@ VulkanRender::VulkanRender(){
 void VulkanRender::init(GLFWwindow* window){
     // Создание инстанса Vulkan
     vulkanInstance = std::make_shared<VulkanInstance>();
+    vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
+    vulkanInstanceExtensions = vulkanInstance->getInstanceExtensions();
     
     // Создаем плоскость отрисовки
-    vulkanWindowSurface = std::make_shared<VulkanSurface>(window);
+    vulkanWindowSurface = std::make_shared<VulkanSurface>(window, vulkanInstance);
     
     // Получаем физическое устройство
-    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>();
+    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanInstanceExtensions, vulkanWindowSurface);
     vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
 
+    // Создаем логическое устройство
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanInstanceExtensions);
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();  // Получаем очередь рендеринга
+    vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
 }
 
 VulkanRender::~VulkanRender(){
+    // Ждем завершения работы Vulkan
+    vkQueueWaitIdle(vulkanRenderQueue->queue);
+    vkQueueWaitIdle(vulkanPresentQueue->queue);
+    vkDeviceWaitIdle(vulkanLogicalDevice->device);
+    
+    vulkanRenderQueue = nullptr;
+    vulkanPresentQueue = nullptr;
+    vulkanLogicalDevice = nullptr;
     vulkanPhysicalDevice = nullptr;
     vulkanWindowSurface = nullptr;
     vulkanInstance = nullptr;
