@@ -196,6 +196,18 @@ print_current_cmake_config()
 ####################################################
 set(ALL_SOURCES 
     src/main.cpp
+    src/VulkanRender.h
+    src/VulkanRender.cpp
+    src/VulkanInstance.h
+    src/VulkanInstance.cpp
+    src/VulkanSurface.h
+    src/VulkanSurface.cpp
+    src/VulkanPhysicalDevice.h
+    src/VulkanPhysicalDevice.cpp
+    src/VulkanQueuesFamiliesIndexes.h
+    src/VulkanQueuesFamiliesIndexes.cpp
+    src/VulkanSwapChainSupportDetails.h
+    src/VulkanSwapChainSupportDetails.cpp
     src/CommonDefines.h
     src/CommonConstants.h
     src/Vertex.h
