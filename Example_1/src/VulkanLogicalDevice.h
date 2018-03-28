@@ -20,8 +20,10 @@ public:
 public:
     VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice, VulkanQueuesFamiliesIndexes queuesFamiliesIndexes, std::vector<const char*> validationLayers, std::vector<const char*> extensions);
     ~VulkanLogicalDevice();
-    // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
-    void createLogicalDeviceAndQueue();
+    VulkanPhysicalDevicePtr getBasePhysicalDevice() const;
+    VulkanQueuesFamiliesIndexes getBaseQueuesFamiliesIndexes() const;
+    std::vector<const char*> getBaseValidationLayers() const;
+    std::vector<const char*> getBaseExtensions() const;
     VkDevice getDevice();
     std::shared_ptr<VulkanQueue> getRenderQueue();
     std::shared_ptr<VulkanQueue> getPresentQueue();
@@ -36,6 +38,8 @@ private:
     std::shared_ptr<VulkanQueue> _presentQueue;
     
 private:
+    // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
+    void createLogicalDeviceAndQueue();
 };
 
 typedef std::shared_ptr<VulkanLogicalDevice> VulkanLogicalDevicePtr;

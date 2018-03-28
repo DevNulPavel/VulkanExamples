@@ -503,22 +503,6 @@ void createCommandPool() {
     }
 }
 
-// Подбираем тип памяти буффера вершин
-uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-    // Запрашиваем типы памяти физического устройства
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(RenderI->vulkanPhysicalDevice->getDevice(), &memProperties);
-    
-    // Найдем тип памяти, который подходит для самого буфера
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    
-    throw std::runtime_error("failed to find suitable memory type!");
-}
-
 // Создаем изображение
 void createImage(uint32_t width, uint32_t height,
                  VkFormat format, VkImageTiling tiling, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
@@ -1656,6 +1640,7 @@ int local_main(int argc, char** argv) {
     
     // Создаем преграды для проверки завершения комманд отрисовки
     createFences();
+    
     
     // Ищем формат буффера глубины
     findDepthFormat();

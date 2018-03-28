@@ -27,6 +27,22 @@ VulkanLogicalDevice::~VulkanLogicalDevice(){
     vkDestroyDevice(_device, nullptr);
 }
 
+VulkanPhysicalDevicePtr VulkanLogicalDevice::getBasePhysicalDevice() const{
+    return _physicalDevice;
+}
+
+VulkanQueuesFamiliesIndexes VulkanLogicalDevice::getBaseQueuesFamiliesIndexes() const{
+    return _queuesFamiliesIndexes;
+}
+
+std::vector<const char*> VulkanLogicalDevice::getBaseValidationLayers() const{
+    return _validationLayers;
+}
+
+std::vector<const char*> VulkanLogicalDevice::getBaseExtensions() const{
+    return _extensions;
+}
+
 VkDevice VulkanLogicalDevice::getDevice(){
     createLogicalDeviceAndQueue();
     return _device;
