@@ -158,6 +158,8 @@ void VulkanPhysicalDevice::pickPhysicalDevice() {
     
     // Есть ли вообще карты?
     if (deviceCount == 0) {
+        printf("Failed to find GPUs with Vulkan support!");
+        fflush(stdout);
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
     
@@ -194,6 +196,8 @@ void VulkanPhysicalDevice::pickPhysicalDevice() {
     
     // Есть ли вообще карты?
     if (candidates.size() == 0) {
+        printf("No picked GPU physical devices!");
+        fflush(stdout);
         throw std::runtime_error("No picked GPU physical devices!");
     }
     
@@ -203,6 +207,8 @@ void VulkanPhysicalDevice::pickPhysicalDevice() {
         _queuesFamiliesIndexes = std::get<1>(candidates.begin()->second);
         _swapchainSuppportDetails = std::get<2>(candidates.begin()->second);
     } else {
-        throw std::runtime_error("failed to find a suitable GPU!");
+        printf("Failed to find a suitable GPU!");
+        fflush(stdout);
+        throw std::runtime_error("Failed to find a suitable GPU!");
     }
 }

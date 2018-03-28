@@ -38,6 +38,7 @@ void VulkanRender::init(GLFWwindow* window){
 }
 
 VulkanRender::~VulkanRender(){
+    vulkanPhysicalDevice = nullptr;
     vulkanWindowSurface = nullptr;
     vulkanInstance = nullptr;
 }

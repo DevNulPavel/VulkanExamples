@@ -54,10 +54,6 @@ GLFWwindow* window = nullptr;
 
 
 
-int vulkanRenderQueueFamilyIndex = -1;
-int vulkanRenderQueueFamilyQueuesCount = 0;
-int vulkanPresentQueueFamilyIndex = -1;
-int vulkanPresentQueueFamilyQueuesCount = 0;
 VkDevice vulkanLogicalDevice = VK_NULL_HANDLE;
 VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
 VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
@@ -186,6 +182,9 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
 // Создаем логическое устройство для выбранного физического устройства + очередь отрисовки
 void createLogicalDeviceAndQueue() {
     // Только уникальные индексы очередей
+    int vulkanRenderQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.renderQueueFamilyIndex;
+    uint32_t vulkanRenderQueueFamilyQueuesCount = RenderI->vulkanQueuesFamiliesIndexes.renderQueueFamilyQueuesCount;
+    int vulkanPresentQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.presentQueueFamilyIndex;
     std::set<int> uniqueQueueFamilies = {vulkanRenderQueueFamilyIndex, vulkanPresentQueueFamilyIndex};
     
     // Определяем количество создаваемых очередей
@@ -231,7 +230,8 @@ void createLogicalDeviceAndQueue() {
     createInfo.ppEnabledLayerNames = RenderI->vulkanInstance->validationLayers.data();
 
     // Пробуем создать логический девайс на конкретном физическом
-    VkResult createStatus = vkCreateDevice(vulkanPhysicalDevice, &createInfo, nullptr, &vulkanLogicalDevice);
+    VkPhysicalDevice device = RenderI->vulkanPhysicalDevice->physicalDevice;
+    VkResult createStatus = vkCreateDevice(device, &createInfo, nullptr, &vulkanLogicalDevice);
     if (createStatus != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device!");
     }
@@ -279,7 +279,7 @@ void createFences(){
 void createSwapChain() {
     // Запрашиваем информацию о свопчейне
     // TODO: !!!
-    ///SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vulkanPhysicalDevice);
+    VulkanSwapChainSupportDetails swapChainSupport = RenderI->vulkanSwapchainSuppportDetails;
     
     // Выбираем подходящие форматы пикселя, режима смены кадров, размеры кадра
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -306,6 +306,8 @@ void createSwapChain() {
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;    // Картинки используются в качестве буффера цвета
     
     // Если у нас разные очереди для рендеринга и отображения -
+    int vulkanRenderQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.renderQueueFamilyIndex;
+    int vulkanPresentQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.presentQueueFamilyIndex;
     uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
     if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
         // Изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
@@ -759,6 +761,9 @@ void createFramebuffers(){
 
 // Создаем пулл комманд
 void createCommandPool() {
+    int vulkanRenderQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.renderQueueFamilyIndex;
+    //int vulkanPresentQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.presentQueueFamilyIndex;
+    
     // Информация о пуле коммандных буфферов
     VkCommandPoolCreateInfo poolInfo = {};
     memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
@@ -775,7 +780,7 @@ void createCommandPool() {
 uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     // Запрашиваем типы памяти физического устройства
     VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(vulkanPhysicalDevice, &memProperties);
+    vkGetPhysicalDeviceMemoryProperties(RenderI->vulkanPhysicalDevice->physicalDevice, &memProperties);
     
     // Найдем тип памяти, который подходит для самого буфера
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
@@ -1016,7 +1021,7 @@ VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTil
     for (VkFormat format : candidates) {
         // Запрашиваем информацию для формата
         VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(vulkanPhysicalDevice, format, &props);
+        vkGetPhysicalDeviceFormatProperties(RenderI->vulkanPhysicalDevice->physicalDevice, format, &props);
         
         if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
             return format;
