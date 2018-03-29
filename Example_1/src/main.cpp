@@ -43,6 +43,7 @@
 #include "Vertex.h"
 #include "Figures.h"
 #include "UniformBuffer.h"
+#include "VulkanHelpers.h"
 
 
 #define APPLICATION_SAMPLING_VALUE VK_SAMPLE_COUNT_1_BIT
@@ -55,7 +56,8 @@ GLFWwindow* window = nullptr;
 
 
 VkFence vulkanFence = VK_NULL_HANDLE;
-VkFormat vulkanDepthFormat = VK_FORMAT_UNDEFINED;
+
+
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
 VkShaderModule vulkanFragmentShader = VK_NULL_HANDLE;
 VkRenderPass vulkanRenderPass = VK_NULL_HANDLE;
@@ -178,84 +180,6 @@ void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderMod
     
     if (vkCreateShaderModule(RenderI->vulkanLogicalDevice->getDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
-    }
-}
-
-// Создание рендер-прохода
-void createRenderPass() {
-    // Уничтожаем старый рендер пасс, если был уже
-    if(vulkanRenderPass != VK_NULL_HANDLE){
-        vkDestroyRenderPass(RenderI->vulkanLogicalDevice->getDevice(), vulkanRenderPass, nullptr);
-    }
-    
-    // Описание подсоединенного буффера цвета
-    VkAttachmentDescription colorAttachment = {};
-    memset(&colorAttachment, 0, sizeof(VkAttachmentDescription));
-    colorAttachment.format = RenderI->vulkanSwapchain->getSwapChainImageFormat();    // Формат буфферов цвета кадра
-    colorAttachment.samples = APPLICATION_SAMPLING_VALUE;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при начале работы с цветом?
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // После завершения что делать?
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Что делать с трафаретом при начале
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;  // Что делать с трафаретом после
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // TODO: ???
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Изображение показывается в swap chain
-    
-    // Описание присоединенного буффера глубины
-    VkAttachmentDescription depthAttachment = {};
-    memset(&depthAttachment, 0, sizeof(VkAttachmentDescription));
-    depthAttachment.format = vulkanDepthFormat; //  Формат
-    depthAttachment.samples = APPLICATION_SAMPLING_VALUE; // Уровень семплирования
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Что делать при загрузке буффера глубины?
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Что делать после отрисовки с буффером глубины - буффер не рисуется, так что пофик на него
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    // Референс присоединенного цвета
-    VkAttachmentReference colorAttachmentRef = {};
-    memset(&colorAttachmentRef, 0, sizeof(VkAttachmentReference));
-    colorAttachmentRef.attachment = 0;  // Аттачмент находится по 0му индексу в массиве attachments ниже
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;   // Используется для цвета
-    
-    // Референс присоединенного буффера глубины
-    VkAttachmentReference depthAttachmentRef = {};
-    memset(&depthAttachmentRef, 0, sizeof(VkAttachmentReference));
-    depthAttachmentRef.attachment = 1; // Аттачмент глубины находится по 1му индексу в массиве attachments ниже
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;   // Используется для глубины
-    
-    // Подпроход, всего один (наверное можно задействовать для постэффектов)
-    VkSubpassDescription subPass1 = {};
-    memset(&subPass1, 0, sizeof(VkSubpassDescription));
-    subPass1.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
-    subPass1.colorAttachmentCount = 1;    // Один аттачмент цвета
-    subPass1.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
-    subPass1.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины
-    
-    /*// Подпроход, всего один (наверное можно задействовать для постэффектов)
-    VkSubpassDescription subPass2 = {};
-    memset(&subPass2, 0, sizeof(VkSubpassDescription));
-    subPass2.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;    // Пайплайн будет использоваться для отрисовки графики
-    subPass2.colorAttachmentCount = 1;    // Один аттачмент цвета
-    subPass2.pColorAttachments = &colorAttachmentRef;    // Ref аттачмента цвета
-    subPass2.pDepthStencilAttachment = &depthAttachmentRef;  // Ref аттачмента глубины*/
-    
-    // Описание создания рендер-прохода
-    std::array<VkSubpassDescription, 1> subpasses = {{subPass1}};
-    std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};  // Индексы и использование указаны выше
-    VkRenderPassCreateInfo renderPassInfo = {};
-    memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = attachments.size();
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
-    renderPassInfo.pSubpasses = subpasses.data();
-    renderPassInfo.dependencyCount = 0;     // TODO: Зависимости?
-    renderPassInfo.pDependencies = nullptr;
-    
-    // Создаем ренде-проход
-    if (vkCreateRenderPass(RenderI->vulkanLogicalDevice->getDevice(), &renderPassInfo, nullptr, &vulkanRenderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
     }
 }
 
@@ -503,69 +427,6 @@ void createCommandPool() {
     }
 }
 
-// Создаем изображение
-void createImage(uint32_t width, uint32_t height,
-                 VkFormat format, VkImageTiling tiling, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                 uint32_t mipmapsCount,
-                 VkImage& image, VkDeviceMemory& imageMemory) {
-    
-    // Удаляем старые объекты
-    if (image != VK_NULL_HANDLE) {
-        vkDestroyImage(RenderI->vulkanLogicalDevice->getDevice(), image, nullptr);
-        image = VK_NULL_HANDLE;
-    }
-    if (imageMemory != VK_NULL_HANDLE) {
-        vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), imageMemory, nullptr);
-        imageMemory = VK_NULL_HANDLE;
-    }
-    
-    // Для поля initialLayout есть только два возможных значения:
-    // VK_IMAGE_LAYOUT_UNDEFINED: Не и используется GPU и первое изменение (transition) отбросит все тексели.
-    // VK_IMAGE_LAYOUT_PREINITIALIZED: Не и используется GPU, но первое изменение (transition) сохранит тексели.
-    // Первый вариант подходит для изображений, которые будут использоваться в качестве вложений, как буфер цвета и глубины.
-    // В таком случае не нужно заботиться о данных инициализации, т.к. они скорее всего будут очищены проходом рендера до начала использования. А если же вы хотите заполнить данные, такие как текстуры, тогда используйте второй вариант:
-    
-    // Информация об изображении
-    VkImageCreateInfo imageInfo = {};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D; // 2D текстура
-    imageInfo.extent.width = width;     // Ширина
-    imageInfo.extent.height = height;   // Высота
-    imageInfo.extent.depth = 1;         // Глубина
-    imageInfo.mipLevels = mipmapsCount; // Уровней мипмапинга всего?
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = format;          // Формат данных текстуры
-    imageInfo.tiling = tiling;
-    imageInfo.initialLayout = layout; // Текстура заранее с нужными данными
-    imageInfo.usage = usage;    // Флаги использования текстуры
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;  // Семплирование данной текстуры
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Режим междевайного доступа
-    
-    // Создаем изображение
-    if (vkCreateImage(RenderI->vulkanLogicalDevice->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create image!");
-    }
-    
-    // Запрашиваем информацию о требованиях памяти для текстуры
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(RenderI->vulkanLogicalDevice->getDevice(), image, &memRequirements);
-    
-    // Подбираем нужный тип аллоцируемой памяти для требований и возможностей
-    uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits, properties);
-    VkMemoryAllocateInfo allocInfo = {};
-    memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;    // Размер аллоцируемой памяти
-    allocInfo.memoryTypeIndex = memoryType;             // Тип памяти
-    
-    if (vkAllocateMemory(RenderI->vulkanLogicalDevice->getDevice(), &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate image memory!");
-    }
-    
-    // Цепляем к картинке буффер памяти
-    vkBindImageMemory(RenderI->vulkanLogicalDevice->getDevice(), image, imageMemory, 0);
-}
-
 // Запуск коммандного буффера на получение комманд
 VkCommandBuffer beginSingleTimeCommands() {
     // Параметр level определяет, будет ли выделенный буфер команд первичным или вторичным буфером команд:
@@ -725,47 +586,6 @@ void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t heig
     
     // Завершаем буффер комманд
     endSingleTimeCommands(commandBuffer);
-}
-
-// Подбираем формат текстуры в зависимости от доступных на устройстве
-VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
-    for (VkFormat format : candidates) {
-        // Запрашиваем информацию для формата
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(RenderI->vulkanPhysicalDevice->getDevice(), format, &props);
-        
-        if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-            return format;
-        } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-            return format;
-        }
-    }
-    
-    throw std::runtime_error("failed to find supported format!");
-}
-
-// Подбираем нужный формат глубины
-VkFormat findDepthFormat() {
-    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    vulkanDepthFormat = findSupportedFormat(candidates,
-                                            VK_IMAGE_TILING_OPTIMAL,
-                                            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    return vulkanDepthFormat;
-}
-
-// Создаем буфферы для глубины
-void createDepthResources() {
-    createImage(RenderI->vulkanSwapchain->getSwapChainExtent().width, RenderI->vulkanSwapchain->getSwapChainExtent().height,
-                vulkanDepthFormat,                                  // Формат текстуры
-                VK_IMAGE_TILING_OPTIMAL,                            // Оптимальный тайлинг
-                VK_IMAGE_LAYOUT_UNDEFINED,  // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,        // Использоваться будет в качестве аттачмента глубины
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,                // Хранится только на GPU
-                1,
-                vulkanDepthImage, vulkanDepthImageMemory);
-    
-    // Создаем вью для изображения буффера глубины
-    createImageView(vulkanDepthImage, vulkanDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, vulkanDepthImageView);
 }
 
 // Обновляем лаяут текстуры глубины на правильный
@@ -1110,7 +930,8 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     vkGetBufferMemoryRequirements(RenderI->vulkanLogicalDevice->getDevice(), buffer, &memRequirements);
     
     // Настройки аллокации буффера
-    uint32_t memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+    uint32_t memoryTypeIndex = findMemoryType(RenderI->vulkanPhysicalDevice->getDevice(),
+                                              memRequirements.memoryTypeBits,
                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkMemoryAllocateInfo allocInfo = {};
     memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
@@ -1488,9 +1309,9 @@ void recreateSwapChain() {
     //createSwapChain();
     //getSwapchainImages();
     //createImageViews();
-    createDepthResources();
-    updateDepthTextureLayout();
-    createRenderPass();
+    //createDepthResources();
+    //updateDepthTextureLayout();
+    //createRenderPass();
     createFramebuffers();
     createGraphicsPipeline();
     createCommandBuffers();
@@ -1642,14 +1463,6 @@ int local_main(int argc, char** argv) {
     createFences();
     
     
-    // Ищем формат буффера глубины
-    findDepthFormat();
-    
-    // Создаем ресурсы для глубины
-    createDepthResources();
-    
-    // Создание рендер-прохода
-    createRenderPass();
     
     // Создаем фреймбуфферы
     createFramebuffers();

@@ -15,6 +15,7 @@ public:
     VulkanSemafore(VulkanLogicalDevicePtr device);
     ~VulkanSemafore();
     VkSemaphore getSemafore() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
     
 private:
     VulkanLogicalDevicePtr _device;

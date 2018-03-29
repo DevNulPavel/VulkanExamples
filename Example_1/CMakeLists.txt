@@ -224,6 +224,8 @@ set(ALL_SOURCES
     src/VulkanImageView.cpp
     src/CommonDefines.h
     src/CommonConstants.h
+    src/VulkanRenderPass.h
+    src/VulkanRenderPass.cpp
     src/Vertex.h
     src/Vertex.cpp
     src/Figures.h

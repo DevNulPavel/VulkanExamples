@@ -46,12 +46,59 @@ void VulkanRender::init(GLFWwindow* window){
     vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     
-    // Создаем свопчейн
+    // Создаем свопчейн + получаем изображения свопчейна
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
-
     
-    VkFormat vulkanSwapChainImageFormat = vulkanSwapchain->getSwapChainImageFormat();
-    VkExtent2D vulkanSwapChainExtent = vulkanSwapchain->getSwapChainExtent();
+    // Создаем текстуры для буффера глубины
+    createDepthResources();
+    
+    // Создаем рендер проход
+    createMainRenderPass();
+}
+
+// Создаем буфферы для глубины
+void VulkanRender::createDepthResources() {
+    // Определяем подходящий формат изображения для глубины
+    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+    VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(),
+                                                     candidates,
+                                                     VK_IMAGE_TILING_OPTIMAL,
+                                                     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    
+    // Создаем изображение для глубины
+    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
+    uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
+    vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
+                                                           width, height,               // Размеры
+                                                           vulkanDepthFormat,           // Формат текстуры
+                                                           VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
+                                                           VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
+                                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, // Использоваться будет в качестве аттачмента глубины
+                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                                                           1);                          // 1 уровень мипмапов
+    
+    // Создаем вью для изображения буффера глубины
+    vulkanWindowDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
+                                                                   vulkanWindowDepthImage,
+                                                                   VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
+}
+
+// Создание рендер прохода
+void VulkanRender::createMainRenderPass(){
+    VulkanRenderPassConfig imageConfig;
+    imageConfig.format = vulkanSwapchain->getSwapChainImageFormat();
+    imageConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
+    imageConfig.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Сохраняем для отрисовки
+    imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageConfig.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VulkanRenderPassConfig depthConfig;
+    depthConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
+    depthConfig.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Не важен результат
+    depthConfig.initLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthConfig.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthConfig.refLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    vulkanRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig, depthConfig);
 }
 
 VulkanRender::~VulkanRender(){
@@ -60,6 +107,9 @@ VulkanRender::~VulkanRender(){
     vkQueueWaitIdle(vulkanPresentQueue->getQueue());
     vkDeviceWaitIdle(vulkanLogicalDevice->getDevice());
     
+    vulkanRenderPass = nullptr;
+    vulkanWindowDepthImageView = nullptr;
+    vulkanWindowDepthImage = nullptr;
     vulkanSwapchain = nullptr;
     vulkanRenderQueue = nullptr;
     vulkanPresentQueue = nullptr;

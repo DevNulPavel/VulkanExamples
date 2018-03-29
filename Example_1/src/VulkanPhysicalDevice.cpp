@@ -31,6 +31,18 @@ VulkanSwapChainSupportDetails VulkanPhysicalDevice::getSwapChainSupportDetails()
     return _swapchainSuppportDetails;
 }
 
+VulkanInstancePtr VulkanPhysicalDevice::getBaseInstance() const{
+    return _vulkanInstance;
+}
+
+std::vector<const char*> VulkanPhysicalDevice::getBaseExtentions() const{
+    return _vulkanExtensions;
+}
+
+VulkanSurfacePtr VulkanPhysicalDevice::getBaseSurface() const{
+    return _vulkanSurface;
+}
+
 // Проверяем, поддерживает ли девайс цепочку свопинга
 bool VulkanPhysicalDevice::checkDeviceRequiredExtensionSupport(VkPhysicalDevice device) {
     // Получаем количество расширений

@@ -28,6 +28,10 @@ public:
     VkExtent2D getSwapChainExtent() const;
     std::vector<VulkanImagePtr> getImages() const;
     std::vector<VulkanImageViewPtr> getImageViews() const;
+    VulkanSurfacePtr getBaseSurface() const;
+    VulkanLogicalDevicePtr getBaseLogicalDevice() const;
+    VulkanQueuesFamiliesIndexes getBaseQueuesFamiliesIndexes() const;
+    VulkanSwapChainSupportDetails getBaseSwapChainSupportDetails() const;
     
 private:
     VulkanSurfacePtr _surface;

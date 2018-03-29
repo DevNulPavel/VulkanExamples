@@ -21,7 +21,10 @@ public:
     VkPhysicalDevice getDevice() const;
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
     VulkanSwapChainSupportDetails getSwapChainSupportDetails() const;
-
+    VulkanInstancePtr getBaseInstance() const;
+    std::vector<const char*> getBaseExtentions() const;
+    VulkanSurfacePtr getBaseSurface() const;
+    
 private:
     VulkanInstancePtr _vulkanInstance;
     std::vector<const char*> _vulkanExtensions;

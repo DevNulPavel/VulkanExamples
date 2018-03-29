@@ -20,3 +20,15 @@ VulkanQueue::~VulkanQueue(){
 VkQueue VulkanQueue::getQueue() const{
     return _queue;
 }
+
+VulkanLogicalDevicePtr VulkanQueue::getBaseDevice() const{
+    return _device;
+}
+
+uint32_t VulkanQueue::getFamilyIndex() const {
+    return _familyIndex;
+}
+
+uint32_t VulkanQueue::getQueueIndex() const {
+    return _queueIndex;
+}

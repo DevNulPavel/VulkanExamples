@@ -22,6 +22,18 @@ VkImageView VulkanImageView::getImageView() const{
     return _imageView;
 }
 
+VulkanLogicalDevicePtr VulkanImageView::getBaseDevice() const{
+    return _device;
+}
+
+VulkanImagePtr VulkanImageView::getBaseImage() const{
+    return _image;
+}
+
+VkImageAspectFlags VulkanImageView::getBaseAspectFlags() const{
+    return _aspectFlags;
+}
+
 // Создание вью для изображения
 void VulkanImageView::createImageView() {
     // Описание вьюшки

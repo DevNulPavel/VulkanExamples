@@ -19,8 +19,7 @@ public:
                 VkFormat format,
                 VkExtent2D size,
                 bool needDestroy);
-    VulkanImage(VulkanPhysicalDevicePtr physicalDevice,
-                VulkanLogicalDevicePtr logicDevice,
+    VulkanImage(VulkanLogicalDevicePtr logicDevice,
                 uint32_t width, uint32_t height,
                 VkFormat format,
                 VkImageTiling tiling,
@@ -28,14 +27,14 @@ public:
                 VkImageUsageFlags usage,
                 VkMemoryPropertyFlags properties,
                 uint32_t mipmapsCount);
-    
     ~VulkanImage();
     VkImage getImage() const;
+    VkDeviceMemory getImageMemory() const;
     VkFormat getFormat() const;
     VkExtent2D getSize() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
     
 private:
-    VulkanPhysicalDevicePtr _physicalDevice;
     VulkanLogicalDevicePtr _logicalDevice;
     VkImage _image;
     VkDeviceMemory _imageMemory;

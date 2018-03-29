@@ -18,6 +18,7 @@ public:
     VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance);
     ~VulkanSurface();
     VkSurfaceKHR getSurface() const;
+    VulkanInstancePtr getBaseInstance() const;
     
 private:
     // Создаем плоскость отрисовки GLFW

@@ -18,6 +18,9 @@ struct VulkanQueue {
 public:
     ~VulkanQueue();
     VkQueue getQueue() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
+    uint32_t getFamilyIndex() const;
+    uint32_t getQueueIndex() const;
     
 protected:
     VulkanQueue(VulkanLogicalDevicePtr device, uint32_t familyIndex, uint32_t queueIndex, VkQueue queue);

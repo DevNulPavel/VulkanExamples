@@ -51,6 +51,23 @@ std::vector<VulkanImageViewPtr> VulkanSwapchain::getImageViews() const{
     return _imageViews;
 }
 
+VulkanSurfacePtr VulkanSwapchain::getBaseSurface() const{
+    return _surface;
+}
+
+VulkanLogicalDevicePtr VulkanSwapchain::getBaseLogicalDevice() const{
+    return _device;
+}
+
+VulkanQueuesFamiliesIndexes VulkanSwapchain::getBaseQueuesFamiliesIndexes() const{
+    return _queuesFamilies;
+}
+
+VulkanSwapChainSupportDetails VulkanSwapchain::getBaseSwapChainSupportDetails() const{
+    return _swapChainSupportDetails;
+}
+
+
 // Выбираем нужный формат кадра
 VkSurfaceFormatKHR VulkanSwapchain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     if (availableFormats.size() == 0) {

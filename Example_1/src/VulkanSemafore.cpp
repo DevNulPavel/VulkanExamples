@@ -21,10 +21,14 @@ VulkanSemafore::VulkanSemafore(VulkanLogicalDevicePtr device):
     }
 }
 
+VulkanSemafore::~VulkanSemafore(){
+    vkDestroySemaphore(_device->getDevice(), _semafore, nullptr);
+}
+
 VkSemaphore VulkanSemafore::getSemafore() const{
     return _semafore;
 }
 
-VulkanSemafore::~VulkanSemafore(){
-    vkDestroySemaphore(_device->getDevice(), _semafore, nullptr);
+VulkanLogicalDevicePtr VulkanSemafore::getBaseDevice() const{
+    return _device;
 }

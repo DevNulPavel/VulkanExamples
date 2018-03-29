@@ -25,9 +25,34 @@ VulkanImage::VulkanImage(VkImage image, VkFormat format, VkExtent2D size):
 VulkanImage::VulkanImage(VulkanLogicalDevicePtr device, VkImage image, VkFormat format, VkExtent2D size, bool needDestroy):
     _logicalDevice(device),
     _image(image),
+    _imageMemory(VK_NULL_HANDLE),
     _format(format),
     _size(size),
     _needDestroy(needDestroy){
+}
+
+VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
+                         uint32_t width, uint32_t height,
+                         VkFormat format,
+                         VkImageTiling tiling,
+                         VkImageLayout layout,
+                         VkImageUsageFlags usage,
+                         VkMemoryPropertyFlags properties,
+                         uint32_t mipmapsCount):
+    _logicalDevice(logicDevice),
+    _image(VK_NULL_HANDLE),
+    _imageMemory(VK_NULL_HANDLE),
+    _format(format),
+    _size({width, height}),
+    _needDestroy(true){
+        
+    createImage(width, height,
+                format,
+                tiling,
+                layout,
+                usage,
+                properties,
+                mipmapsCount);
 }
 
 VulkanImage::~VulkanImage(){
@@ -45,12 +70,20 @@ VkImage VulkanImage::getImage() const{
     return _image;
 }
 
+VkDeviceMemory VulkanImage::getImageMemory() const{
+    return _imageMemory;
+}
+
 VkFormat VulkanImage::getFormat() const{
     return _format;
 }
 
 VkExtent2D VulkanImage::getSize() const{
     return _size;
+}
+
+VulkanLogicalDevicePtr VulkanImage::getBaseDevice() const{
+    return _logicalDevice;
 }
 
 // Создаем изображение
@@ -96,7 +129,7 @@ void VulkanImage::createImage(uint32_t width, uint32_t height,
     vkGetImageMemoryRequirements(_logicalDevice->getDevice(), _image, &memRequirements);
     
     // Подбираем нужный тип аллоцируемой памяти для требований и возможностей
-    uint32_t memoryType = findMemoryType(_physicalDevice->getDevice(), memRequirements.memoryTypeBits, properties);
+    uint32_t memoryType = findMemoryType(_logicalDevice->getBasePhysicalDevice()->getDevice(), memRequirements.memoryTypeBits, properties);
     VkMemoryAllocateInfo allocInfo = {};
     memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;

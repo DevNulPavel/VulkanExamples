@@ -5,6 +5,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "VulkanHelpers.h"
 #include "VulkanInstance.h"
 #include "VulkanSurface.h"
 #include "VulkanPhysicalDevice.h"
@@ -12,6 +13,9 @@
 #include "VulkanQueue.h"
 #include "VulkanSemafore.h"
 #include "VulkanSwapchain.h"
+#include "VulkanImage.h"
+#include "VulkanImageView.h"
+#include "VulkanRenderPass.h"
 
 
 
@@ -38,6 +42,15 @@ public:
     VulkanSemaforePtr vulkanImageAvailableSemaphore;
     VulkanSemaforePtr vulkanRenderFinishedSemaphore;
     VulkanSwapchainPtr vulkanSwapchain;
+    VulkanImagePtr vulkanWindowDepthImage;
+    VulkanImageViewPtr vulkanWindowDepthImageView;
+    VulkanRenderPassPtr vulkanRenderPass;
+    
+private:
+    // Создаем буфферы для глубины
+    void createDepthResources();
+    // Создание рендер прохода
+    void createMainRenderPass();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

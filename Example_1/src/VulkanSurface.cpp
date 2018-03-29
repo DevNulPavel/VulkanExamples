@@ -19,6 +19,10 @@ VkSurfaceKHR VulkanSurface::getSurface() const{
     return _surface;
 }
 
+VulkanInstancePtr VulkanSurface::getBaseInstance() const{
+    return _instance;
+}
+
 // Создаем плоскость отрисовки GLFW
 void VulkanSurface::createDrawSurface(GLFWwindow* window) {
     if (glfwCreateWindowSurface(_instance->getInstance(), window, nullptr, &_surface) != VK_SUCCESS) {

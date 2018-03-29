@@ -16,6 +16,9 @@ public:
     VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr image, VkImageAspectFlags aspectFlags);
     ~VulkanImageView();
     VkImageView getImageView() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
+    VulkanImagePtr getBaseImage() const;
+    VkImageAspectFlags getBaseAspectFlags() const;
     
 private:
     VulkanLogicalDevicePtr _device;
