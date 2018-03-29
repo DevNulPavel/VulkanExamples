@@ -8,7 +8,11 @@ VulkanSurface::VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance):
     _surface(VK_NULL_HANDLE),
     _instance(instance){
         
-    createDrawSurface(window);
+    if (glfwCreateWindowSurface(_instance->getInstance(), window, nullptr, &_surface) != VK_SUCCESS) {
+        printf("Failed to create window surface!");
+        fflush(stdout);
+        throw std::runtime_error("Failed to create window surface!");
+    }
 }
 
 VulkanSurface::~VulkanSurface(){
@@ -21,13 +25,4 @@ VkSurfaceKHR VulkanSurface::getSurface() const{
 
 VulkanInstancePtr VulkanSurface::getBaseInstance() const{
     return _instance;
-}
-
-// Создаем плоскость отрисовки GLFW
-void VulkanSurface::createDrawSurface(GLFWwindow* window) {
-    if (glfwCreateWindowSurface(_instance->getInstance(), window, nullptr, &_surface) != VK_SUCCESS) {
-        printf("Failed to create window surface!");
-        fflush(stdout);
-        throw std::runtime_error("Failed to create window surface!");
-    }
 }

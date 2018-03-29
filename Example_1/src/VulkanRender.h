@@ -1,6 +1,8 @@
 #ifndef VULKAN_RENDER_H
 #define VULKAN_RENDER_H
 
+#include <vector>
+
 // GLFW include
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -16,6 +18,7 @@
 #include "VulkanImage.h"
 #include "VulkanImageView.h"
 #include "VulkanRenderPass.h"
+#include "VulkanFrameBuffer.h"
 
 
 
@@ -45,12 +48,15 @@ public:
     VulkanImagePtr vulkanWindowDepthImage;
     VulkanImageViewPtr vulkanWindowDepthImageView;
     VulkanRenderPassPtr vulkanRenderPass;
+    std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
     
 private:
     // Создаем буфферы для глубины
     void createDepthResources();
     // Создание рендер прохода
     void createMainRenderPass();
+    // Создаем фреймбуфферы для вьюшек изображений окна
+    void createWindowFrameBuffers();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

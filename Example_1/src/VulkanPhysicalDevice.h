@@ -34,8 +34,6 @@ private:
     VulkanSwapChainSupportDetails _swapchainSuppportDetails;
     
 private:
-    // Дергаем видеокарту
-    void pickPhysicalDevice();
     // Проверяем, поддерживает ли девайс цепочку свопинга
     bool checkDeviceRequiredExtensionSupport(VkPhysicalDevice device);
     // Оценка производительности и пригодности конкретной GPU

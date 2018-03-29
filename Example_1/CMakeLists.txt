@@ -226,6 +226,8 @@ set(ALL_SOURCES
     src/CommonConstants.h
     src/VulkanRenderPass.h
     src/VulkanRenderPass.cpp
+    src/VulkanFrameBuffer.h
+    src/VulkanFrameBuffer.cpp
     src/Vertex.h
     src/Vertex.cpp
     src/Figures.h

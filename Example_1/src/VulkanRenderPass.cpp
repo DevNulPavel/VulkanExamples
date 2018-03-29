@@ -16,8 +16,8 @@ VulkanRenderPassConfig::VulkanRenderPassConfig():
 
 
 VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
-                                   VulkanRenderPassConfig imageConfig,
-                                   VulkanRenderPassConfig depthConfig):
+                                   const VulkanRenderPassConfig& imageConfig,
+                                   const VulkanRenderPassConfig& depthConfig):
     _device(device),
     _imageConfig(imageConfig),
     _depthConfig(depthConfig){
@@ -96,7 +96,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
 }
 
 VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
-                                   VulkanRenderPassConfig imageConfig):
+                                   const VulkanRenderPassConfig& imageConfig):
     _device(device),
     _imageConfig(imageConfig){
     
@@ -158,5 +158,9 @@ VulkanRenderPassConfig VulkanRenderPass::getBaseImageConfig() const{
 
 VulkanRenderPassConfig VulkanRenderPass::getBaseDepthConfig() const{
     return _depthConfig;
+}
+
+VkRenderPass VulkanRenderPass::getPass() const{
+    return _renderPass;
 }
 

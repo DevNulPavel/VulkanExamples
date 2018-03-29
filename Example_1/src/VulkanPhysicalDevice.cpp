@@ -12,11 +12,68 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, std::vect
     _vulkanSurface(surface),
     _device(VK_NULL_HANDLE){
         
-    pickPhysicalDevice();
+    // Получаем количество GPU
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(_vulkanInstance->getInstance(), &deviceCount, nullptr);
+    
+    // Есть ли вообще карты?
+    if (deviceCount == 0) {
+        printf("Failed to find GPUs with Vulkan support!");
+        fflush(stdout);
+        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+    }
+    
+    // Получаем список устройств
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(_vulkanInstance->getInstance(), &deviceCount, devices.data());
+    
+    // Используем Map для автоматической сортировки по производительности
+    std::map<int, std::tuple<VkPhysicalDevice, VulkanQueuesFamiliesIndexes, VulkanSwapChainSupportDetails>> candidates;
+    
+    // Перебираем GPU для поиска подходящего устройства
+    for (const VkPhysicalDevice& device: devices) {
+        // Смотрим - есть ли у данного устройства поддержка свопа кадров в виде расширения?
+        bool swapchainExtentionSupported = checkDeviceRequiredExtensionSupport(device);
+        if(swapchainExtentionSupported == false){
+            continue;
+        }
+        
+        // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
+        VulkanSwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        if (swapChainValid == false) {
+            continue;
+        }
+        
+        // Получаем индекс группы очередй отрисовки
+        VulkanQueuesFamiliesIndexes familiesFound = findQueueFamiliesIndexInDevice(device);
+        if (familiesFound.isComplete()) {
+            // Оцениваем возможности устройства
+            int score = rateDeviceScore(device);
+            candidates[score] = std::tuple<VkPhysicalDevice, VulkanQueuesFamiliesIndexes, VulkanSwapChainSupportDetails>(device, familiesFound, swapChainSupport);
+        }
+    }
+    
+    // Есть ли вообще карты?
+    if (candidates.size() == 0) {
+        printf("No picked GPU physical devices!");
+        fflush(stdout);
+        throw std::runtime_error("No picked GPU physical devices!");
+    }
+    
+    // Получаем наилучший вариант GPU
+    if (candidates.begin()->first > 0) {
+        _device = std::get<0>(candidates.begin()->second);
+        _queuesFamiliesIndexes = std::get<1>(candidates.begin()->second);
+        _swapchainSuppportDetails = std::get<2>(candidates.begin()->second);
+    } else {
+        printf("Failed to find a suitable GPU!");
+        fflush(stdout);
+        throw std::runtime_error("Failed to find a suitable GPU!");
+    }
 }
 
 VulkanPhysicalDevice::~VulkanPhysicalDevice(){
-    
 }
 
 VkPhysicalDevice VulkanPhysicalDevice::getDevice() const{
@@ -168,65 +225,3 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
     return result;
 }
 
-// Дергаем видеокарту
-void VulkanPhysicalDevice::pickPhysicalDevice() {
-    // Получаем количество GPU
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(_vulkanInstance->getInstance(), &deviceCount, nullptr);
-    
-    // Есть ли вообще карты?
-    if (deviceCount == 0) {
-        printf("Failed to find GPUs with Vulkan support!");
-        fflush(stdout);
-        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
-    }
-    
-    // Получаем список устройств
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(_vulkanInstance->getInstance(), &deviceCount, devices.data());
-    
-    // Используем Map для автоматической сортировки по производительности
-    std::map<int, std::tuple<VkPhysicalDevice, VulkanQueuesFamiliesIndexes, VulkanSwapChainSupportDetails>> candidates;
-    
-    // Перебираем GPU для поиска подходящего устройства
-    for (const VkPhysicalDevice& device: devices) {
-        // Смотрим - есть ли у данного устройства поддержка свопа кадров в виде расширения?
-        bool swapchainExtentionSupported = checkDeviceRequiredExtensionSupport(device);
-        if(swapchainExtentionSupported == false){
-            continue;
-        }
-        
-        // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
-        VulkanSwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
-        bool swapChainValid = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-        if (swapChainValid == false) {
-            continue;
-        }
-        
-        // Получаем индекс группы очередй отрисовки
-        VulkanQueuesFamiliesIndexes familiesFound = findQueueFamiliesIndexInDevice(device);
-        if (familiesFound.isComplete()) {
-            // Оцениваем возможности устройства
-            int score = rateDeviceScore(device);
-            candidates[score] = std::tuple<VkPhysicalDevice, VulkanQueuesFamiliesIndexes, VulkanSwapChainSupportDetails>(device, familiesFound, swapChainSupport);
-        }
-    }
-    
-    // Есть ли вообще карты?
-    if (candidates.size() == 0) {
-        printf("No picked GPU physical devices!");
-        fflush(stdout);
-        throw std::runtime_error("No picked GPU physical devices!");
-    }
-    
-    // Получаем наилучший вариант GPU
-    if (candidates.begin()->first > 0) {
-        _device = std::get<0>(candidates.begin()->second);
-        _queuesFamiliesIndexes = std::get<1>(candidates.begin()->second);
-        _swapchainSuppportDetails = std::get<2>(candidates.begin()->second);
-    } else {
-        printf("Failed to find a suitable GPU!");
-        fflush(stdout);
-        throw std::runtime_error("Failed to find a suitable GPU!");
-    }
-}

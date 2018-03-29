@@ -375,40 +375,6 @@ void createGraphicsPipeline() {
 }
 
 
-// Создаем фреймбуфферы для вьюшек изображений свопчейна
-void createFramebuffers(){
-    // Уничтожаем старые буфферы свопчейнов
-    if (vulkanSwapChainFramebuffers.size() > 0) {
-        for (const auto& buffer: vulkanSwapChainFramebuffers) {
-            vkDestroyFramebuffer(RenderI->vulkanLogicalDevice->getDevice(), buffer, nullptr);
-        }
-        vulkanSwapChainFramebuffers.clear();
-    }
-    
-    // Ресайзим массив с фреймбуфферами свопчейна
-    vulkanSwapChainFramebuffers.resize(RenderI->vulkanSwapchain->getImageViews().size());
-    
-    // Для каждой вьюшки картинки создаем  фреймбуффер
-    for (size_t i = 0; i < RenderI->vulkanSwapchain->getImageViews().size(); i++) {
-        // Список аттачментов
-        std::array<VkImageView, 2> attachments = { {RenderI->vulkanSwapchain->getImageViews()[i]->getImageView(), vulkanDepthImageView} };
-        
-        // Информация для создания фрейб-буфферов
-        VkFramebufferCreateInfo framebufferInfo = {};
-        memset(&framebufferInfo, 0, sizeof(VkFramebufferCreateInfo));
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = vulkanRenderPass;  // Совместимый рендер-проход
-        framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
-        framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
-        framebufferInfo.width = RenderI->vulkanSwapchain->getSwapChainExtent().width;    // Размеры экрана
-        framebufferInfo.height = RenderI->vulkanSwapchain->getSwapChainExtent().height;  // Размеры экрана
-        framebufferInfo.layers = 1; // TODO: ???
-        
-        if (vkCreateFramebuffer(RenderI->vulkanLogicalDevice->getDevice(), &framebufferInfo, nullptr, &(vulkanSwapChainFramebuffers[i])) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create framebuffer!");
-        }
-    }
-}
 
 // Создаем пулл комманд
 void createCommandPool() {

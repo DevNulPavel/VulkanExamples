@@ -23,11 +23,12 @@ struct VulkanRenderPassConfig{
 struct VulkanRenderPass {
 public:
     VulkanRenderPass(VulkanLogicalDevicePtr device,
-                     VulkanRenderPassConfig imageConfig,
-                     VulkanRenderPassConfig depthConfig);
+                     const VulkanRenderPassConfig& imageConfig,
+                     const VulkanRenderPassConfig& depthConfig);
     VulkanRenderPass(VulkanLogicalDevicePtr device,
-                     VulkanRenderPassConfig imageConfig);
+                     const VulkanRenderPassConfig& imageConfig);
     ~VulkanRenderPass();
+    VkRenderPass getPass() const;
     VulkanRenderPassConfig getBaseImageConfig() const;
     VulkanRenderPassConfig getBaseDepthConfig() const;
     
@@ -38,8 +39,6 @@ private:
     VkRenderPass _renderPass;
     
 private:
-    // Создание рендер-прохода
-    void createRenderPass();
 };
 
 typedef std::shared_ptr<VulkanRenderPass> VulkanRenderPassPtr;

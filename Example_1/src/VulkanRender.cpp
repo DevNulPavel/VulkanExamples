@@ -54,6 +54,9 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем рендер проход
     createMainRenderPass();
+    
+    // Создаем фреймбуфферы для вьюшек изображений окна
+    createWindowFrameBuffers();
 }
 
 // Создаем буфферы для глубины
@@ -99,6 +102,25 @@ void VulkanRender::createMainRenderPass(){
     depthConfig.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthConfig.refLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     vulkanRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig, depthConfig);
+}
+
+// Создаем фреймбуфферы для вьюшек изображений окна
+void VulkanRender::createWindowFrameBuffers(){
+    std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
+    vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
+    
+    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
+    uint32_t heigth = vulkanSwapchain->getSwapChainExtent().height;
+    for (const VulkanImageViewPtr& view: windowImagesViews) {
+        // Вьюшка текстуры отображения + глубины
+        std::vector<VulkanImageViewPtr> views;
+        views.push_back(view);
+        views.push_back(vulkanWindowDepthImageView);
+        
+        // Создаем фреймбуффер
+        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderPass, views, width, heigth);
+        vulkanWindowFrameBuffers.push_back(frameBuffer);
+    }
 }
 
 VulkanRender::~VulkanRender(){
