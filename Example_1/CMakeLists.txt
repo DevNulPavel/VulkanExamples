@@ -230,6 +230,12 @@ set(ALL_SOURCES
     src/VulkanFrameBuffer.cpp
     src/VulkanDescriptorSetLayout.h
     src/VulkanDescriptorSetLayout.cpp
+    src/VulkanShaderModule.h
+    src/VulkanShaderModule.cpp
+    src/VulkanPipeline.h
+    src/VulkanPipeline.cpp
+    src/Helpers.h
+    src/Helpers.cpp
     src/Vertex.h
     src/Vertex.cpp
     src/Figures.h

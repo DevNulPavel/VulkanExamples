@@ -49,3 +49,15 @@ VulkanDescriptorSetLayout::~VulkanDescriptorSetLayout(){
     vkDestroyDescriptorSetLayout(_device->getDevice(), _layout, nullptr);
 }
 
+VkDescriptorSetLayout VulkanDescriptorSetLayout::getLayout() const{
+    return _layout;
+}
+
+VulkanLogicalDevicePtr VulkanDescriptorSetLayout::getBaseDevice() const{
+    return _device;
+}
+
+std::vector<VulkanDescriptorSetConfig> VulkanDescriptorSetLayout::getConfig() const{
+    return _config;
+}
+

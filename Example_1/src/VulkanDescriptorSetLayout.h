@@ -24,6 +24,9 @@ struct VulkanDescriptorSetLayout {
 public:
     VulkanDescriptorSetLayout(VulkanLogicalDevicePtr device, const std::vector<VulkanDescriptorSetConfig>& configs);
     ~VulkanDescriptorSetLayout();
+    VkDescriptorSetLayout getLayout() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
+    std::vector<VulkanDescriptorSetConfig> getConfig() const;
 
 private:
     VulkanLogicalDevicePtr _device;

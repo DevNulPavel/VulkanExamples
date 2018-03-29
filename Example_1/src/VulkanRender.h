@@ -20,6 +20,7 @@
 #include "VulkanRenderPass.h"
 #include "VulkanFrameBuffer.h"
 #include "VulkanDescriptorSetLayout.h"
+#include "VulkanShaderModule.h"
 
 
 
@@ -51,6 +52,8 @@ public:
     VulkanRenderPassPtr vulkanRenderPass;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
     VulkanDescriptorSetLayoutPtr vulkanDescriptorSetLayout;
+    VulkanShaderModulePtr vulkanVertexModule;
+    VulkanShaderModulePtr vulkanFragmentModule;
     
 private:
     // Создаем буфферы для глубины
@@ -61,6 +64,8 @@ private:
     void createWindowFrameBuffers();
     // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
     void createDescriptorsSetLayout();
+    // Грузим шейдеры
+    void loadShaders();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

@@ -1,4 +1,6 @@
 #include "VulkanRender.h"
+#include "Helpers.h"
+
 
 static VulkanRender* renderInstance = nullptr;
 
@@ -60,6 +62,9 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
     createDescriptorsSetLayout();
+    
+    // Грузим шейдеры
+    loadShaders();
 }
 
 // Создаем буфферы для глубины
@@ -147,12 +152,26 @@ void VulkanRender::createDescriptorsSetLayout(){
     vulkanDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
 }
 
+// Грузим шейдеры
+void VulkanRender::loadShaders(){
+    // Читаем байт-код шейдеров
+    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/vert.spv");
+    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/frag.spv");
+    
+    // Создаем шейдерные модули
+    vulkanVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);
+    vulkanFragmentModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, fragShaderCode);
+}
+
 VulkanRender::~VulkanRender(){
     // Ждем завершения работы Vulkan
     vkQueueWaitIdle(vulkanRenderQueue->getQueue());
     vkQueueWaitIdle(vulkanPresentQueue->getQueue());
     vkDeviceWaitIdle(vulkanLogicalDevice->getDevice());
     
+    vulkanVertexModule = nullptr;
+    vulkanFragmentModule = nullptr;
+    vulkanDescriptorSetLayout = nullptr;
     vulkanRenderPass = nullptr;
     vulkanWindowDepthImageView = nullptr;
     vulkanWindowDepthImage = nullptr;

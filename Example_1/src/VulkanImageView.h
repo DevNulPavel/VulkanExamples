@@ -27,8 +27,6 @@ private:
     VkImageView _imageView;
     
 private:
-    // Создание вьюшек изображений
-    void createImageView();
 };
 
 typedef std::shared_ptr<VulkanImageView> VulkanImageViewPtr;

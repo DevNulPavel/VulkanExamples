@@ -10,32 +10,6 @@ VulkanImageView::VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr i
     _aspectFlags(aspectFlags),
     _imageView(VK_NULL_HANDLE){
     
-    createImageView();
-}
-
-
-VulkanImageView::~VulkanImageView(){
-    vkDestroyImageView(_device->getDevice(), _imageView, nullptr);
-}
-
-VkImageView VulkanImageView::getImageView() const{
-    return _imageView;
-}
-
-VulkanLogicalDevicePtr VulkanImageView::getBaseDevice() const{
-    return _device;
-}
-
-VulkanImagePtr VulkanImageView::getBaseImage() const{
-    return _image;
-}
-
-VkImageAspectFlags VulkanImageView::getBaseAspectFlags() const{
-    return _aspectFlags;
-}
-
-// Создание вью для изображения
-void VulkanImageView::createImageView() {
     // Описание вьюшки
     VkImageViewCreateInfo viewInfo = {};
     memset(&viewInfo, 0, sizeof(VkImageViewCreateInfo));
@@ -60,3 +34,25 @@ void VulkanImageView::createImageView() {
         throw std::runtime_error("Failed to create texture image view!");
     }
 }
+
+
+VulkanImageView::~VulkanImageView(){
+    vkDestroyImageView(_device->getDevice(), _imageView, nullptr);
+}
+
+VkImageView VulkanImageView::getImageView() const{
+    return _imageView;
+}
+
+VulkanLogicalDevicePtr VulkanImageView::getBaseDevice() const{
+    return _device;
+}
+
+VulkanImagePtr VulkanImageView::getBaseImage() const{
+    return _image;
+}
+
+VkImageAspectFlags VulkanImageView::getBaseAspectFlags() const{
+    return _aspectFlags;
+}
+
