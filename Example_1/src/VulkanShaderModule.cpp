@@ -4,7 +4,7 @@
 #include <stdexcept>
 
 
-VulkanShaderModule::VulkanShaderModule(VulkanLogicalDevicePtr device, const std::string& code):
+VulkanShaderModule::VulkanShaderModule(VulkanLogicalDevicePtr device, const std::vector<unsigned char>& code):
     _device(device){
         
     VkShaderModuleCreateInfo createInfo = {};

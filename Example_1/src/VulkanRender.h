@@ -21,6 +21,7 @@
 #include "VulkanFrameBuffer.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanShaderModule.h"
+#include "VulkanPipeline.h"
 
 
 
@@ -54,6 +55,7 @@ public:
     VulkanDescriptorSetLayoutPtr vulkanDescriptorSetLayout;
     VulkanShaderModulePtr vulkanVertexModule;
     VulkanShaderModulePtr vulkanFragmentModule;
+    VulkanPipelinePtr vulkanPipeline;
     
 private:
     // Создаем буфферы для глубины
@@ -66,6 +68,8 @@ private:
     void createDescriptorsSetLayout();
     // Грузим шейдеры
     void loadShaders();
+    // Создание пайплайна отрисовки
+    void createGraphicsPipeline();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

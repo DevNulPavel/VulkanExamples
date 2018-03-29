@@ -2,7 +2,7 @@
 #define VERTEX_H
 
 #include <cstring>
-#include <array>
+#include <vector>
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN
@@ -28,8 +28,10 @@ struct Vertex {
         return bindingDescription;
     }
     
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+        attributeDescriptions.resize(3);
+        
         // Позиция
         memset(&attributeDescriptions[0], 0, sizeof(VkVertexInputAttributeDescription));
         attributeDescriptions[0].binding = 0;
@@ -43,6 +45,7 @@ struct Vertex {
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[1].offset = offsetof(Vertex, color);
         // TexCoord
+        memset(&attributeDescriptions[2], 0, sizeof(VkVertexInputAttributeDescription));
         attributeDescriptions[2].binding = 0;
         attributeDescriptions[2].location = 2; // 2 в шейдере
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;

@@ -1,5 +1,6 @@
 #include "VulkanRender.h"
 #include "Helpers.h"
+#include "Vertex.h"
 
 
 static VulkanRender* renderInstance = nullptr;
@@ -65,6 +66,9 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Грузим шейдеры
     loadShaders();
+    
+    // Создание пайплайна отрисовки
+    createGraphicsPipeline();
 }
 
 // Создаем буфферы для глубины
@@ -163,15 +167,72 @@ void VulkanRender::loadShaders(){
     vulkanFragmentModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, fragShaderCode);
 }
 
+// Создание пайплайна отрисовки
+void VulkanRender::createGraphicsPipeline() {
+    // Описание вершин, шага по вершинам и описание данных
+    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex::getAttributeDescriptions();
+    
+    // Настраиваем вьюпорт
+    VkViewport viewport = {};
+    memset(&viewport, 0, sizeof(VkViewport));
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(vulkanSwapchain->getSwapChainExtent().width);
+    viewport.height = static_cast<float>(vulkanSwapchain->getSwapChainExtent().height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    
+    // Выставляем сциссор
+    VkRect2D scissor = {};
+    memset(&scissor, 0, sizeof(VkRect2D));
+    scissor.offset = {0, 0};
+    scissor.extent = vulkanSwapchain->getSwapChainExtent();
+    
+    // Настройка глубины
+    VulkanPipelineDepthConfig depthConfig;
+    depthConfig.depthTestEnabled = VK_TRUE;
+    depthConfig.depthWriteEnabled = VK_TRUE;
+    depthConfig.depthFunc = VK_COMPARE_OP_LESS;
+    
+    // Настройки кулинга
+    VulkanPipelineCullingConfig cullingConfig;
+    cullingConfig.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    cullingConfig.cullMode = VK_CULL_MODE_BACK_BIT;
+    
+    // Блендинг
+    VulkanPipelineBlendConfig blendConfig;
+    blendConfig.enabled = VK_FALSE;
+    blendConfig.blendOp = VK_BLEND_OP_ADD;
+    blendConfig.srcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blendConfig.dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    
+    // Пайплайн
+    vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
+                                                      vulkanVertexModule, vulkanFragmentModule,
+                                                      depthConfig,
+                                                      bindingDescription,
+                                                      attributeDescriptions,
+                                                      VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                                                      viewport,
+                                                      scissor,
+                                                      cullingConfig,
+                                                      blendConfig,
+                                                      vulkanDescriptorSetLayout,
+                                                      vulkanRenderPass);
+}
+
 VulkanRender::~VulkanRender(){
     // Ждем завершения работы Vulkan
     vkQueueWaitIdle(vulkanRenderQueue->getQueue());
     vkQueueWaitIdle(vulkanPresentQueue->getQueue());
     vkDeviceWaitIdle(vulkanLogicalDevice->getDevice());
     
+    vulkanPipeline = nullptr;
     vulkanVertexModule = nullptr;
     vulkanFragmentModule = nullptr;
     vulkanDescriptorSetLayout = nullptr;
+    vulkanWindowFrameBuffers.clear();
     vulkanRenderPass = nullptr;
     vulkanWindowDepthImageView = nullptr;
     vulkanWindowDepthImage = nullptr;

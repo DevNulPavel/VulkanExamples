@@ -47,7 +47,7 @@ public:
                    VkPrimitiveTopology primitivesTypes,
                    VkViewport viewport,
                    VkRect2D scissor,
-                   VulkanPipelineCullingConfig culingConfig,
+                   VulkanPipelineCullingConfig cullingConfig,
                    VulkanPipelineBlendConfig blendConfig,
                    VulkanDescriptorSetLayoutPtr descriptorSetLayout,
                    VulkanRenderPassPtr renderPass);

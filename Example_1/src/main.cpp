@@ -57,8 +57,6 @@ GLFWwindow* window = nullptr;
 VkFence vulkanFence = VK_NULL_HANDLE;
 
 
-VkPipelineLayout vulkanPipelineLayout = VK_NULL_HANDLE;
-VkPipeline vulkanPipeline = VK_NULL_HANDLE;
 std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
 VkCommandPool vulkanCommandPool = VK_NULL_HANDLE;
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
@@ -106,37 +104,6 @@ void createFences(){
         throw std::runtime_error("Failed to create fence!");
     }
 }
-
-// Создание пайплайна отрисовки
-void createGraphicsPipeline() {
-    
-    
-
-    
-    // Описание вершин, шага по вершинам и описание данных
-    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-    std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = Vertex::getAttributeDescriptions();
-    
-    
-    
-    // Настраиваем вьюпорт
-    VkViewport viewport = {};
-    memset(&viewport, 0, sizeof(VkViewport));
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(RenderI->vulkanSwapchain->getSwapChainExtent().width);
-    viewport.height = static_cast<float>(RenderI->vulkanSwapchain->getSwapChainExtent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    
-    // Выставляем сциссор
-    VkRect2D scissor = {};
-    memset(&scissor, 0, sizeof(VkRect2D));
-    scissor.offset = {0, 0};
-    scissor.extent = RenderI->vulkanSwapchain->getSwapChainExtent();
-    
-}
-
 
 
 // Создаем пулл комманд
@@ -1042,7 +1009,7 @@ void recreateSwapChain() {
     //updateDepthTextureLayout();
     //createRenderPass();
     //createFramebuffers();
-    createGraphicsPipeline();
+    //createGraphicsPipeline();
     createCommandBuffers();
 }
 
@@ -1193,9 +1160,6 @@ int local_main(int argc, char** argv) {
     
     
     
-    // Создание пайплайна отрисовки
-    createGraphicsPipeline();
-    
     // Создаем пулл комманд
     createCommandPool();
     
@@ -1290,13 +1254,7 @@ int local_main(int argc, char** argv) {
     vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBufferMemory, nullptr);
     vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBuffer, nullptr);
     vkDestroyCommandPool(RenderI->vulkanLogicalDevice->getDevice(), vulkanCommandPool, nullptr);
-    for (const auto& buffer: vulkanSwapChainFramebuffers) {
-        vkDestroyFramebuffer(RenderI->vulkanLogicalDevice->getDevice(), buffer, nullptr);
-    }
-    vkDestroyPipeline(RenderI->vulkanLogicalDevice->getDevice(), vulkanPipeline, nullptr);
-    vkDestroyPipelineLayout(RenderI->vulkanLogicalDevice->getDevice(), vulkanPipelineLayout, nullptr);
-    vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexShader, nullptr);
-    vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanFragmentShader, nullptr);
+
     
     vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);
         

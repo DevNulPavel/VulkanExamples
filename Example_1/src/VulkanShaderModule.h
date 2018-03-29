@@ -14,7 +14,7 @@
 
 struct VulkanShaderModule {
 public:
-    VulkanShaderModule(VulkanLogicalDevicePtr device, const std::string& code);
+    VulkanShaderModule(VulkanLogicalDevicePtr device, const std::vector<unsigned char>& code);
     ~VulkanShaderModule();
     VkShaderModule getModule() const;
     
