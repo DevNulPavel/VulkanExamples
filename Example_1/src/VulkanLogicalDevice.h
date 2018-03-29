@@ -15,11 +15,9 @@ struct VulkanQueue;
 
 struct VulkanLogicalDevice: public std::enable_shared_from_this<VulkanLogicalDevice> {
 public:
-    
-    
-public:
     VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice, VulkanQueuesFamiliesIndexes queuesFamiliesIndexes, std::vector<const char*> validationLayers, std::vector<const char*> extensions);
     ~VulkanLogicalDevice();
+    void wait();
     VulkanPhysicalDevicePtr getBasePhysicalDevice() const;
     VulkanQueuesFamiliesIndexes getBaseQueuesFamiliesIndexes() const;
     std::vector<const char*> getBaseValidationLayers() const;

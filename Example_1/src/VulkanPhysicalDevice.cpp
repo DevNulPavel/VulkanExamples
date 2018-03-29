@@ -202,16 +202,16 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
         
         // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
         if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-            result.renderQueueFamilyIndex = i;
-            result.renderQueueFamilyQueuesCount = queueFamily.queueCount;
+            result.renderQueuesFamilyIndex = i;
+            result.renderQueuesFamilyQueuesCount = queueFamily.queueCount;
         }
         
         // Провеяем, может является ли данная очередь - очередью отображения
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _vulkanSurface->getSurface(), &presentSupport);
         if ((queueFamily.queueCount > 0) && presentSupport) {
-            result.presentQueueFamilyIndex = i;
-            result.presentQueueFamilyQueuesCount = queueFamily.queueCount;
+            result.presentQueuesFamilyIndex = i;
+            result.presentQueuesFamilyQueuesCount = queueFamily.queueCount;
         }
         
         // Нашли очереди

@@ -2,10 +2,10 @@
 #define VULKAN_FAMILIES_QUEUE_INDEXES_H
 
 struct VulkanQueuesFamiliesIndexes {
-    int renderQueueFamilyIndex;     // Индекс семейства очередей отрисовки
-    int renderQueueFamilyQueuesCount;// Количество очередей в семействе
-    int presentQueueFamilyIndex;    // Индекс семейства очередей отображения
-    int presentQueueFamilyQueuesCount;// Количество очередей в семействе
+    int renderQueuesFamilyIndex;     // Индекс семейства очередей отрисовки
+    int renderQueuesFamilyQueuesCount;// Количество очередей в семействе
+    int presentQueuesFamilyIndex;    // Индекс семейства очередей отображения
+    int presentQueuesFamilyQueuesCount;// Количество очередей в семействе
     
     VulkanQueuesFamiliesIndexes();
     bool isComplete() const; 

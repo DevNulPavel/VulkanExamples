@@ -22,6 +22,8 @@
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanShaderModule.h"
 #include "VulkanPipeline.h"
+#include "VulkanCommandPool.h"
+#include "VulkanCommandBuffer.h"
 
 
 
@@ -56,6 +58,7 @@ public:
     VulkanShaderModulePtr vulkanVertexModule;
     VulkanShaderModulePtr vulkanFragmentModule;
     VulkanPipelinePtr vulkanPipeline;
+    VulkanCommandPoolPtr vulkanRenderCommandPool;
     
 private:
     // Создаем буфферы для глубины
@@ -70,6 +73,23 @@ private:
     void loadShaders();
     // Создание пайплайна отрисовки
     void createGraphicsPipeline();
+    // Запуск коммандного буффера на получение комманд
+    VulkanCommandBufferPtr beginSingleTimeCommands();
+    // Завершение коммандного буффера + отправка в очередь
+    void endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer);
+    // Обновляем лаяут текстуры глубины на правильный
+    void updateDepthTextureLayout();
+    // Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
+    void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
+                               VulkanImagePtr image,
+                               VkImageLayout oldLayout,
+                               VkImageLayout newLayout,
+                               uint32_t mipmapLevel,
+                               VkImageAspectFlags aspectFlags,
+                               VkPipelineStageFlagBits srcStage,
+                               VkPipelineStageFlagBits dstStage,
+                               VkAccessFlags srcAccessBarrier,
+                               VkAccessFlags dstAccessBarrier);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

@@ -10,13 +10,14 @@
 #include "VulkanQueuesFamiliesIndexes.h"
 #include "VulkanSwapChainSupportDetails.h"
 #include "VulkanLogicalDevice.h"
-
-
+#include "VulkanCommandBuffer.h"
 
 struct VulkanQueue {
     friend VulkanLogicalDevice;
 public:
     ~VulkanQueue();
+    void submitBuffer(VulkanCommandBufferPtr buffer);
+    void wait();
     VkQueue getQueue() const;
     VulkanLogicalDevicePtr getBaseDevice() const;
     uint32_t getFamilyIndex() const;

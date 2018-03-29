@@ -30,9 +30,14 @@ public:
     ~VulkanImage();
     VkImage getImage() const;
     VkDeviceMemory getImageMemory() const;
+    VulkanLogicalDevicePtr getBaseDevice() const;
     VkFormat getFormat() const;
     VkExtent2D getSize() const;
-    VulkanLogicalDevicePtr getBaseDevice() const;
+    VkImageTiling getBaseTiling() const;
+    VkImageLayout getBaseLayout() const;
+    VkImageUsageFlags getBaseUsage() const;
+    VkMemoryPropertyFlags getBaseProperties() const;
+    uint32_t getBaseMipmapsCount() const;
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;
@@ -40,6 +45,11 @@ private:
     VkDeviceMemory _imageMemory;
     VkFormat _format;
     VkExtent2D _size;
+    VkImageTiling _tiling;
+    VkImageLayout _layout;
+    VkImageUsageFlags _usage;
+    VkMemoryPropertyFlags _properties;
+    uint32_t _mipmapsCount;
     bool _needDestroy;
     
 private:

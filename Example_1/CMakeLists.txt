@@ -234,6 +234,10 @@ set(ALL_SOURCES
     src/VulkanShaderModule.cpp
     src/VulkanPipeline.h
     src/VulkanPipeline.cpp
+    src/VulkanCommandPool.h
+    src/VulkanCommandPool.cpp
+    src/VulkanCommandBuffer.h
+    src/VulkanCommandBuffer.cpp
     src/Helpers.h
     src/Helpers.cpp
     src/Vertex.h

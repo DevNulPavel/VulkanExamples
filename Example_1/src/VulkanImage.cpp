@@ -18,6 +18,11 @@ VulkanImage::VulkanImage(VkImage image, VkFormat format, VkExtent2D size):
     _imageMemory(VK_NULL_HANDLE),
     _format(format),
     _size(size),
+    _tiling(VK_IMAGE_TILING_OPTIMAL),
+    _layout(VK_IMAGE_LAYOUT_UNDEFINED),
+    _usage(0),
+    _properties(0),
+    _mipmapsCount(1),
     _needDestroy(false){
     // Удаляется извне
 }
@@ -28,6 +33,11 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr device, VkImage image, VkFormat 
     _imageMemory(VK_NULL_HANDLE),
     _format(format),
     _size(size),
+    _tiling(VK_IMAGE_TILING_OPTIMAL),
+    _layout(VK_IMAGE_LAYOUT_UNDEFINED),
+    _usage(0),
+    _properties(0),
+    _mipmapsCount(1),
     _needDestroy(needDestroy){
 }
 
@@ -44,6 +54,11 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
     _imageMemory(VK_NULL_HANDLE),
     _format(format),
     _size({width, height}),
+    _tiling(tiling),
+    _layout(layout),
+    _usage(usage),
+    _properties(properties),
+    _mipmapsCount(mipmapsCount),
     _needDestroy(true){
         
     createImage(width, height,
@@ -84,6 +99,26 @@ VkExtent2D VulkanImage::getSize() const{
 
 VulkanLogicalDevicePtr VulkanImage::getBaseDevice() const{
     return _logicalDevice;
+}
+
+VkImageTiling VulkanImage::getBaseTiling() const{
+    return _tiling;
+}
+
+VkImageLayout VulkanImage::getBaseLayout() const{
+    return _layout;
+}
+
+VkImageUsageFlags VulkanImage::getBaseUsage() const{
+    return _usage;
+}
+
+VkMemoryPropertyFlags VulkanImage::getBaseProperties() const{
+    return _properties;
+}
+
+uint32_t VulkanImage::getBaseMipmapsCount() const{
+    return _mipmapsCount;
 }
 
 // Создаем изображение

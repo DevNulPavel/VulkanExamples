@@ -2,12 +2,12 @@
 
 
 VulkanQueuesFamiliesIndexes::VulkanQueuesFamiliesIndexes(){
-    renderQueueFamilyIndex = -1;
-    renderQueueFamilyQueuesCount = 0;
-    presentQueueFamilyIndex = -1;
-    presentQueueFamilyQueuesCount = 0;
+    renderQueuesFamilyIndex = -1;
+    renderQueuesFamilyQueuesCount = 0;
+    presentQueuesFamilyIndex = -1;
+    presentQueuesFamilyQueuesCount = 0;
 }
 
 bool VulkanQueuesFamiliesIndexes::isComplete() const{
-    return (renderQueueFamilyIndex >= 0) && (presentQueueFamilyIndex >= 0);
+    return (renderQueuesFamilyIndex >= 0) && (presentQueuesFamilyIndex >= 0);
 }

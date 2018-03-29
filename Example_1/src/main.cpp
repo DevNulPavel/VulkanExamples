@@ -105,149 +105,11 @@ void createFences(){
     }
 }
 
-
-// Создаем пулл комманд
-void createCommandPool() {
-    int vulkanRenderQueueFamilyIndex = RenderI->vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueueFamilyIndex;
-    //int vulkanPresentQueueFamilyIndex = RenderI->vulkanQueuesFamiliesIndexes.presentQueueFamilyIndex;
-    
-    // Информация о пуле коммандных буфферов
-    VkCommandPoolCreateInfo poolInfo = {};
-    memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = vulkanRenderQueueFamilyIndex;   // Пулл будет для семейства очередей рендеринга
-    poolInfo.flags = 0; // Optional
-    
-    if (vkCreateCommandPool(RenderI->vulkanLogicalDevice->getDevice(), &poolInfo, nullptr, &vulkanCommandPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create command pool!");
-    }
-}
-
-// Запуск коммандного буффера на получение комманд
-VkCommandBuffer beginSingleTimeCommands() {
-    // Параметр level определяет, будет ли выделенный буфер команд первичным или вторичным буфером команд:
-    // VK_COMMAND_BUFFER_LEVEL_PRIMARY: Может быть передан очереди для исполнения, но не может быть вызван из других буферов команд.
-    // VK_COMMAND_BUFFER_LEVEL_SECONDARY: не может быть передан непосредственно, но может быть вызван из первичных буферов команд.
-    VkCommandBufferAllocateInfo allocInfo = {};
-    memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // Первичный буффер, которыый будет исполняться сразу
-    allocInfo.commandPool = vulkanCommandPool;      // Пул комманд
-    allocInfo.commandBufferCount = 1;
-    
-    // Аллоцируем коммандный буффер для задач, который будут закидываться в очередь
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(RenderI->vulkanLogicalDevice->getDevice(), &allocInfo, &commandBuffer);
-    
-    // Параметр flags определяет, как использовать буфер команд. Возможны следующие значения:
-    // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: Буфер команд будет перезаписан сразу после первого выполнения.
-    // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
-    // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
-    
-    // Настройки запуска коммандного буффера
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    
-    // Запускаем буффер комманд
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    
-    return commandBuffer;
-}
-
-// Завершение коммандного буффера
-void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-    // Заканчиваем прием комманд
-    vkEndCommandBuffer(commandBuffer);
-    
-    // Структура с описанием отправки в буффер
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-    
-    // Отправляем задание на отрисовку в буффер отрисовки
-    vkQueueSubmit(RenderI->vulkanRenderQueue->getQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    
-    // TODO: Ожидание передачи комманды в очередь на GPU???
-    // Как альтернативу - можно использовать Fence
-    vkQueueWaitIdle(RenderI->vulkanRenderQueue->getQueue());
-    /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
-    vkQueueWaitIdle(vulkanGraphicsQueue);
-    std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
-    int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-    printf("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmicroSec\n", elapsedMicroSec);
-    fflush(stdout);*/
-    
-    // Удаляем коммандный буффер
-    vkFreeCommandBuffers(RenderI->vulkanLogicalDevice->getDevice(), vulkanCommandPool, 1, &commandBuffer);
-}
-
 // Есть ли поддержка трафарета в формате
 bool hasStencilComponent(VkFormat format) {
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-// Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
-void transitionImageLayout(VkCommandBuffer commandBuffer,
-                           VkImage image,
-                           VkFormat format,
-                           VkImageLayout oldLayout,
-                           VkImageLayout newLayout,
-                           VkImageSubresourceRange* mipSubRange,
-                           VkPipelineStageFlagBits srcStage,
-                           VkPipelineStageFlagBits dstStage,
-                           VkAccessFlags srcAccessBarrier,
-                           VkAccessFlags dstAccessBarrier) {
-    // Создаем коммандный буффер
-    //VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-    
-    // Создаем барьер памяти для картинок
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;  // Старый лаяут (способ использования)
-    barrier.newLayout = newLayout;  // Новый лаяут (способ использования)
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.image = image;  // Изображение, которое меняется
-    
-    if (mipSubRange != VK_NULL_HANDLE) {
-        barrier.subresourceRange = *mipSubRange;
-    }else{
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;    // Изображение использовалось для цвета
-        barrier.subresourceRange.baseMipLevel = 0;  // 0 левел мипмапов
-        barrier.subresourceRange.levelCount = 1;    // 1 уровень мипмапов
-        barrier.subresourceRange.baseArrayLayer = 0;    // Базовый уровень
-        barrier.subresourceRange.layerCount = 1;        // 1 уровень
-    }
-    
-    // Настраиваем условия ожиданий для конвертации
-    barrier.srcAccessMask = srcAccessBarrier;
-    barrier.dstAccessMask = dstAccessBarrier;
-    
-    // TODO: ???
-    if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        
-        if (hasStencilComponent(format)) {
-            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
-    } else {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-    
-    // Закидываем в очередь барьер конвертации использования для изображения
-    vkCmdPipelineBarrier(commandBuffer,
-                         srcStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         dstStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         0,
-                         0, nullptr,
-                         0, nullptr,
-                         1, &barrier);
-    
-    //endSingleTimeCommands(commandBuffer);
-}
 
 // Закидываем в очередь операцию копирования текстуры
 void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height) {
@@ -284,22 +146,6 @@ void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t heig
     endSingleTimeCommands(commandBuffer);
 }
 
-// Обновляем лаяут текстуры глубины на правильный
-void updateDepthTextureLayout(){
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-    // Конвертируем в формат, пригодный для глубины
-    transitionImageLayout(commandBuffer,
-                          vulkanDepthImage,
-                          vulkanDepthFormat,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          nullptr,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          0,
-                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    endSingleTimeCommands(commandBuffer);
-}
 
 void generateMipmapsForImage(VkImage image, uint32_t miplevels, int32_t width, int32_t height){
     // Generate the mip chain
@@ -1157,12 +1003,8 @@ int local_main(int argc, char** argv) {
     
     // Создаем преграды для проверки завершения комманд отрисовки
     createFences();
-    
-    
-    
-    // Создаем пулл комманд
-    createCommandPool();
-    
+
+
     // Обновляем лаяут текстуры глубины на правильный
     updateDepthTextureLayout();
     

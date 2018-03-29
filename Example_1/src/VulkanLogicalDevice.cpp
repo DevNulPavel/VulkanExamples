@@ -22,7 +22,7 @@ VulkanLogicalDevice::VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice,
 
 VulkanLogicalDevice::~VulkanLogicalDevice(){
     // Wait
-    vkDeviceWaitIdle(_device);
+    wait();
     
     vkDestroyDevice(_device, nullptr);
 }
@@ -62,10 +62,10 @@ std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getPresentQueue(){
 void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
     if (_device == VK_NULL_HANDLE) {
         // Только уникальные индексы очередей
-        uint32_t vulkanRenderQueueFamilyIndex = _queuesFamiliesIndexes.renderQueueFamilyIndex;
-        uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueueFamilyQueuesCount;
-        uint32_t vulkanPresentQueueFamilyIndex = _queuesFamiliesIndexes.presentQueueFamilyIndex;
-        //uint32_t vulkanPresentQueueFamilyQueuesCount = _queuesFamiliesIndexes.presentQueueFamilyQueuesCount;
+        uint32_t vulkanRenderQueueFamilyIndex = _queuesFamiliesIndexes.renderQueuesFamilyIndex;
+        uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueuesFamilyQueuesCount;
+        uint32_t vulkanPresentQueueFamilyIndex = _queuesFamiliesIndexes.presentQueuesFamilyIndex;
+        //uint32_t vulkanPresentQueueFamilyQueuesCount = _queuesFamiliesIndexes.presentQueuesFamilyQueuesCount;
         
         std::set<uint32_t> uniqueQueueFamilies = {vulkanRenderQueueFamilyIndex, vulkanPresentQueueFamilyIndex};
         
@@ -137,4 +137,8 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         vkGetDeviceQueue(_device, vulkanPresentQueueFamilyIndex, queuesIndexes[1], &vulkanPresentQueue);
         _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[1], vulkanGraphicsQueue));
     }
+}
+
+void VulkanLogicalDevice::wait(){
+    vkDeviceWaitIdle(_device);
 }

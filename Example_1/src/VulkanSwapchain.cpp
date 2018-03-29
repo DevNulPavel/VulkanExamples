@@ -145,8 +145,8 @@ void VulkanSwapchain::createSwapChain() {
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;    // Картинки используются в качестве буффера цвета
     
     // Если у нас разные очереди для рендеринга и отображения -
-    int vulkanRenderQueueFamilyIndex = _queuesFamilies.renderQueueFamilyIndex;
-    int vulkanPresentQueueFamilyIndex = _queuesFamilies.presentQueueFamilyIndex;
+    int vulkanRenderQueueFamilyIndex = _queuesFamilies.renderQueuesFamilyIndex;
+    int vulkanPresentQueueFamilyIndex = _queuesFamilies.presentQueuesFamilyIndex;
     uint32_t queueFamilyIndices[] = {(uint32_t)vulkanRenderQueueFamilyIndex, (uint32_t)vulkanPresentQueueFamilyIndex};
     if (vulkanRenderQueueFamilyIndex != vulkanPresentQueueFamilyIndex) {
         // Изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
