@@ -60,8 +60,6 @@ VkFence vulkanFence = VK_NULL_HANDLE;
 
 VkShaderModule vulkanVertexShader = VK_NULL_HANDLE;
 VkShaderModule vulkanFragmentShader = VK_NULL_HANDLE;
-VkRenderPass vulkanRenderPass = VK_NULL_HANDLE;
-VkDescriptorSetLayout vulkanDescriptorSetLayout = VK_NULL_HANDLE;
 VkPipelineLayout vulkanPipelineLayout = VK_NULL_HANDLE;
 VkPipeline vulkanPipeline = VK_NULL_HANDLE;
 std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
@@ -137,38 +135,6 @@ void createFences(){
     }
 }
 
-// Создаем дескриптор для буффера юниформов
-void createDescriptorSetLayout() {
-    // Лаяут для юниформ буффера
-    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-    memset(&uboLayoutBinding, 0, sizeof(VkDescriptorSetLayoutBinding));
-    uboLayoutBinding.binding = 0;   // Юниформ буффер находится на 0 позиции
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;    // Тип - юниформ буффер
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Предназначен буффер толкьо для вершинного шейдера, можно подрубить другие
-    uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
-    
-    // Лаяут для семплера
-    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-    memset(&samplerLayoutBinding, 0, sizeof(VkDescriptorSetLayoutBinding));
-    samplerLayoutBinding.binding = 1;   // Находится на 1й позиции
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;    // Семплер для текстуры
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Предназначено для фрагментного шейдера
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    
-    // Биндинги
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{uboLayoutBinding, samplerLayoutBinding}};
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = bindings.size();
-    layoutInfo.pBindings = bindings.data();
-    
-    // Создаем лаяут для шейдера
-    if (vkCreateDescriptorSetLayout(RenderI->vulkanLogicalDevice->getDevice(), &layoutInfo, nullptr, &vulkanDescriptorSetLayout) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout!");
-    }
-}
 
 // Из байткода исходника создаем шейдерный модуль
 void createShaderModule(const std::vector<char>& code, VkShaderModule& shaderModule) {
@@ -1278,7 +1244,7 @@ void recreateSwapChain() {
     //createDepthResources();
     //updateDepthTextureLayout();
     //createRenderPass();
-    createFramebuffers();
+    //createFramebuffers();
     createGraphicsPipeline();
     createCommandBuffers();
 }
@@ -1430,12 +1396,6 @@ int local_main(int argc, char** argv) {
     
     
     
-    // Создаем фреймбуфферы
-    createFramebuffers();
-    
-    // Создаем дескриптор для буффера юниформов
-    createDescriptorSetLayout();
-    
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
     
@@ -1538,10 +1498,8 @@ int local_main(int argc, char** argv) {
     }
     vkDestroyPipeline(RenderI->vulkanLogicalDevice->getDevice(), vulkanPipeline, nullptr);
     vkDestroyPipelineLayout(RenderI->vulkanLogicalDevice->getDevice(), vulkanPipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(RenderI->vulkanLogicalDevice->getDevice(), vulkanDescriptorSetLayout, nullptr);
     vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexShader, nullptr);
     vkDestroyShaderModule(RenderI->vulkanLogicalDevice->getDevice(), vulkanFragmentShader, nullptr);
-    vkDestroyRenderPass(RenderI->vulkanLogicalDevice->getDevice(), vulkanRenderPass, nullptr);
     
     vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);
         

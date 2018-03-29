@@ -57,6 +57,9 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
+    
+    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+    createDescriptorsSetLayout();
 }
 
 // Создаем буфферы для глубины
@@ -121,6 +124,27 @@ void VulkanRender::createWindowFrameBuffers(){
         VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderPass, views, width, heigth);
         vulkanWindowFrameBuffers.push_back(frameBuffer);
     }
+}
+
+// Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+void VulkanRender::createDescriptorsSetLayout(){
+    VulkanDescriptorSetConfig uniformBuffer;
+    uniformBuffer.binding = 0; // Юниформ буффер биндим на 0 индекс
+    uniformBuffer.desriptorsCount = 1; // 1н дескриптор
+    uniformBuffer.desriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
+    uniformBuffer.descriptorStageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Используется в вершинном шейдере
+    
+    VulkanDescriptorSetConfig sampler;
+    sampler.binding = 1;         // Семплер будет на 1м индексе
+    sampler.desriptorsCount = 1; // 1н дескриптор
+    sampler.desriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; // Тип - семплер
+    sampler.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
+
+    std::vector<VulkanDescriptorSetConfig> configs;
+    configs.push_back(uniformBuffer);
+    configs.push_back(sampler);
+    
+    vulkanDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
 }
 
 VulkanRender::~VulkanRender(){

@@ -19,6 +19,7 @@
 #include "VulkanImageView.h"
 #include "VulkanRenderPass.h"
 #include "VulkanFrameBuffer.h"
+#include "VulkanDescriptorSetLayout.h"
 
 
 
@@ -49,6 +50,7 @@ public:
     VulkanImageViewPtr vulkanWindowDepthImageView;
     VulkanRenderPassPtr vulkanRenderPass;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
+    VulkanDescriptorSetLayoutPtr vulkanDescriptorSetLayout;
     
 private:
     // Создаем буфферы для глубины
@@ -57,6 +59,8 @@ private:
     void createMainRenderPass();
     // Создаем фреймбуфферы для вьюшек изображений окна
     void createWindowFrameBuffers();
+    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+    void createDescriptorsSetLayout();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

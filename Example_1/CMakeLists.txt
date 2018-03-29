@@ -228,6 +228,8 @@ set(ALL_SOURCES
     src/VulkanRenderPass.cpp
     src/VulkanFrameBuffer.h
     src/VulkanFrameBuffer.cpp
+    src/VulkanDescriptorSetLayout.h
+    src/VulkanDescriptorSetLayout.cpp
     src/Vertex.h
     src/Vertex.cpp
     src/Figures.h
