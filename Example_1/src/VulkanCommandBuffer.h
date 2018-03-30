@@ -16,6 +16,7 @@ public:
     VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool);
     ~VulkanCommandBuffer();
     void begin(VkCommandBufferUsageFlags usageFlags);
+    void begin(VkCommandBufferUsageFlags usageFlags, const VkCommandBufferInheritanceInfo& inheritance);
     void end();
     void reset(VkCommandBufferResetFlags flags);
     VkCommandBuffer getBuffer() const;

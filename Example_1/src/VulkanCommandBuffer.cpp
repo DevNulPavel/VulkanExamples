@@ -46,8 +46,26 @@ void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags) {
     
     // Настройки запуска коммандного буффера
     VkCommandBufferBeginInfo beginInfo = {};
+    memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = usageFlags; // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    
+    // Запускаем буффер комманд
+    vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+}
+
+void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags, const VkCommandBufferInheritanceInfo& inheritance){
+    // Параметр flags определяет, как использовать буфер команд. Возможны следующие значения:
+    // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: Буфер команд будет перезаписан сразу после первого выполнения.
+    // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
+    // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+    
+    // Настройки запуска коммандного буффера
+    VkCommandBufferBeginInfo beginInfo = {};
+    memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = usageFlags; // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    beginInfo.pInheritanceInfo = &inheritance;
     
     // Запускаем буффер комманд
     vkBeginCommandBuffer(_commandBuffer, &beginInfo);
