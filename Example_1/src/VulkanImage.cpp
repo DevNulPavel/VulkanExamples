@@ -178,3 +178,48 @@ void VulkanImage::createImage(uint32_t width, uint32_t height,
     // Цепляем к картинке буффер памяти
     vkBindImageMemory(_logicalDevice->getDevice(), _image, _imageMemory, 0);
 }
+
+// Получаем лаяут картинки
+VkSubresourceLayout VulkanImage::getSubresourceLayout(VkImageAspectFlags aspect, uint32_t mipLevel) const{
+    // Описание подресурса для изображения
+    VkImageSubresource subresource = {};
+    memset(&subresource, 0, sizeof(VkImageSubresource));
+    subresource.aspectMask = aspect;
+    subresource.mipLevel = mipLevel;
+    subresource.arrayLayer = 0;
+    
+    // Создание лаяута для подресурса
+    VkSubresourceLayout stagingImageLayout;
+    vkGetImageSubresourceLayout(_logicalDevice->getDevice(),
+                                _image,
+                                &subresource,
+                                &stagingImageLayout);
+    return stagingImageLayout;
+}
+
+// Загружаем данные в картинку
+void VulkanImage::uploadDataToImage(VkImageAspectFlags aspect, uint32_t mipLevel, unsigned char* imageSourceData, size_t dataSize){
+    // Создание лаяута для подресурса
+    VkSubresourceLayout stagingImageLayout = getSubresourceLayout(aspect, mipLevel);
+    
+    // Мапим данные текстуры в адресное пространство CPU
+    void* mappedData = nullptr;
+    vkMapMemory(_logicalDevice->getDevice(), _imageMemory, 0, static_cast<VkDeviceSize>(dataSize), 0, &mappedData);
+    
+    // Копируем целиком или построчно в зависимости от размера и выравнивания на GPU
+    if (stagingImageLayout.rowPitch == static_cast<VkDeviceSize>(_size.width * 4)) {
+        memcpy(mappedData, imageSourceData, dataSize);
+    } else {
+        uint8_t* dataBytes = reinterpret_cast<uint8_t*>(mappedData);
+        
+        for (size_t y = 0; y < static_cast<size_t>(_size.height); y++) {
+            memcpy(&dataBytes[y * stagingImageLayout.rowPitch],
+                   &imageSourceData[y * _size.width * 4],
+                   _size.width * 4);
+        }
+    }
+    
+    // Размапим данные
+    vkUnmapMemory(_logicalDevice->getDevice(), _imageMemory);
+}
+

@@ -30,6 +30,8 @@ public:
     ~VulkanImage();
     VkImage getImage() const;
     VkDeviceMemory getImageMemory() const;
+    VkSubresourceLayout getSubresourceLayout(VkImageAspectFlags aspect, uint32_t mipLevel) const; // Получаем лаяут картинки
+    void uploadDataToImage(VkImageAspectFlags aspect, uint32_t mipLevel, unsigned char* imageSourceData, size_t dataSize); // Загружаем данные в картинку
     VulkanLogicalDevicePtr getBaseDevice() const;
     VkFormat getFormat() const;
     VkExtent2D getSize() const;

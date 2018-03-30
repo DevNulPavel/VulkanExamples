@@ -2,6 +2,10 @@
 #include "Helpers.h"
 #include "Vertex.h"
 
+// TinyObj
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 
 static VulkanRender* renderInstance = nullptr;
 
@@ -75,6 +79,12 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Обновляем лаяут текстуры глубины на правильный
     updateDepthTextureLayout();
+    
+    // Грузим текстуру
+    modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "res/textures/chalet.jpg");
+    
+    // Вью для текстуры
+    modelTextureImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, modelTextureImage, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 // Создаем буфферы для глубины
@@ -228,27 +238,15 @@ void VulkanRender::createGraphicsPipeline() {
                                                       vulkanRenderPass);
 }
 
-// Запуск коммандного буффера на получение комманд
-VulkanCommandBufferPtr VulkanRender::beginSingleTimeCommands() {
-    VulkanCommandBufferPtr buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
-    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    return buffer;
-}
 
-// Завершение коммандного буффера + отправка в очередь
-void VulkanRender::endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer) {
-    commandBuffer->end();
-    vulkanRenderQueue->submitBuffer(commandBuffer);
-    vulkanRenderQueue->wait();
-}
 
 // Обновляем лаяут текстуры глубины на правильный
 void VulkanRender::updateDepthTextureLayout(){
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands();
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
     
     VkImageAspectFlags aspectMask;
     aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (hasStencilComponent(format)) {
+    if (hasStencilComponent(vulkanWindowDepthImage->getFormat())) {
         aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
     
@@ -257,56 +255,16 @@ void VulkanRender::updateDepthTextureLayout(){
                           vulkanWindowDepthImage,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          0,
+                          0, 1,
                           aspectMask,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                           0,
                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     
-    endAndQueueSingleTimeCommands(commandBuffer);
+    endAndQueueSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
-// Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
-void VulkanRender::transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
-                                         VulkanImagePtr image,
-                                         VkImageLayout oldLayout,
-                                         VkImageLayout newLayout,
-                                         uint32_t mipmapLevel,
-                                         VkImageAspectFlags aspectFlags,
-                                         VkPipelineStageFlagBits srcStage,
-                                         VkPipelineStageFlagBits dstStage,
-                                         VkAccessFlags srcAccessBarrier,
-                                         VkAccessFlags dstAccessBarrier) {
-    
-    VkImageSubresourceRange range;
-    range.baseArrayLayer = 0;
-    range.layerCount = 1;
-    range.levelCount = image->getBaseMipmapsCount();
-    range.baseMipLevel = mipmapLevel;
-    range.aspectMask = aspectFlags;
-    
-    // Создаем барьер памяти для картинок
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;  // Старый лаяут (способ использования)
-    barrier.newLayout = newLayout;  // Новый лаяут (способ использования)
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.image = image->getImage();  // Изображение, которое меняется
-    barrier.srcAccessMask = srcAccessBarrier;
-    barrier.dstAccessMask = dstAccessBarrier;
-    barrier.subresourceRange = range;
-    
-    // Закидываем в очередь барьер конвертации использования для изображения
-    vkCmdPipelineBarrier(commandBuffer->getBuffer(),
-                         srcStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         dstStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         0,
-                         0, nullptr,
-                         0, nullptr,
-                         1, &barrier);
-}
 
 
 VulkanRender::~VulkanRender(){

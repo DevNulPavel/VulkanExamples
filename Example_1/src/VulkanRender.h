@@ -60,6 +60,9 @@ public:
     VulkanPipelinePtr vulkanPipeline;
     VulkanCommandPoolPtr vulkanRenderCommandPool;
     
+    VulkanImagePtr modelTextureImage;
+    VulkanImageViewPtr modelTextureImageView;
+    
 private:
     // Создаем буфферы для глубины
     void createDepthResources();
@@ -73,23 +76,8 @@ private:
     void loadShaders();
     // Создание пайплайна отрисовки
     void createGraphicsPipeline();
-    // Запуск коммандного буффера на получение комманд
-    VulkanCommandBufferPtr beginSingleTimeCommands();
-    // Завершение коммандного буффера + отправка в очередь
-    void endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer);
     // Обновляем лаяут текстуры глубины на правильный
     void updateDepthTextureLayout();
-    // Перевод изображения из одного лаяута в другой (из одного способа использования в другой)
-    void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
-                               VulkanImagePtr image,
-                               VkImageLayout oldLayout,
-                               VkImageLayout newLayout,
-                               uint32_t mipmapLevel,
-                               VkImageAspectFlags aspectFlags,
-                               VkPipelineStageFlagBits srcStage,
-                               VkPipelineStageFlagBits dstStage,
-                               VkAccessFlags srcAccessBarrier,
-                               VkAccessFlags dstAccessBarrier);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
