@@ -57,8 +57,6 @@ GLFWwindow* window = nullptr;
 VkFence vulkanFence = VK_NULL_HANDLE;
 
 
-std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
-VkCommandPool vulkanCommandPool = VK_NULL_HANDLE;
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
 VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
@@ -70,13 +68,7 @@ VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
 VkDescriptorPool vulkanDescriptorPool = VK_NULL_HANDLE;
 VkDescriptorSet vulkanDescriptorSet = VK_NULL_HANDLE;
-VkImage vulkanTextureImage = VK_NULL_HANDLE;
-VkDeviceMemory vulkanTextureImageMemory = VK_NULL_HANDLE;
-VkImageView vulkanTextureImageView = VK_NULL_HANDLE;
-VkSampler vulkanTextureSampler = VK_NULL_HANDLE;
-VkImage vulkanDepthImage = VK_NULL_HANDLE;
-VkDeviceMemory vulkanDepthImageMemory = VK_NULL_HANDLE;
-VkImageView vulkanDepthImageView = VK_NULL_HANDLE;
+
 std::vector<Vertex> vulkanVertices;
 std::vector<uint32_t> vulkanIndices;
 size_t vulkanTotalVertexesCount = 0;
@@ -102,34 +94,6 @@ void createFences(){
         printf("Failed to create fence!");
         fflush(stdout);
         throw std::runtime_error("Failed to create fence!");
-    }
-}
-
-
-// Создание семплера для картинки
-void createTextureSampler() {
-    // Описание семплирования для текстуры
-    VkSamplerCreateInfo samplerInfo = {};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;   // Линейное
-    samplerInfo.minFilter = VK_FILTER_LINEAR;   // Линейное
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   // Ограничение по границе
-    samplerInfo.anisotropyEnable = VK_FALSE;    // Анизотропная фильтрация
-    samplerInfo.maxAnisotropy = 1;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-    
-    // Создаем семплер
-    if (vkCreateSampler(RenderI->vulkanLogicalDevice->getDevice(), &samplerInfo, nullptr, &vulkanTextureSampler) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create texture sampler!");
     }
 }
 
@@ -737,16 +701,6 @@ int local_main(int argc, char** argv) {
     
     // Создаем преграды для проверки завершения комманд отрисовки
     createFences();
-
-    
-    // Создание текстуры из изображения
-    createTextureImage();
-    
-    // Создание вью для текстуры
-    createTextureImageView();
-    
-    // Создаем семплер для картинки
-    createTextureSampler();
     
     // Грузим нашу модель
     loadModel();
@@ -809,14 +763,6 @@ int local_main(int argc, char** argv) {
     
     // Очищаем Vulkan
     // Удаляем старые объекты
-    vkFreeCommandBuffers(RenderI->vulkanLogicalDevice->getDevice(), vulkanCommandPool, vulkanCommandBuffers.size(), vulkanCommandBuffers.data());
-    vkDestroyImage(RenderI->vulkanLogicalDevice->getDevice(), vulkanDepthImage, nullptr);
-    vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanDepthImageMemory, nullptr);
-    vkDestroyImageView(RenderI->vulkanLogicalDevice->getDevice(), vulkanDepthImageView, nullptr);
-    vkDestroySampler(RenderI->vulkanLogicalDevice->getDevice(), vulkanTextureSampler, nullptr);
-    vkDestroyImageView(RenderI->vulkanLogicalDevice->getDevice(), vulkanTextureImageView, nullptr);
-    vkDestroyImage(RenderI->vulkanLogicalDevice->getDevice(), vulkanTextureImage, nullptr);
-    vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanTextureImageMemory, nullptr);
     vkDestroyDescriptorPool(RenderI->vulkanLogicalDevice->getDevice(), vulkanDescriptorPool, nullptr);
     vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanUniformStagingBuffer, nullptr);
     vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanUniformStagingBufferMemory, nullptr);
@@ -826,7 +772,6 @@ int local_main(int argc, char** argv) {
     vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanIndexBuffer, nullptr);
     vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBufferMemory, nullptr);
     vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBuffer, nullptr);
-    vkDestroyCommandPool(RenderI->vulkanLogicalDevice->getDevice(), vulkanCommandPool, nullptr);
 
     
     vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);

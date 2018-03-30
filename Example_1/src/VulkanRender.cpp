@@ -57,7 +57,7 @@ void VulkanRender::init(GLFWwindow* window){
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
     
     // Создаем текстуры для буффера глубины
-    createDepthResources();
+    createWindowDepthResources();
     
     // Создаем рендер проход
     createMainRenderPass();
@@ -78,17 +78,20 @@ void VulkanRender::init(GLFWwindow* window){
     vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
     
     // Обновляем лаяут текстуры глубины на правильный
-    updateDepthTextureLayout();
+    updateWindowDepthTextureLayout();
     
     // Грузим текстуру
     modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "res/textures/chalet.jpg");
     
     // Вью для текстуры
     modelTextureImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, modelTextureImage, VK_IMAGE_ASPECT_COLOR_BIT);
+    
+    // Создаем семплер для текстуры
+    modelTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 }
 
 // Создаем буфферы для глубины
-void VulkanRender::createDepthResources() {
+void VulkanRender::createWindowDepthResources() {
     // Определяем подходящий формат изображения для глубины
     std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
     VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(),
@@ -241,7 +244,7 @@ void VulkanRender::createGraphicsPipeline() {
 
 
 // Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updateDepthTextureLayout(){
+void VulkanRender::updateWindowDepthTextureLayout(){
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
     
     VkImageAspectFlags aspectMask;
@@ -272,7 +275,10 @@ VulkanRender::~VulkanRender(){
     vulkanRenderQueue->wait();
     vulkanPresentQueue->wait();
     vulkanLogicalDevice->wait();
-        
+    
+    modelTextureSampler = nullptr;
+    modelTextureImage = nullptr;
+    modelTextureImageView = nullptr;
     vulkanRenderCommandPool = nullptr;
     vulkanPipeline = nullptr;
     vulkanVertexModule = nullptr;

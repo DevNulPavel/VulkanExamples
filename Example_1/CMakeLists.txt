@@ -238,6 +238,8 @@ set(ALL_SOURCES
     src/VulkanCommandPool.cpp
     src/VulkanCommandBuffer.h
     src/VulkanCommandBuffer.cpp
+    src/VulkanSampler.h
+    src/VulkanSampler.cpp
     src/Helpers.h
     src/Helpers.cpp
     src/Vertex.h

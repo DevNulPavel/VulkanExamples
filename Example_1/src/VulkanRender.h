@@ -24,6 +24,7 @@
 #include "VulkanPipeline.h"
 #include "VulkanCommandPool.h"
 #include "VulkanCommandBuffer.h"
+#include "VulkanSampler.h"
 
 
 
@@ -62,10 +63,11 @@ public:
     
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;
+    VulkanSamplerPtr modelTextureSampler;
     
 private:
     // Создаем буфферы для глубины
-    void createDepthResources();
+    void createWindowDepthResources();
     // Создание рендер прохода
     void createMainRenderPass();
     // Создаем фреймбуфферы для вьюшек изображений окна
@@ -77,7 +79,7 @@ private:
     // Создание пайплайна отрисовки
     void createGraphicsPipeline();
     // Обновляем лаяут текстуры глубины на правильный
-    void updateDepthTextureLayout();
+    void updateWindowDepthTextureLayout();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
