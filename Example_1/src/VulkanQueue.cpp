@@ -21,6 +21,7 @@ void VulkanQueue::submitBuffer(VulkanCommandBufferPtr buffer){
     
     // Структура с описанием отправки в буффер
     VkSubmitInfo submitInfo = {};
+    memset(&submitInfo, 0, sizeof(VkSubmitInfo));
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;

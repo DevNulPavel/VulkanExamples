@@ -246,7 +246,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     staggingImage->uploadDataToImage(VK_IMAGE_ASPECT_COLOR_BIT, 0, static_cast<unsigned char*>(pixels), imageSize);
     
     // TODO: For test
-    {
+    /*{
         VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         transitionImageLayout(commandBuffer,
                               staggingImage,
@@ -263,7 +263,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
         stbi_image_free(pixels);
         
         return staggingImage;
-    }
+    }*/
     
     uint32_t mipmapLevels = floor(log2(std::max(texWidth, texHeight))) + 1;
     mipmapLevels = 1;
@@ -346,7 +346,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     
     // Учищаем буффер данных картинки
     // TODO: Наверное можно удалить раньше
-    stbi_image_free(pixels);
+    //stbi_image_free(pixels);
     
     return resultImage;
 }
