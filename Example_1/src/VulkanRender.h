@@ -41,9 +41,14 @@ public:
     static VulkanRender* getInstance();
     static void destroyRender();
 
+public:
+    // Обновляем юниформ буффер
+    void updateUniformBuffer(float delta);
+    // Непосредственно отрисовка кадра
+    void drawFrame();
+    
 private:
     VulkanRender();
-    void init(GLFWwindow* window);
     ~VulkanRender();
     
 public:
@@ -84,7 +89,11 @@ public:
     
     float rotateAngle;
     
+    uint32_t vulkanImageIndex;
+    
 private:
+    void init(GLFWwindow* window);
+    
     // Создаем буфферы для глубины
     void createWindowDepthResources();
     // Создание рендер прохода
@@ -112,9 +121,6 @@ private:
     void createModelDescriptorSet();
     // Создаем коммандные буфферы
     void createRenderModelCommandBuffers();
-    
-    // Обновляем юниформ буффер
-    void updateUniformBuffer(float delta);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

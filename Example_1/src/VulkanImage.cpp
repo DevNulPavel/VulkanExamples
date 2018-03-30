@@ -89,11 +89,11 @@ VkDeviceMemory VulkanImage::getImageMemory() const{
     return _imageMemory;
 }
 
-VkFormat VulkanImage::getFormat() const{
+VkFormat VulkanImage::getBaseFormat() const{
     return _format;
 }
 
-VkExtent2D VulkanImage::getSize() const{
+VkExtent2D VulkanImage::getBaseSize() const{
     return _size;
 }
 
@@ -119,6 +119,10 @@ VkMemoryPropertyFlags VulkanImage::getBaseProperties() const{
 
 uint32_t VulkanImage::getBaseMipmapsCount() const{
     return _mipmapsCount;
+}
+
+void VulkanImage::setNewLayout(VkImageLayout layout){
+    _layout = layout;
 }
 
 // Создаем изображение

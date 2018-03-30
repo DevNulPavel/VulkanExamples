@@ -16,7 +16,7 @@ VulkanImageView::VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr i
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = _image->getImage(); // Изображение
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 2D
-    viewInfo.format = _image->getFormat();   // Формат вьюшки
+    viewInfo.format = _image->getBaseFormat();   // Формат вьюшки
     viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдельным компонентам??
     viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдельным компонентам??
     viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдельным компонентам??

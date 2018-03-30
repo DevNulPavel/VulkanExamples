@@ -39,6 +39,7 @@ VulkanRender::VulkanRender(){
     modelTotalIndexesCount = 0;
     modelImageIndex = 0;
     rotateAngle = 0;
+    vulkanImageIndex = 0;
 }
 
 void VulkanRender::init(GLFWwindow* window){
@@ -103,6 +104,9 @@ void VulkanRender::init(GLFWwindow* window){
     // Грузим данные для модели
     loadModelSrcData();
     
+    // Создание буфферов вершин + индексов
+    createModelBuffers();
+    
     // Создаем буффер юниформов
     createModelUniformBuffer();
     
@@ -153,6 +157,7 @@ void VulkanRender::createMainRenderPass(){
     imageConfig.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     VulkanRenderPassConfig depthConfig;
+    depthConfig.format = vulkanWindowDepthImage->getBaseFormat();
     depthConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
     depthConfig.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Не важен результат
     depthConfig.initLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -275,7 +280,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
     
     VkImageAspectFlags aspectMask;
     aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (hasStencilComponent(vulkanWindowDepthImage->getFormat())) {
+    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
         aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
     
@@ -436,7 +441,7 @@ void VulkanRender::createRenderModelCommandBuffers() {
         
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
-        clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clearValues[0].color = {{0.5f, 0.5f, 0.5f, 1.0f}};
         clearValues[1].depthStencil = {1.0f, 0};
         
         VkRenderPassBeginInfo renderPassInfo = {};
@@ -551,7 +556,95 @@ void VulkanRender::updateUniformBuffer(float delta){
     modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
     
     // Закидываем задачу на копирование буффера
-    copyBuffer(vulkanRenderQueue, modelUniformStagingBuffer, modelUniformGPUBuffer);
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+    copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
+    endAndQueueSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+}
+
+// Непосредственно отрисовка кадра
+void VulkanRender::drawFrame() {
+    // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
+    uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
+    VkResult result = vkAcquireNextImageKHR(RenderI->vulkanLogicalDevice->getDevice(), RenderI->vulkanSwapchain->getSwapchain(),
+                                            std::numeric_limits<uint64_t>::max(),
+                                            RenderI->vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
+                                            VK_NULL_HANDLE,
+                                            &swapchainImageIndex);
+    
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        //recreateSwapChain();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
+    
+    // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
+    if (vulkanImageIndex != swapchainImageIndex) {
+        printf("Vulkan image index not equal to swapchain image index!\n");
+        fflush(stdout);
+    }
+    
+    VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
+    
+    // Настраиваем отправление в очередь комманд отрисовки
+    // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
+    VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore()}; // Семафор ожидания картинки для вывода туда графики
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем c помощью семафора возможности вывода в буфер цвета
+    VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore->getSemafore()}; // Семафор оповещения о завершении рендеринга
+    VkSubmitInfo submitInfo = {};
+    memset(&submitInfo, 0, sizeof(VkSubmitInfo));
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
+    submitInfo.pWaitDstStageMask = waitStages;      // Ждать будем возможности вывода в буфер цвета
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &drawBuffer; // Указываем коммандный буффер отрисовки
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+    
+    // Синхронизация с ожиданием на CPU завершения очереди выполнения комманд
+    /*
+     //VkResult fenceStatus = vkGetFenceStatus(vulkanLogicalDevice, vulkanFence);
+     //VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
+     VkResult waitStatus = vkWaitForFences(vulkanLogicalDevice, 1, &vulkanFence, VK_TRUE, std::numeric_limits<uint64_t>::max()-1);
+     if (waitStatus == VK_SUCCESS) {
+     VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
+     //printf("Fence waited + reset!\n");
+     //fflush(stdout);
+     }*/
+    
+    // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo,  VK_NULL_HANDLE/*vulkanFence*/) != VK_SUCCESS) {
+        printf("Failed to submit draw command buffer!\n");
+        fflush(stdout);
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+    
+    // Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
+    vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapchain->getImageViews().size();
+    
+    // Настраиваем задачу отображения полученного изображения
+    VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
+    VkPresentInfoKHR presentInfo = {};
+    memset(&presentInfo, 0, sizeof(VkPresentInfoKHR));
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores; // Ожидаем окончания подготовки кадра с помощью семафора
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &swapchainImageIndex;
+    
+    // Закидываем в очередь задачу отображения картинки
+    VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue->getQueue(), &presentInfo);
+    
+    // В случае проблем - пересоздаем свопчейн
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
+        //recreateSwapChain();
+        return;
+    } else if (presentResult != VK_SUCCESS) {
+        printf("failed to present swap chain image!\n");
+        throw std::runtime_error("failed to present swap chain image!");
+    }
 }
 
 VulkanRender::~VulkanRender(){

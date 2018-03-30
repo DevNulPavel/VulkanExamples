@@ -57,7 +57,8 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
     descriptorWrites.reserve(configs.size());
     
     for (const VulkanDescriptorSetUpdateConfig& config: configs) {
-        VkWriteDescriptorSet writeSet;
+        VkWriteDescriptorSet writeSet = {};
+        memset(&writeSet, 0, sizeof(VkWriteDescriptorSet));
         
         writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writeSet.dstSet = _set;   // Набор дескрипторов из пула
@@ -65,7 +66,7 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
         writeSet.dstArrayElement = 0;            // 0 элемент
         writeSet.descriptorType = config.type; // Тип - юниформ буффер
         writeSet.descriptorCount = 1;            // 1н дескриптор
-        if (config.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+        if (config.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
             writeSet.pImageInfo = &config.imageInfo;
         }else if(config.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER){
             writeSet.pBufferInfo = &config.bufferInfo;

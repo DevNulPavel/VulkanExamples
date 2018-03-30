@@ -23,6 +23,7 @@ VulkanSwapchain::VulkanSwapchain(VulkanSurfacePtr surface,
         
     createSwapChain();
     getSwapchainImages();
+    makeSwapchainImageViews();
 }
 
 VulkanSwapchain::~VulkanSwapchain(){

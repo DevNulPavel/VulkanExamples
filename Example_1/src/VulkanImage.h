@@ -33,13 +33,14 @@ public:
     VkSubresourceLayout getSubresourceLayout(VkImageAspectFlags aspect, uint32_t mipLevel) const; // Получаем лаяут картинки
     void uploadDataToImage(VkImageAspectFlags aspect, uint32_t mipLevel, unsigned char* imageSourceData, size_t dataSize); // Загружаем данные в картинку
     VulkanLogicalDevicePtr getBaseDevice() const;
-    VkFormat getFormat() const;
-    VkExtent2D getSize() const;
+    VkFormat getBaseFormat() const;
+    VkExtent2D getBaseSize() const;
     VkImageTiling getBaseTiling() const;
     VkImageLayout getBaseLayout() const;
     VkImageUsageFlags getBaseUsage() const;
     VkMemoryPropertyFlags getBaseProperties() const;
     uint32_t getBaseMipmapsCount() const;
+    void setNewLayout(VkImageLayout layout);
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;

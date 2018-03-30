@@ -92,6 +92,8 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
                          0, nullptr,
                          0, nullptr,
                          1, &barrier);
+    
+    image->setNewLayout(newLayout);
 }
 
 // Закидываем в очередь операцию копирования текстуры
@@ -113,8 +115,8 @@ void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, Vu
     region.dstSubresource = subResource;
     region.srcOffset = {0, 0, 0};
     region.dstOffset = {0, 0, 0};
-    region.extent.width = srcImage->getSize().width;
-    region.extent.height = srcImage->getSize().height;
+    region.extent.width = srcImage->getBaseSize().width;
+    region.extent.height = srcImage->getBaseSize().height;
     region.extent.depth = 1;
     
     // Создаем задачу на копирование данных
@@ -151,16 +153,16 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
         imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imageBlit.srcSubresource.layerCount = 1;
         imageBlit.srcSubresource.mipLevel = i-1;
-        imageBlit.srcOffsets[1].x = int32_t(image->getSize().width >> (i - 1));
-        imageBlit.srcOffsets[1].y = int32_t(image->getSize().height >> (i - 1));
+        imageBlit.srcOffsets[1].x = int32_t(image->getBaseSize().width >> (i - 1));
+        imageBlit.srcOffsets[1].y = int32_t(image->getBaseSize().height >> (i - 1));
         imageBlit.srcOffsets[1].z = 1;
         
         // Destination
         imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imageBlit.dstSubresource.layerCount = 1;
         imageBlit.dstSubresource.mipLevel = i;
-        imageBlit.dstOffsets[1].x = int32_t(image->getSize().width >> i);
-        imageBlit.dstOffsets[1].y = int32_t(image->getSize().height >> i);
+        imageBlit.dstOffsets[1].x = int32_t(image->getBaseSize().width >> i);
+        imageBlit.dstOffsets[1].y = int32_t(image->getBaseSize().height >> i);
         imageBlit.dstOffsets[1].z = 1;
         
         // Blit from previous level
