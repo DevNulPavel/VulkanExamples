@@ -39,7 +39,7 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
                            VkAccessFlags dstAccessBarrier);
 
 // Закидываем в очередь операцию копирования текстуры
-void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage);
+void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel);
 
 // Создаем мипмапы для картинок
 void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr image);

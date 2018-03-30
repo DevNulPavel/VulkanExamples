@@ -23,7 +23,7 @@ VulkanImageView::VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr i
     viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;  // Маска по отдельным компонентам??
     viewInfo.subresourceRange.aspectMask = _aspectFlags; // Использование вью текстуры
     viewInfo.subresourceRange.baseMipLevel = 0; // 0 мипмаплевел
-    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.levelCount = image->getBaseMipmapsCount();
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
     

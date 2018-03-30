@@ -97,16 +97,16 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
 }
 
 // Закидываем в очередь операцию копирования текстуры
-void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage) {
+void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel) {
     // TODO: Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
     
     // Описание ресурса
     VkImageSubresourceLayers subResource = {};
     memset(&subResource, 0, sizeof(VkImageSubresourceLayers));
-    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Текстура с цветом
+    subResource.aspectMask = aspectMask; // Текстура с цветом
     subResource.layerCount = 1; // Всего 1н слой
     subResource.baseArrayLayer = 0; // 0й слой
-    subResource.mipLevel = 0;   // 0й уровень мипмаппинга
+    subResource.mipLevel = mipLevel;   // Уровень мипмаппинга
     
     // Регион копирования текстуры
     VkImageCopy region = {};
@@ -244,7 +244,28 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     // Отгружаем данные во временную текстуру
     staggingImage->uploadDataToImage(VK_IMAGE_ASPECT_COLOR_BIT, 0, static_cast<unsigned char*>(pixels), imageSize);
     
+    // TODO: For test
+    {
+        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        transitionImageLayout(commandBuffer,
+                              staggingImage,
+                              VK_IMAGE_LAYOUT_PREINITIALIZED,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              0, staggingImage->getBaseMipmapsCount(),
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_HOST_WRITE_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
+        endAndQueueSingleTimeCommands(commandBuffer, queue);
+        
+        stbi_image_free(pixels);
+        
+        return staggingImage;
+    }
+    
     uint32_t mipmapLevels = floor(log2(std::max(texWidth, texHeight))) + 1;
+    mipmapLevels = 1;
     
     // Создаем рабочее изображение для последующего использования
     VulkanImagePtr resultImage = std::make_shared<VulkanImage>(device,
@@ -263,7 +284,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                               staggingImage,
                               VK_IMAGE_LAYOUT_PREINITIALIZED,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                              0, 1,
+                              0, resultImage->getBaseMipmapsCount(),
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -278,8 +299,8 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
         transitionImageLayout(commandBuffer,
                               resultImage,
                               VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-                              0, 1,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, C - VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                              0, resultImage->getBaseMipmapsCount(),
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -291,33 +312,33 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     // Копируем данные в пределах GPU из временной текстуры в целевую
     {
         VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-        copyImage(commandBuffer, staggingImage, resultImage);
+        copyImage(commandBuffer, staggingImage, resultImage, VK_IMAGE_ASPECT_COLOR_BIT, 0);
         endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
     // Генерируем мипмапы для текстуры
-    {
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-        generateMipmapsForImage(commandBuffer, resultImage);
-        endAndQueueSingleTimeCommands(commandBuffer, queue);
-    }
+//    {
+//        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+//        generateMipmapsForImage(commandBuffer, resultImage);
+//        endAndQueueSingleTimeCommands(commandBuffer, queue);
+//    }
     
     // Конвертируем использование текстуры в оптимальное для рендеринга
     // Генерация мипмапов делает это самостоятельно
-    /*{
-     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands();
-     transitionImageLayout(commandBuffer,
-     resultImage,
-     VK_FORMAT_R8G8B8A8_UNORM,
-     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-     0, resultImage->getBaseMipmapsCount(),
-     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     VK_ACCESS_TRANSFER_WRITE_BIT,
-     VK_ACCESS_SHADER_READ_BIT);
-     endAndQueueSingleTimeCommands(commandBuffer);
-     }*/
+    {
+        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        transitionImageLayout(commandBuffer,
+                              resultImage,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, C - VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                              0, resultImage->getBaseMipmapsCount(),
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
+         endAndQueueSingleTimeCommands(commandBuffer, queue);
+     }
     
     // Удаляем временные объекты
     staggingImage = nullptr;

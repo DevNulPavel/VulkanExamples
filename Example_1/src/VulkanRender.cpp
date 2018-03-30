@@ -247,7 +247,7 @@ void VulkanRender::createGraphicsPipeline() {
     
     // Настройки кулинга
     VulkanPipelineCullingConfig cullingConfig;
-    cullingConfig.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    cullingConfig.frontFace = VK_FRONT_FACE_CLOCKWISE;
     cullingConfig.cullMode = VK_CULL_MODE_BACK_BIT;
     
     // Блендинг
@@ -450,7 +450,7 @@ void VulkanRender::createRenderModelCommandBuffers() {
         renderPassInfo.renderPass = vulkanRenderPass->getPass();   // Рендер проход
         renderPassInfo.framebuffer = vulkanWindowFrameBuffers[i]->getBuffer();    // Фреймбуффер смены кадров
         renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = RenderI->vulkanSwapchain->getSwapChainExtent();
+        renderPassInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
         renderPassInfo.clearValueCount = clearValues.size();
         renderPassInfo.pClearValues = clearValues.data();
         

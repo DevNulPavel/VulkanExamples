@@ -33,6 +33,7 @@ VulkanDescriptorSetLayout::VulkanDescriptorSetLayout(VulkanLogicalDevicePtr devi
 
     // Биндинги
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    memset(&layoutInfo, 0, sizeof(VkDescriptorSetLayoutCreateInfo));
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
