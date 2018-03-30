@@ -74,6 +74,7 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
     
     // Создаем барьер памяти для картинок
     VkImageMemoryBarrier barrier = {};
+    memset(&barrier, 0, sizeof(VkImageMemoryBarrier));
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;  // Старый лаяут (способ использования)
     barrier.newLayout = newLayout;  // Новый лаяут (способ использования)

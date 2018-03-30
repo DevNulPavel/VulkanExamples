@@ -13,8 +13,8 @@ VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, V
     // Описание семплирования для текстуры
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = _minFiler;   // Линейное
-    samplerInfo.minFilter = _magFilter;   // Линейное
+    samplerInfo.minFilter = _minFiler;   // Линейное
+    samplerInfo.magFilter = _magFilter;   // Линейное
     samplerInfo.addressModeU = _mode;   // Ограничение по границе
     samplerInfo.addressModeV = _mode;   // Ограничение по границе
     samplerInfo.addressModeW = _mode;   // Ограничение по границе
