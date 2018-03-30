@@ -97,6 +97,9 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем буффер юниформов
     createModelUniformBuffer();
+    
+    // Создаем пул дескрипторов ресурсов
+    createModelDescriptorPool();
 }
 
 // Создаем буфферы для глубины
@@ -336,7 +339,6 @@ void VulkanRender::createModelBuffers(){
     modelIndices.clear();
 }
 
-
 // Создаем буффер юниформов
 void VulkanRender::createModelUniformBuffer() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -354,6 +356,22 @@ void VulkanRender::createModelUniformBuffer() {
                                                            bufferSize);
 }
 
+// Создаем пул дескрипторов ресурсов
+void VulkanRender::createModelDescriptorPool() {
+    // Структура с типами пулов
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    poolSizes.resize(2);
+    // Юниформ буффер
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1;
+    // Семплер для текстуры
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
+    
+    // Создаем пул
+    modelDescriptoPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes);
+}
+
 
 VulkanRender::~VulkanRender(){
     // Ждем завершения работы Vulkan
@@ -361,6 +379,7 @@ VulkanRender::~VulkanRender(){
     vulkanPresentQueue->wait();
     vulkanLogicalDevice->wait();
     
+    modelDescriptoPool = nullptr;
     modelUniformGPUBuffer = nullptr;
     modelUniformStagingBuffer = nullptr;
     modelVertexBuffer = nullptr;

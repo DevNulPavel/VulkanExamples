@@ -58,11 +58,6 @@ VkFence vulkanFence = VK_NULL_HANDLE;
 
 
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
-VkBuffer vulkanUniformStagingBuffer = VK_NULL_HANDLE;
-VkDeviceMemory vulkanUniformStagingBufferMemory = VK_NULL_HANDLE;
-VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
-VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
-VkDescriptorPool vulkanDescriptorPool = VK_NULL_HANDLE;
 VkDescriptorSet vulkanDescriptorSet = VK_NULL_HANDLE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,30 +78,6 @@ void createFences(){
         printf("Failed to create fence!");
         fflush(stdout);
         throw std::runtime_error("Failed to create fence!");
-    }
-}
-
-// Создаем пул дескрипторов ресурсов
-void createDescriptorPool() {
-    // Структура с типами пулов
-    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-    // Юниформ буффер
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 1;
-    // Семплер для текстуры
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = 1;
-    
-    // Создаем пул
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    memset(&poolInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = poolSizes.size();
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = 1;
-    
-    if (vkCreateDescriptorPool(RenderI->vulkanLogicalDevice->getDevice(), &poolInfo, nullptr, &vulkanDescriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
@@ -534,10 +505,6 @@ int local_main(int argc, char** argv) {
     vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanUniformStagingBufferMemory, nullptr);
     vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanUniformBuffer, nullptr);
     vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanUniformBufferMemory, nullptr);
-    vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanIndexBufferMemory, nullptr);
-    vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanIndexBuffer, nullptr);
-    vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBufferMemory, nullptr);
-    vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), vulkanVertexBuffer, nullptr);
 
     
     vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);

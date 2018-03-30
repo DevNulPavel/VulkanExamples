@@ -242,6 +242,10 @@ set(ALL_SOURCES
     src/VulkanSampler.cpp
     src/VulkanBuffer.h
     src/VulkanBuffer.cpp
+    src/VulkanDescriptorPool.h
+    src/VulkanDescriptorPool.cpp
+    src/VulkanDescriptorSet.h
+    src/VulkanDescriptorSet.cpp
     src/Helpers.h
     src/Helpers.cpp
     src/Vertex.h

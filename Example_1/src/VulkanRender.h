@@ -26,6 +26,7 @@
 #include "VulkanCommandBuffer.h"
 #include "VulkanSampler.h"
 #include "VulkanBuffer.h"
+#include "VulkanDescriptorPool.h"
 
 #include "Vertex.h"
 #include "UniformBuffer.h"
@@ -76,6 +77,7 @@ public:
     VulkanBufferPtr modelIndexBuffer;
     VulkanBufferPtr modelUniformStagingBuffer;
     VulkanBufferPtr modelUniformGPUBuffer;
+    VulkanDescriptorPoolPtr modelDescriptoPool;
     
 private:
     // Создаем буфферы для глубины
@@ -99,6 +101,8 @@ private:
     void createModelBuffers();
     // Создаем буффер юниформов
     void createModelUniformBuffer()
+    // Создаем пул дескрипторов ресурсов
+    void createModelDescriptorPool();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
