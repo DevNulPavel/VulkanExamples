@@ -238,9 +238,25 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                  VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
                                                                  VK_IMAGE_TILING_LINEAR,             // Тайлинг
                                                                  VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                                                                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
+                                                                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных // TODO: For test
                                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
                                                                  1);
+    
+    // TODO: For test
+    /*{
+        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        transitionImageLayout(commandBuffer,
+                              staggingImage,
+                              VK_IMAGE_LAYOUT_PREINITIALIZED,
+                              VK_IMAGE_LAYOUT_PREINITIALIZED,
+                              0, staggingImage->getBaseMipmapsCount(),
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              0,
+                              VK_ACCESS_HOST_WRITE_BIT);
+        endAndQueueSingleTimeCommands(commandBuffer, queue);
+    }*/
     
     // Отгружаем данные во временную текстуру
     staggingImage->uploadDataToImage(VK_IMAGE_ASPECT_COLOR_BIT, 0, static_cast<unsigned char*>(pixels), imageSize);
@@ -273,7 +289,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                texWidth, texHeight,
                                                                VK_FORMAT_R8G8B8A8_UNORM,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
-                                                               VK_IMAGE_LAYOUT_UNDEFINED,     // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
+                                                               VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                                                                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
                                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                                                                mipmapLevels);
@@ -346,7 +362,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     
     // Учищаем буффер данных картинки
     // TODO: Наверное можно удалить раньше
-    //stbi_image_free(pixels);
+    stbi_image_free(pixels);
     
     return resultImage;
 }

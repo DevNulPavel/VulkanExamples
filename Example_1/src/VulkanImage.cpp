@@ -208,7 +208,7 @@ void VulkanImage::uploadDataToImage(VkImageAspectFlags aspect, uint32_t mipLevel
     
     // Мапим данные текстуры в адресное пространство CPU
     void* mappedData = nullptr;
-    vkMapMemory(_logicalDevice->getDevice(), _imageMemory, 0, static_cast<VkDeviceSize>(dataSize), 0, &mappedData);
+    vkMapMemory(_logicalDevice->getDevice(), _imageMemory, 0, stagingImageLayout.size, 0, &mappedData);
     
     // Копируем целиком или построчно в зависимости от размера и выравнивания на GPU
     if (stagingImageLayout.rowPitch == static_cast<VkDeviceSize>(_size.width * 4)) {
