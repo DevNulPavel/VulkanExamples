@@ -28,6 +28,9 @@ void VulkanRender::destroyRender(){
 }
 
 VulkanRender::VulkanRender(){
+    modelTotalVertexesCount = 0;
+    modelTotalIndexesCount = 0;
+    modelImageIndex = 0;
 }
 
 void VulkanRender::init(GLFWwindow* window){
@@ -88,6 +91,12 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем семплер для текстуры
     modelTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+    
+    // Грузим данные для модели
+    loadModelSrcData();
+    
+    // Создаем буффер юниформов
+    createModelUniformBuffer();
 }
 
 // Создаем буфферы для глубины
@@ -269,6 +278,82 @@ void VulkanRender::updateWindowDepthTextureLayout(){
 }
 
 
+// Грузим данные для модели
+void VulkanRender::loadModelSrcData(){
+    printf("Model loading started\n");
+    fflush(stdout);
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err;
+    
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "res/models/chalet.obj")) {
+        throw std::runtime_error(err);
+    }
+    
+    for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            Vertex vertex = {};
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            
+            vertex.color = {1.0f, 1.0f, 1.0f};
+            
+            modelVertices.push_back(vertex);
+            modelIndices.push_back(modelIndices.size());
+        }
+    }
+    
+    modelTotalVertexesCount = modelVertices.size();
+    modelTotalIndexesCount = modelIndices.size();
+    
+    printf("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n",
+           modelTotalVertexesCount,
+           modelTotalVertexesCount/3,
+           modelTotalIndexesCount);
+    fflush(stdout);
+}
+
+// Создание буфферов вершин
+void VulkanRender::createModelBuffers(){
+    // Создаем рабочий буффер
+    modelVertexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, (unsigned char*)modelVertices.data(), sizeof(modelVertices[0]) * modelVertices.size());
+    
+    // Чистим исходные данные
+    modelVertices.clear();
+    
+    // Создаем рабочий буффер
+    modelIndexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, (unsigned char*)modelIndices.data(), sizeof(modelIndices[0]) * modelIndices.size());
+
+    // Чистим исходные данные
+    modelIndices.clear();
+}
+
+
+// Создаем буффер юниформов
+void VulkanRender::createModelUniformBuffer() {
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    
+    // Буффер для юниформов для CPU
+    modelUniformStagingBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
+                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
+                                                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+                                                               bufferSize);
+    
+    // Буффер для юниформов на GPU
+    modelUniformGPUBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
+                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                                                           VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, // Испольузется как получаетель + юниформ буффер
+                                                           bufferSize);
+}
+
 
 VulkanRender::~VulkanRender(){
     // Ждем завершения работы Vulkan
@@ -276,6 +361,10 @@ VulkanRender::~VulkanRender(){
     vulkanPresentQueue->wait();
     vulkanLogicalDevice->wait();
     
+    modelUniformGPUBuffer = nullptr;
+    modelUniformStagingBuffer = nullptr;
+    modelVertexBuffer = nullptr;
+    modelIndexBuffer = nullptr;
     modelTextureSampler = nullptr;
     modelTextureImage = nullptr;
     modelTextureImageView = nullptr;

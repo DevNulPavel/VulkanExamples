@@ -58,23 +58,12 @@ VkFence vulkanFence = VK_NULL_HANDLE;
 
 
 std::vector<VkCommandBuffer> vulkanCommandBuffers;
-VkBuffer vulkanVertexBuffer = VK_NULL_HANDLE;
-VkDeviceMemory vulkanVertexBufferMemory = VK_NULL_HANDLE;
-VkBuffer vulkanIndexBuffer = VK_NULL_HANDLE;
-VkDeviceMemory vulkanIndexBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanUniformStagingBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformStagingBufferMemory = VK_NULL_HANDLE;
 VkBuffer vulkanUniformBuffer = VK_NULL_HANDLE;
 VkDeviceMemory vulkanUniformBufferMemory = VK_NULL_HANDLE;
 VkDescriptorPool vulkanDescriptorPool = VK_NULL_HANDLE;
 VkDescriptorSet vulkanDescriptorSet = VK_NULL_HANDLE;
-
-std::vector<Vertex> vulkanVertices;
-std::vector<uint32_t> vulkanIndices;
-size_t vulkanTotalVertexesCount = 0;
-size_t vulkanTotalIndexesCount = 0;
-uint32_t vulkanImageIndex = 0;
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,222 +84,6 @@ void createFences(){
         fflush(stdout);
         throw std::runtime_error("Failed to create fence!");
     }
-}
-
-// Грузим данные для модели
-void loadModel(){
-    printf("Model loading started\n");
-    fflush(stdout);
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string err;
-    
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "res/models/chalet.obj")) {
-        throw std::runtime_error(err);
-    }
-    
-    for (const auto& shape : shapes) {
-        for (const auto& index : shape.mesh.indices) {
-            Vertex vertex = {};
-            vertex.pos = {
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            };
-            vertex.texCoord = {
-                attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-            };
-            
-            vertex.color = {1.0f, 1.0f, 1.0f};
-            
-            vulkanVertices.push_back(vertex);
-            vulkanIndices.push_back(vulkanIndices.size());
-        }
-    }
-    
-    vulkanTotalVertexesCount = vulkanVertices.size();
-    vulkanTotalIndexesCount = vulkanIndices.size();
-    
-    printf("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n", vulkanTotalVertexesCount, vulkanTotalVertexesCount/3, vulkanTotalIndexesCount);
-    fflush(stdout);
-}
-
-// Создаем буффер нужного размера
-void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-    // Удаляем старое, если есть
-    if(bufferMemory != VK_NULL_HANDLE){
-        vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), bufferMemory, nullptr);
-        bufferMemory = VK_NULL_HANDLE;
-    }
-    if (buffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), buffer, nullptr);
-        buffer = VK_NULL_HANDLE;
-    }
-    
-    // VK_SHARING_MODE_EXCLUSIVE: изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
-    // VK_SHARING_MODE_CONCURRENT: изображение может быть использовано несколькими семействами без явной передачи.
-    
-    // Описание формата буффера
-    VkBufferCreateInfo bufferInfo = {};
-    memset(&bufferInfo, 0, sizeof(VkBufferCreateInfo));
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;     // Размер буффера
-    bufferInfo.usage = usage;   // Использование данного буффера
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // изображение принадлежит одному семейству в один момент времени и должно быть явно передано другому семейству. Данный вариант обеспечивает наилучшую производительность.
-    
-    // Непосредственно создание буффера
-    if (vkCreateBuffer(RenderI->vulkanLogicalDevice->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create buffer!");
-    }
-    
-    // Запрашиваем данные о необходимой памяти
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(RenderI->vulkanLogicalDevice->getDevice(), buffer, &memRequirements);
-    
-    // Настройки аллокации буффера
-    uint32_t memoryTypeIndex = findMemoryType(RenderI->vulkanPhysicalDevice->getDevice(),
-                                              memRequirements.memoryTypeBits,
-                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo allocInfo = {};
-    memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = memoryTypeIndex;
-    
-    // Выделяем память для буффера
-    if (vkAllocateMemory(RenderI->vulkanLogicalDevice->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
-    }
-    
-    // Подцепляем память к буфферу
-    // Последний параметр – смещение в области памяти. Т.к. эта память выделяется специально для буфера вершин, смещение просто 0.
-    // Если же оно не будет равно нулю, то значение должно быть кратным memRequirements.alignment.
-    vkBindBufferMemory(RenderI->vulkanLogicalDevice->getDevice(), buffer, bufferMemory, 0);
-}
-
-// Копирование буффера
-void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    // Запускаем буффер
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-    
-    // Ставим в очередь копирование буффера
-    VkBufferCopy copyRegion = {};
-    memset(&copyRegion, 0, sizeof(VkBufferCopy));
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-    
-    // Заканчиваем буффер
-    endSingleTimeCommands(commandBuffer);
-}
-
-// Создание буфферов вершин
-void createVertexBuffer(){
-    // Размер буфферов
-    VkDeviceSize bufferSize = sizeof(vulkanVertices[0]) * vulkanVertices.size();
-    
-    // Создание временного буффера для передачи данных
-    VkBuffer stagingBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
-                 stagingBuffer, stagingBufferMemory);
-    
-    // Маппим видео-память в адресное пространство оперативной памяти
-    void* data = nullptr;
-    vkMapMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    
-    // Копируем вершины в память
-    memcpy(data, vulkanVertices.data(), (size_t)bufferSize);
-    
-    // Размапим
-    vkUnmapMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory);
-    
-    // Создаем рабочий буффер
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,  // Буффер может принимать данные + для отрисовки используется
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится на видео-карте
-                 vulkanVertexBuffer, vulkanVertexBufferMemory);
-    
-    // Ставим задачу на копирование буфферов
-    copyBuffer(stagingBuffer, vulkanVertexBuffer, bufferSize);
-    
-    // Удаляем временный буффер, если есть
-    if(stagingBufferMemory != VK_NULL_HANDLE){
-        vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory, nullptr);
-        stagingBufferMemory = VK_NULL_HANDLE;
-    }
-    if (stagingBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), stagingBuffer, nullptr);
-        stagingBuffer = VK_NULL_HANDLE;
-    }
-    
-    // Чистим исходные данные
-    vulkanVertices.clear();
-}
-
-// Создание буффера индексов
-void createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(vulkanIndices[0]) * vulkanIndices.size();
-    
-    VkBuffer stagingBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-    
-    // Создаем временный буффер
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,  // Буффер используется как исходник для копирования
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Видимый из CPU
-                 stagingBuffer, stagingBufferMemory);
-    
-    // Маппим видео-память в адресное пространство оперативной памяти
-    void* data = nullptr;
-    vkMapMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
-    
-    // Копируем данные
-    memcpy(data, vulkanIndices.data(), (size_t)bufferSize);
-    
-    // Размапим память
-    vkUnmapMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory);
-    
-    // Создаем рабочий буффер
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, // Используется как получатель + индексный буффер
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
-                 vulkanIndexBuffer, vulkanIndexBufferMemory);
-    
-    // Ставим задачу на копирование буфферов
-    copyBuffer(stagingBuffer, vulkanIndexBuffer, bufferSize);
-    
-    // Удаляем временный буффер, если есть
-    if(stagingBufferMemory != VK_NULL_HANDLE){
-        vkFreeMemory(RenderI->vulkanLogicalDevice->getDevice(), stagingBufferMemory, nullptr);
-        stagingBufferMemory = VK_NULL_HANDLE;
-    }
-    if (stagingBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(RenderI->vulkanLogicalDevice->getDevice(), stagingBuffer, nullptr);
-        stagingBuffer = VK_NULL_HANDLE;
-    }
-    
-    // Чистим исходные данные
-    vulkanIndices.clear();
-}
-
-// Создаем буффер юниформов
-void createUniformBuffer() {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-    
-    // Буффер для юниформов для CPU
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,  // Используется как исходник для передачи на отрисовку
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Доступно для изменения на GPU
-                 vulkanUniformStagingBuffer, vulkanUniformStagingBufferMemory);
-    // Буффер для юниформов на GPU
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, // Испольузется как получаетель + юниформ буффер
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
-                 vulkanUniformBuffer, vulkanUniformBufferMemory);
 }
 
 // Создаем пул дескрипторов ресурсов
@@ -702,14 +475,7 @@ int local_main(int argc, char** argv) {
     // Создаем преграды для проверки завершения комманд отрисовки
     createFences();
     
-    // Грузим нашу модель
-    loadModel();
-    
-    // Создание буфферов вершин
-    createVertexBuffer();
-    
-    // Создание индексного буффера
-    createIndexBuffer();
+
     
     // Создаем буффер юниформов
     createUniformBuffer();

@@ -327,3 +327,41 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     return resultImage;
 }
 
+// Копирование буффера
+void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer) {
+    // Ставим в очередь копирование буффера
+    VkBufferCopy copyRegion = {};
+    memset(&copyRegion, 0, sizeof(VkBufferCopy));
+    copyRegion.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
+    vkCmdCopyBuffer(commandBuffer->getBuffer(), srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
+}
+
+
+// Создание буфферов
+VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, unsigned char* data, size_t bufferSize){
+    
+    // Создание временного буффера для передачи данных
+    VulkanBufferPtr staggingBuffer = std::make_shared<VulkanBuffer>(device,
+                                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
+                                                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+                                                                    bufferSize);
+    // Отгружаем данные
+    staggingBuffer->uploadDataToBuffer(data, bufferSize);
+    
+    // Создаем рабочий буффер
+    VulkanBufferPtr resultBuffer = std::make_shared<VulkanBuffer>(device,
+                                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится на видео-карте
+                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,  // Буффер может принимать данные + для отрисовки используется
+                                                                  bufferSize);
+    
+    // Ставим задачу на копирование буфферов
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+    copyBuffer(commandBuffer, staggingBuffer, resultBuffer);
+    endAndQueueSingleTimeCommands(commandBuffer, queue);
+    
+    // Удаляем временный буффер, если есть
+    staggingBuffer = nullptr;
+    
+    return resultBuffer;
+}
+

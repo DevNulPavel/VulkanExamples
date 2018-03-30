@@ -12,6 +12,7 @@
 #include "VulkanCommandBuffer.h"
 #include "VulkanQueue.h"
 #include "VulkanImage.h"
+#include "VulkanBuffer.h"
 
 
 // Подбираем тип памяти буффера вершин
@@ -51,5 +52,11 @@ void endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQ
 
 // Создание текстуры из изображения на диске
 VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, const std::string& path);
+
+// Копирование буффера
+void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer);
+
+// Создание буфферов
+VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, unsigned char* data, size_t bufferSize);
 
 #endif

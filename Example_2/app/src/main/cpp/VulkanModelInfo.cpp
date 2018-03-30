@@ -304,7 +304,7 @@ void VulkanModelInfo::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
     // Настройки аллокации буффера
     uint32_t memoryTypeIndex = findMemoryType(vulkanDevice->vulkanPhysicalDevice,
                                               memRequirements.memoryTypeBits,
-                                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                                              properties);
     VkMemoryAllocateInfo allocInfo = {};
     memset(&allocInfo, 0, sizeof(VkMemoryAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;

@@ -25,7 +25,10 @@
 #include "VulkanCommandPool.h"
 #include "VulkanCommandBuffer.h"
 #include "VulkanSampler.h"
+#include "VulkanBuffer.h"
 
+#include "Vertex.h"
+#include "UniformBuffer.h"
 
 
 #define RenderI VulkanRender::getInstance()
@@ -64,6 +67,15 @@ public:
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;
     VulkanSamplerPtr modelTextureSampler;
+    std::vector<Vertex> modelVertices;
+    std::vector<uint32_t> modelIndices;
+    size_t modelTotalVertexesCount;
+    size_t modelTotalIndexesCount;
+    uint32_t modelImageIndex;
+    VulkanBufferPtr modelVertexBuffer;
+    VulkanBufferPtr modelIndexBuffer;
+    VulkanBufferPtr modelUniformStagingBuffer;
+    VulkanBufferPtr modelUniformGPUBuffer;
     
 private:
     // Создаем буфферы для глубины
@@ -80,6 +92,13 @@ private:
     void createGraphicsPipeline();
     // Обновляем лаяут текстуры глубины на правильный
     void updateWindowDepthTextureLayout();
+    
+    // Грузим данные для модели
+    void loadModelSrcData();
+    // Создание буфферов вершин
+    void createModelBuffers();
+    // Создаем буффер юниформов
+    void createModelUniformBuffer()
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

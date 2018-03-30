@@ -240,6 +240,8 @@ set(ALL_SOURCES
     src/VulkanCommandBuffer.cpp
     src/VulkanSampler.h
     src/VulkanSampler.cpp
+    src/VulkanBuffer.h
+    src/VulkanBuffer.cpp
     src/Helpers.h
     src/Helpers.cpp
     src/Vertex.h
