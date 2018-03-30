@@ -196,7 +196,7 @@ void VulkanRender::createDescriptorsSetLayout(){
     VulkanDescriptorSetConfig sampler;
     sampler.binding = 1;         // Семплер будет на 1м индексе
     sampler.desriptorsCount = 1; // 1н дескриптор
-    sampler.desriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; // Тип - семплер
+    sampler.desriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // Тип - семплер
     sampler.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
 
     std::vector<VulkanDescriptorSetConfig> configs;

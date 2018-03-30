@@ -12,6 +12,7 @@ VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, V
         
     // Описание семплирования для текстуры
     VkSamplerCreateInfo samplerInfo = {};
+    memset(&samplerInfo, 0, sizeof(VkSamplerCreateInfo));
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.minFilter = _minFiler;   // Линейное
     samplerInfo.magFilter = _magFilter;   // Линейное
