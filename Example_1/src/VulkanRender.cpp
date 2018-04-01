@@ -347,13 +347,13 @@ void VulkanRender::loadModelSrcData(){
 // Создание буфферов вершин
 void VulkanRender::createModelBuffers(){
     // Создаем рабочий буффер
-    modelVertexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, (unsigned char*)modelVertices.data(), sizeof(modelVertices[0]) * modelVertices.size());
+    modelVertexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, (unsigned char*)modelVertices.data(), sizeof(modelVertices[0]) * modelVertices.size());
     
     // Чистим исходные данные
     modelVertices.clear();
     
     // Создаем рабочий буффер
-    modelIndexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, (unsigned char*)modelIndices.data(), sizeof(modelIndices[0]) * modelIndices.size());
+    modelIndexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, (unsigned char*)modelIndices.data(), sizeof(modelIndices[0]) * modelIndices.size());
 
     // Чистим исходные данные
     modelIndices.clear();

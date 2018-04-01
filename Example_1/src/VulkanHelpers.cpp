@@ -353,7 +353,7 @@ void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer,
 
 
 // Создание буфферов
-VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, unsigned char* data, size_t bufferSize){
+VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, VkBufferUsageFlagBits usage, unsigned char* data, size_t bufferSize){
     
     // Создание временного буффера для передачи данных
     VulkanBufferPtr staggingBuffer = std::make_shared<VulkanBuffer>(device,
@@ -366,7 +366,7 @@ VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePt
     // Создаем рабочий буффер
     VulkanBufferPtr resultBuffer = std::make_shared<VulkanBuffer>(device,
                                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится на видео-карте
-                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,  // Буффер может принимать данные + для отрисовки используется
+                                                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,  // Буффер может принимать данные + для отрисовки используется
                                                                   bufferSize);
     
     // Ставим задачу на копирование буфферов
