@@ -16,7 +16,10 @@
 
 struct VulkanPhysicalDevice {
 public:
-    VulkanPhysicalDevice(VulkanInstancePtr instance, std::vector<const char*> extensions, VulkanSurfacePtr surface);
+    VulkanPhysicalDevice(VulkanInstancePtr instance,
+						 const std::vector<const char*>& extensions,
+						 const std::vector<const char*>& layers,
+						 VulkanSurfacePtr surface);
     ~VulkanPhysicalDevice();
     VkPhysicalDevice getDevice() const;
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
@@ -28,6 +31,7 @@ public:
 private:
     VulkanInstancePtr _vulkanInstance;
     std::vector<const char*> _vulkanExtensions;
+	std::vector<const char*> _vulkanLayers;
     VulkanSurfacePtr _vulkanSurface;
     VkPhysicalDevice _device;
     VulkanQueuesFamiliesIndexes _queuesFamiliesIndexes;
@@ -36,6 +40,8 @@ private:
 private:
     // Проверяем, поддерживает ли девайс цепочку свопинга
     bool checkDeviceRequiredExtensionSupport(VkPhysicalDevice device);
+	// Смотрим - есть ли у данного устройства поддержка нужных слоев
+	bool checkDeviceRequiredLayerSupport(VkPhysicalDevice device);
     // Оценка производительности и пригодности конкретной GPU
     int rateDeviceScore(VkPhysicalDevice device);
     // Запрашиваем поддержку свопачейна изображений на экране

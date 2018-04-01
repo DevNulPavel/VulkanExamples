@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <cmath>
+#include <algorithm>
 
 // STB image
 #define STB_IMAGE_IMPLEMENTATION

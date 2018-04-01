@@ -51,13 +51,14 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Получаем физическое устройство
     std::vector<const char*> vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
-    std::vector<const char*> vulkanInstanceExtensions = vulkanInstance->getInstanceExtensions();
-    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanInstanceExtensions, vulkanWindowSurface);
+    std::vector<const char*> vulkanDeviceExtensions;
+	vulkanDeviceExtensions.push_back("VK_KHR_swapchain");
+    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanDeviceExtensions, vulkanInstanceValidationLayers, vulkanWindowSurface);
 
     // Создаем логическое устройство
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanInstanceExtensions);
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
     vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
     

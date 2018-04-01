@@ -6,9 +6,14 @@
 #include "CommonConstants.h"
 
 
-VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, std::vector<const char*> extensions, VulkanSurfacePtr surface):
+VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, 
+										   const std::vector<const char*>& extensions, 
+										   const std::vector<const char*>& layers, 
+										   VulkanSurfacePtr surface):
+
     _vulkanInstance(instance),
     _vulkanExtensions(extensions),
+	_vulkanLayers(layers),
     _vulkanSurface(surface),
     _device(VK_NULL_HANDLE){
         
@@ -37,6 +42,12 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, std::vect
         if(swapchainExtentionSupported == false){
             continue;
         }
+
+		// Смотрим - есть ли у данного устройства поддержка нужных слоев
+		bool swapchainLayersSupported = checkDeviceRequiredLayerSupport(device);
+		if (swapchainLayersSupported == false) {
+			continue;
+		}
         
         // Проверяем, поддержку свопчейна у девайса, есть ли форматы и режимы отображения
         VulkanSwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
@@ -115,13 +126,37 @@ bool VulkanPhysicalDevice::checkDeviceRequiredExtensionSupport(VkPhysicalDevice 
     
     // Пытаемся убрать из списка требуемых расширений возможные
     for (const auto& extension : availableExtensions) {
-        printf("Available extention at logical device: %s\n", extension.extensionName);
+        printf("Available extention at physical device: %s\n", extension.extensionName);
         fflush(stdout);
         requiredExtensions.erase(extension.extensionName);
     }
     
     // Если пусто, значит поддерживается
     return requiredExtensions.empty();
+}
+
+// Смотрим - есть ли у данного устройства поддержка нужных слоев
+bool VulkanPhysicalDevice::checkDeviceRequiredLayerSupport(VkPhysicalDevice device) {
+	// Получаем количество расширений
+	uint32_t layersCount = 0;
+	vkEnumerateDeviceLayerProperties(device, &layersCount, nullptr);
+
+	// Получаем расширения
+	std::vector<VkLayerProperties> availableLayers(layersCount);
+	vkEnumerateDeviceLayerProperties(device, &layersCount, availableLayers.data());
+
+	// Список требуемых слоев
+	std::set<std::string> requiredLayers(_vulkanLayers.begin(), _vulkanLayers.end());
+
+	// Пытаемся убрать из списка требуемых расширений возможные
+	for (const auto& layer : availableLayers) {
+		printf("Available layer at physical device: %s\n", layer.layerName);
+		fflush(stdout);
+		requiredLayers.erase(layer.layerName);
+	}
+
+	// Если пусто, значит поддерживается
+	return requiredLayers.empty();
 }
 
 // Оценка производительности и пригодности конкретной GPU

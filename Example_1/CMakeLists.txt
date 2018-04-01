@@ -6,7 +6,7 @@ set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
 ####################################################
 # Настройка CMake сборки
 ####################################################
-cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 # Информация о текущих настройках
 function(print_current_cmake_config)
