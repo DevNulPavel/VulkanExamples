@@ -70,7 +70,7 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
     range.baseArrayLayer = 0;
     range.layerCount = 1;
     range.baseMipLevel = startMipmapLevel;
-    range.levelCount = levelsCount;    // TODO: Сколько уровней надо конвертить?? Как параметр для мипмапов
+    range.levelCount = levelsCount;    // TODO: Сколько уровней надо конвертить?? Как параметр для мипмапов VK_REMAINING_MIP_LEVELS
     range.aspectMask = aspectFlags;
     
     // Создаем барьер памяти для картинок
@@ -135,6 +135,17 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
     // We copy down the whole mip chain doing a blit from mip-1 to mip
     // An alternative way would be to always blit from the first mip level and sample that one down
     
+	transitionImageLayout(commandBuffer,
+		image,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		0, 1,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_ACCESS_TRANSFER_READ_BIT,
+		VK_ACCESS_TRANSFER_WRITE_BIT);
+
     // Copy down mips from n-1 to n
     for (int32_t i = 1; i < image->getBaseMipmapsCount(); i++){
         // Transiton current mip level to transfer dest
@@ -142,10 +153,10 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
                               image,
                               VK_IMAGE_LAYOUT_UNDEFINED,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_ASPECT_COLOR_BIT,
                               i, 1,
+							  VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT,
-                              VK_PIPELINE_STAGE_HOST_BIT,
+							  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT);
         
@@ -182,9 +193,9 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
                               image,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                              VK_IMAGE_ASPECT_COLOR_BIT,
                               i, 1,
-                              VK_PIPELINE_STAGE_HOST_BIT,
+							  VK_IMAGE_ASPECT_COLOR_BIT,
+			                  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT);
@@ -196,9 +207,9 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
                           image,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                          VK_IMAGE_ASPECT_COLOR_BIT,
                           0, image->getBaseMipmapsCount(),
-                          VK_PIPELINE_STAGE_HOST_BIT,
+					      VK_IMAGE_ASPECT_COLOR_BIT,
+		                  VK_PIPELINE_STAGE_TRANSFER_BIT,
                           VK_PIPELINE_STAGE_TRANSFER_BIT,
                           VK_ACCESS_TRANSFER_WRITE_BIT,
                           VK_ACCESS_TRANSFER_READ_BIT);
@@ -254,7 +265,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                VK_FORMAT_R8G8B8A8_UNORM,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
                                                                VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                                                               VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
+															   VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
                                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                                                                mipmapLevels);
     
@@ -265,10 +276,10 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                               staggingImage,
                               VK_IMAGE_LAYOUT_PREINITIALIZED,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                              0, resultImage->getBaseMipmapsCount(),
+                              0, staggingImage->getBaseMipmapsCount(),
                               VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+							  VK_PIPELINE_STAGE_HOST_BIT,
+							  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_HOST_WRITE_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT);
         endAndQueueSingleTimeCommands(commandBuffer, queue);
@@ -280,11 +291,11 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
         transitionImageLayout(commandBuffer,
                               resultImage,
                               VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, C - VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               0, resultImage->getBaseMipmapsCount(),
                               VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+							  VK_PIPELINE_STAGE_TRANSFER_BIT,
+							  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT);
         endAndQueueSingleTimeCommands(commandBuffer, queue);

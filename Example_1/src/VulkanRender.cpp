@@ -1,5 +1,7 @@
 #include "VulkanRender.h"
 #include <array>
+#include <limits>
+#include <numeric>
 #include "Helpers.h"
 #include "Vertex.h"
 
@@ -293,7 +295,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
                           0, 1,
                           aspectMask,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+						  VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                           0,
                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     
@@ -303,8 +305,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
 
 // Грузим данные для модели
 void VulkanRender::loadModelSrcData(){
-    printf("Model loading started\n");
-    fflush(stdout);
+	LOG("Model loading started\n");
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -337,11 +338,10 @@ void VulkanRender::loadModelSrcData(){
     modelTotalVertexesCount = modelVertices.size();
     modelTotalIndexesCount = modelIndices.size();
     
-    printf("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n",
+	LOG("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n",
            modelTotalVertexesCount,
            modelTotalVertexesCount/3,
            modelTotalIndexesCount);
-    fflush(stdout);
 }
 
 // Создание буфферов вершин
@@ -531,8 +531,7 @@ void VulkanRender::createRenderModelCommandBuffers() {
         
         // Заканчиваем подготовку коммандного буффера
         if (vkEndCommandBuffer(buffer->getBuffer()) != VK_SUCCESS) {
-            printf("Failed to record command buffer!\n");
-            fflush(stdout);
+			LOG("Failed to record command buffer!\n");
             throw std::runtime_error("Failed to record command buffer!");
         }
         
@@ -581,8 +580,7 @@ void VulkanRender::drawFrame() {
     
     // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
     if (vulkanImageIndex != swapchainImageIndex) {
-        printf("Vulkan image index not equal to swapchain image index!\n");
-        fflush(stdout);
+		LOG("Vulkan image index not equal to swapchain image index!\n");
     }
     
     VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
@@ -610,14 +608,12 @@ void VulkanRender::drawFrame() {
      VkResult waitStatus = vkWaitForFences(vulkanLogicalDevice, 1, &vulkanFence, VK_TRUE, std::numeric_limits<uint64_t>::max()-1);
      if (waitStatus == VK_SUCCESS) {
      VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
-     //printf("Fence waited + reset!\n");
-     //fflush(stdout);
+     //LOG("Fence waited + reset!\n");
      }*/
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
     if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo,  VK_NULL_HANDLE/*vulkanFence*/) != VK_SUCCESS) {
-        printf("Failed to submit draw command buffer!\n");
-        fflush(stdout);
+		LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
     
@@ -643,7 +639,7 @@ void VulkanRender::drawFrame() {
         //recreateSwapChain();
         return;
     } else if (presentResult != VK_SUCCESS) {
-        printf("failed to present swap chain image!\n");
+		LOG("failed to present swap chain image!\n");
         throw std::runtime_error("failed to present swap chain image!");
     }
 }

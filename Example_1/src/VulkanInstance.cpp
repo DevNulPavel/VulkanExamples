@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanInstance::VulkanInstance():
@@ -61,7 +62,7 @@ bool VulkanInstance::checkAllLayersInVectorAvailable(const std::vector<VkLayerPr
         }
         
         if (!layerFound) {
-            printf("Layer %s not available!\n", layerName);
+			LOG("Layer %s not available!\n", layerName);
             return false;
         }
     }
@@ -74,8 +75,7 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
     // Список всех слоев
     std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
     for(const VkLayerProperties& layerInfo: allValidationLayers){
-        printf("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
-        fflush(stdout);
+        LOG("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
     }
     
     // Возможные отладочные слои
@@ -92,7 +92,7 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
         result.push_back("VK_LAYER_LUNARG_swapchain");
         
         if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
-            printf("Failed to get validation layers!\n");
+            LOG("Failed to get validation layers!\n");
             throw std::runtime_error("Failed to create instance!");
         }
     }
@@ -130,7 +130,7 @@ void VulkanInstance::printAllExtentionsAtLayers(const std::vector<const char *>&
     std::map<std::string, std::vector<VkExtensionProperties>> allExtentions = getAllExtentionsNames(layersNames);
     for(const std::pair<std::string, std::vector<VkExtensionProperties>>& extentionInfo: allExtentions){
         for (const VkExtensionProperties& property: extentionInfo.second) {
-            printf("Extention at layer %s available: %s\n", extentionInfo.first.c_str(), property.extensionName);
+			LOG("Extention at layer %s available: %s\n", extentionInfo.first.c_str(), property.extensionName);
         }
     }
 }
@@ -145,20 +145,17 @@ std::vector<const char*> VulkanInstance::getRequiredInstanceExtentionNames(){
     // Формируем список расширений
     for (unsigned int i = 0; i < glfwExtensionCount; i++) {
         result.push_back(glfwExtensions[i]);
-        printf("Extention - Required GLFW extention name: %s\n", glfwExtensions[i]);
-        fflush(stdout);
+		LOG("Extention - Required GLFW extention name: %s\n", glfwExtensions[i]);
     }
 #ifdef __APPLE__
     // Optional
     result.push_back("VK_MVK_moltenvk");
-    printf("Extention - Required MoltenVK extention name: %s\n", "VK_MVK_moltenvk");
-    fflush(stdout);
+	LOG("Extention - Required MoltenVK extention name: %s\n", "VK_MVK_moltenvk");
 #endif
     
 #ifdef VALIDATION_LAYERS_ENABLED
     result.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    printf("Extention - Required debug extention name: %s\n", VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    fflush(stdout);
+	LOG("Extention - Required debug extention name: %s\n", VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
     return result;
 }
@@ -197,8 +194,7 @@ void VulkanInstance::createVulkanInstance(){
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &_instance);
     if (createStatus != VK_SUCCESS) {
-        printf("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
-        fflush(stdout);
+		LOG("Failed to create instance! Status = %d\n", static_cast<int>(createStatus));
         throw std::runtime_error("Failed to create instance!");
     }
 }
@@ -250,8 +246,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallbackFunction(VkDebugReportFlagsEX
         messageType = "ERROR";
     }
     
-    printf("Debug message (%s): %s\n", messageType.c_str(), msg);
-    fflush(stdout);
+	LOG("Debug message (%s): %s\n", messageType.c_str(), msg);
     return VK_FALSE;
 }
 #endif
@@ -265,8 +260,7 @@ void VulkanInstance::setupDebugCallback() {
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT |
     VK_DEBUG_REPORT_WARNING_BIT_EXT |
-    VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-    VK_DEBUG_REPORT_INFORMATION_BIT_EXT; // Типы коллбеков
+    VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT; // Типы коллбеков VK_DEBUG_REPORT_INFORMATION_BIT_EXT
     createInfo.pfnCallback = debugCallbackFunction;
     
     if (createDebugReportCallbackEXT(&createInfo, nullptr, &_debugCallback) != VK_SUCCESS) {

@@ -4,6 +4,11 @@
 #include <stdexcept>
 #include <fstream>
 
+
+#ifdef _MSVC_LANG
+	#include <Windows.h>
+#endif 
+
 // Читаем побайтово файлик
 std::vector<unsigned char> readFile(const std::string& filename) {
     // Открываем файлик в бинарном режиме чтения + чтение с конца
@@ -27,3 +32,19 @@ std::vector<unsigned char> readFile(const std::string& filename) {
     
     return buffer;
 }
+
+
+#ifdef _MSVC_LANG
+int __cdecl LOG(const char *format, ...) {
+	char str[1024];
+
+	va_list argptr;
+	va_start(argptr, format);
+	int ret = vsnprintf(str, sizeof(str), format, argptr);
+	va_end(argptr);
+
+	OutputDebugStringA(str);
+
+	return ret;
+}
+#endif
