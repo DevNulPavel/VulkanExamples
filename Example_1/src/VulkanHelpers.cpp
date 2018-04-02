@@ -226,6 +226,12 @@ void endAndQueueWaitSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, Vul
     queue->wait();
 }
 
+// Завершение коммандного буффера + отправка в очередь
+void endSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue) {
+    commandBuffer->end();
+    queue->submitBuffer(commandBuffer);
+}
+
 // Создание текстуры из изображения на диске
 VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, const std::string& path) {
     int texWidth = 0;

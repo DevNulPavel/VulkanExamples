@@ -49,6 +49,9 @@ VulkanCommandBufferPtr beginSingleTimeCommands(VulkanLogicalDevicePtr device, Vu
 // Завершение коммандного буффера + отправка в очередь c ОЖИДАНИЕМ завершения!
 void endAndQueueWaitSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue);
 
+// Завершение коммандного буффера + отправка в очередь
+void endSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue);
+
 // Создание текстуры из изображения на диске
 VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, const std::string& path);
 

@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <chrono>
 #include "CommonConstants.h"
 #include "Helpers.h"
 
@@ -36,12 +37,12 @@ void VulkanQueue::wait(){
     // Как альтернативу - можно использовать Fence
     vkQueueWaitIdle(_queue);
     
-    /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
-     vkQueueWaitIdle(vulkanGraphicsQueue);
+     /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
+     vkQueueWaitIdle(_queue);
      std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
      std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
      int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-     LOG("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmicroSec\n", elapsedMicroSec);*/
+     LOG("Wait duration (vkQueueWaitIdle(_queue)): %lldmicroSec\n", elapsedMicroSec);*/
 }
 
 VkQueue VulkanQueue::getQueue() const{

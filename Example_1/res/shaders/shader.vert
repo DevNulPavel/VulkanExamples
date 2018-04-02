@@ -8,10 +8,14 @@ layout(location = 2) in vec2 inTexCoord;
 
 // Uniforms
 layout(binding = 0) uniform UniformBufferObject {
-	mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;
+
+// Push const
+layout(push_constant) uniform PushConsts {
+	mat4 model;
+} pushConsts;
 
 // Выходные данные
 out gl_PerVertex {
@@ -22,7 +26,7 @@ layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * pushConsts.model * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
 }
