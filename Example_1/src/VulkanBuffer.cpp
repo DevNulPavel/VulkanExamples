@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "VulkanHelpers.h"
+#include "Helpers.h"
 
 
 VulkanBuffer::VulkanBuffer(VulkanLogicalDevicePtr logicalDevice, VkMemoryPropertyFlags properties, VkBufferUsageFlags usage, size_t dataSize):
@@ -24,8 +25,7 @@ VulkanBuffer::VulkanBuffer(VulkanLogicalDevicePtr logicalDevice, VkMemoryPropert
         
     // Непосредственно создание буффера
     if (vkCreateBuffer(_logicalDevice->getDevice(), &bufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
-        printf("Failed to create buffer!\n");
-        fflush(stdout);
+        LOG("Failed to create buffer!\n");
         throw std::runtime_error("Failed to create buffer!");
     }
         
@@ -46,8 +46,7 @@ VulkanBuffer::VulkanBuffer(VulkanLogicalDevicePtr logicalDevice, VkMemoryPropert
     
     // Выделяем память для буффера
     if (vkAllocateMemory(_logicalDevice->getDevice(), &allocInfo, nullptr, &_bufferMemory) != VK_SUCCESS) {
-        printf("Failed to allocate vertex buffer memory!");
-        fflush(stdout);
+        LOG("Failed to allocate vertex buffer memory!");
         throw std::runtime_error("Failed to allocate vertex buffer memory!");
     }
    

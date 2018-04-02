@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "VulkanHelpers.h"
+#include "Helpers.h"
 
 
 VulkanDescriptorPool::VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice, const std::vector<VkDescriptorPoolSize>& poolSize):
@@ -18,8 +19,7 @@ VulkanDescriptorPool::VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice,
     poolInfo.maxSets = 1;
     
     if (vkCreateDescriptorPool(_logicalDevice->getDevice(), &poolInfo, nullptr, &_pool) != VK_SUCCESS) {
-        printf("Failed to create descriptor pool!\n");
-        fflush(stdout);
+        LOG("Failed to create descriptor pool!\n");
         throw std::runtime_error("Failed to create descriptor pool!");
     }
 }

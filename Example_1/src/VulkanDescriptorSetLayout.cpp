@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanDescriptorSetConfig::VulkanDescriptorSetConfig():
@@ -40,8 +41,7 @@ VulkanDescriptorSetLayout::VulkanDescriptorSetLayout(VulkanLogicalDevicePtr devi
     
     // Создаем лаяут для шейдера
     if (vkCreateDescriptorSetLayout(_device->getDevice(), &layoutInfo, nullptr, &_layout) != VK_SUCCESS) {
-        printf("Failed to create descriptor set layout!");
-        fflush(stdout);
+        LOG("Failed to create descriptor set layout!");
         throw std::runtime_error("Failed to create descriptor set layout!");
     }
 }

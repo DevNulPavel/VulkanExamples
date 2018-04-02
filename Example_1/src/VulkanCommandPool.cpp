@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanCommandPool::VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex):
@@ -16,8 +17,7 @@ VulkanCommandPool::VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint3
     poolInfo.flags = 0; // Optional
     
     if (vkCreateCommandPool(_logicalDevice->getDevice(), &poolInfo, nullptr, &_pool) != VK_SUCCESS) {
-        printf("Failed to create command pool!\n");
-        fflush(stdout);
+        LOG("Failed to create command pool!\n");
         throw std::runtime_error("Failed to create command pool!");
     }
 }

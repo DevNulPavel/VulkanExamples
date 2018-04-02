@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "CommonConstants.h"
+#include "Helpers.h"
 
 
 VulkanSemafore::VulkanSemafore(VulkanLogicalDevicePtr device):
@@ -15,8 +16,7 @@ VulkanSemafore::VulkanSemafore(VulkanLogicalDevicePtr device):
     
     // Создаем семафор для отображения и для кодирования графики
     if (vkCreateSemaphore(_device->getDevice(), &semaphoreInfo, nullptr, &_semafore) != VK_SUCCESS) {
-        printf("Failed to create semaphores!\n");
-        fflush(stdout);
+        LOG("Failed to create semaphores!\n");
         throw std::runtime_error("Failed to create semaphores!");
     }
 }

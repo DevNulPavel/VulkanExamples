@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 VulkanFrameBuffer::VulkanFrameBuffer(VulkanLogicalDevicePtr device,
                                      VulkanRenderPassPtr renderPass,
@@ -32,8 +33,7 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanLogicalDevicePtr device,
     framebufferInfo.layers = 1;
     
     if (vkCreateFramebuffer(_device->getDevice(), &framebufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
-        printf("Failed to create framebuffer!");
-        fflush(stdout);
+        LOG("Failed to create framebuffer!");
         throw std::runtime_error("Failed to create framebuffer!");
     }
 }

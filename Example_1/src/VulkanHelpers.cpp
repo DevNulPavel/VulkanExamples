@@ -9,6 +9,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include "Helpers.h"
+
 
 // Подбираем тип памяти буффера вершин
 uint32_t findMemoryType(VkPhysicalDevice device, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -23,8 +25,7 @@ uint32_t findMemoryType(VkPhysicalDevice device, uint32_t typeFilter, VkMemoryPr
         }
     }
     
-    printf("Failed to find suitable memory type!\n");
-    fflush(stdout);
+    LOG("Failed to find suitable memory type!\n");
     throw std::runtime_error("Failed to find suitable memory type!");
 }
 
@@ -43,8 +44,7 @@ VkFormat findSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat
         }
     }
     
-    printf("Failed to find supported format!\n");
-    fflush(stdout);
+    LOG("Failed to find supported format!\n");
     throw std::runtime_error("Failed to find supported format!");
 }
 
@@ -238,8 +238,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     
     if (!pixels) {
-        printf("Failed to load texture image %s!", path.c_str());
-        fflush(stdout);
+        LOG("Failed to load texture image %s!", path.c_str());
         throw std::runtime_error("Failed to load texture image!");
     }
     

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "CommonConstants.h"
+#include "Helpers.h"
 
 
 VulkanQueue::VulkanQueue(VulkanLogicalDevicePtr device, uint32_t familyIndex, uint32_t queueIndex, VkQueue inQueue):
@@ -40,8 +41,7 @@ void VulkanQueue::wait(){
      std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
      std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
      int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-     printf("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmicroSec\n", elapsedMicroSec);
-     fflush(stdout);*/
+     LOG("Wait duration (vkQueueWaitIdle(vulkanGraphicsQueue)): %lldmicroSec\n", elapsedMicroSec);*/
 }
 
 VkQueue VulkanQueue::getQueue() const{

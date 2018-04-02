@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <array>
+#include "Helpers.h"
 
 
 VulkanRenderPassConfig::VulkanRenderPassConfig():
@@ -89,8 +90,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
     
     // Создаем рендер-проход
     if (vkCreateRenderPass(_device->getDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS) {
-        printf("Failed to create render pass!");
-        fflush(stdout);
+        LOG("Failed to create render pass!");
         throw std::runtime_error("Failed to create render pass!");
     }
 }
@@ -141,8 +141,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
     
     // Создаем рендер-проход
     if (vkCreateRenderPass(_device->getDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS) {
-        printf("Failed to create render pass!");
-        fflush(stdout);
+        LOG("Failed to create render pass!");
         throw std::runtime_error("Failed to create render pass!");
     }
 }

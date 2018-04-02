@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <fstream>
 
-
 #ifdef _MSVC_LANG
 	#include <Windows.h>
 #endif 
@@ -15,8 +14,7 @@ std::vector<unsigned char> readFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     
     if (!file.is_open()) {
-        printf("Failed to open file %s!", filename.c_str());
-        fflush(stdout);
+        LOG("Failed to open file %s!", filename.c_str());
         throw std::runtime_error("Failed to open file!");
     }
     

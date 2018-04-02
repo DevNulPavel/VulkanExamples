@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "VulkanHelpers.h"
+#include "Helpers.h"
 
 
 VulkanImage::VulkanImage():
@@ -158,8 +159,7 @@ void VulkanImage::createImage(uint32_t width, uint32_t height,
     
     // Создаем изображение
     if (vkCreateImage(_logicalDevice->getDevice(), &imageInfo, nullptr, &_image) != VK_SUCCESS) {
-        printf("Failed to create image!\n");
-        fflush(stdout);
+        LOG("Failed to create image!\n");
         throw std::runtime_error("Failed to create image!");
     }
     

@@ -25,6 +25,7 @@
 #include "Figures.h"
 #include "UniformBuffer.h"
 #include "VulkanHelpers.h"
+#include "Helpers.h"
 
 
 GLFWwindow* window = nullptr;
@@ -42,8 +43,7 @@ void createFences(){
     createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Изначально создаем вытавленным
     VkResult fenceCreateStatus = vkCreateFence(RenderI->vulkanLogicalDevice->getDevice(), &createInfo, nullptr, &vulkanFence);
     if (fenceCreateStatus != VK_SUCCESS) {
-        printf("Failed to create fence!");
-        fflush(stdout);
+        LOG("Failed to create fence!");
         throw std::runtime_error("Failed to create fence!");
     }
 }
@@ -96,8 +96,7 @@ int local_main(int argc, char** argv) {
     // Проверяем наличие поддержки Vulkan
     int vulkanSupportStatus = glfwVulkanSupported();
     if (vulkanSupportStatus != GLFW_TRUE){
-        printf("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
-		fflush(stdout);
+        LOG("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
         throw std::runtime_error("Vulkan support not found!");
     }
 

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "VulkanHelpers.h"
+#include "Helpers.h"
 
 VulkanDescriptorSetUpdateConfig::VulkanDescriptorSetUpdateConfig():
     type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER),
@@ -26,8 +27,7 @@ VulkanDescriptorSet::VulkanDescriptorSet(VulkanLogicalDevicePtr logicalDevice, V
     
     // Аллоцируем дескрипторы в пуле
     if (vkAllocateDescriptorSets(_logicalDevice->getDevice(), &allocInfo, &_set) != VK_SUCCESS) {
-        printf("Failed to allocate descriptor set!\n");
-        fflush(stdout);
+        LOG("Failed to allocate descriptor set!\n");
         throw std::runtime_error("Failed to allocate descriptor set!");
     }
 }

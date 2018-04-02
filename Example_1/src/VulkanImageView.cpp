@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanImageView::VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr image, VkImageAspectFlags aspectFlags):
@@ -29,8 +30,7 @@ VulkanImageView::VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr i
     
     // Создаем имедж вью
     if (vkCreateImageView(_device->getDevice(), &viewInfo, nullptr, &_imageView) != VK_SUCCESS) {
-        printf("Failed to create texture image view!\n");
-        fflush(stdout);
+        LOG("Failed to create texture image view!\n");
         throw std::runtime_error("Failed to create texture image view!");
     }
 }

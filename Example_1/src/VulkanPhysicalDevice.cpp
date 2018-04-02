@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <set>
 #include "CommonConstants.h"
+#include "Helpers.h"
 
 
 VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance, 
@@ -23,8 +24,7 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance,
     
     // Есть ли вообще карты?
     if (deviceCount == 0) {
-        printf("Failed to find GPUs with Vulkan support!");
-        fflush(stdout);
+        LOG("Failed to find GPUs with Vulkan support!");
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
     
@@ -67,8 +67,7 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance,
     
     // Есть ли вообще карты?
     if (candidates.size() == 0) {
-        printf("No picked GPU physical devices!");
-        fflush(stdout);
+        LOG("No picked GPU physical devices!");
         throw std::runtime_error("No picked GPU physical devices!");
     }
     
@@ -78,8 +77,7 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance,
         _queuesFamiliesIndexes = std::get<1>(candidates.begin()->second);
         _swapchainSuppportDetails = std::get<2>(candidates.begin()->second);
     } else {
-        printf("Failed to find a suitable GPU!");
-        fflush(stdout);
+        LOG("Failed to find a suitable GPU!");
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
 }
@@ -126,8 +124,7 @@ bool VulkanPhysicalDevice::checkDeviceRequiredExtensionSupport(VkPhysicalDevice 
     
     // Пытаемся убрать из списка требуемых расширений возможные
     for (const auto& extension : availableExtensions) {
-        printf("Available extention at physical device: %s\n", extension.extensionName);
-        fflush(stdout);
+        LOG("Available extention at physical device: %s\n", extension.extensionName);
         requiredExtensions.erase(extension.extensionName);
     }
     
@@ -169,12 +166,11 @@ int VulkanPhysicalDevice::rateDeviceScore(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
     
-    printf("Test GPU with name: %s, API version: %d.%d.%d,\n",
+    LOG("Test GPU with name: %s, API version: %d.%d.%d,\n",
            deviceProperties.deviceName,
            VK_VERSION_MAJOR(deviceProperties.apiVersion),
            VK_VERSION_MINOR(deviceProperties.apiVersion),
            VK_VERSION_PATCH(deviceProperties.apiVersion));
-    fflush(stdout);
     
     int score = 0;
     

@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include "CommonConstants.h"
+#include "Helpers.h"
 
 
 VulkanSurface::VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance):
@@ -9,8 +10,7 @@ VulkanSurface::VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance):
     _instance(instance){
         
     if (glfwCreateWindowSurface(_instance->getInstance(), window, nullptr, &_surface) != VK_SUCCESS) {
-        printf("Failed to create window surface!");
-        fflush(stdout);
+        LOG("Failed to create window surface!");
         throw std::runtime_error("Failed to create window surface!");
     }
 }

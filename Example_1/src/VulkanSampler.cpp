@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, VkFilter magFilter, VkSamplerAddressMode mode):
@@ -32,8 +33,7 @@ VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, V
     
     // Создаем семплер
     if (vkCreateSampler(_device->getDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS) {
-        printf("Failed to create texture sampler!\n");
-        fflush(stdout);
+        LOG("Failed to create texture sampler!\n");
         throw std::runtime_error("Failed to create texture sampler!");
     }
 }

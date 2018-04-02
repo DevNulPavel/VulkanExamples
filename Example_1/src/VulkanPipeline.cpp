@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 
@@ -170,8 +171,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам, но без изменения??
     
     if (vkCreatePipelineLayout(_device->getDevice(), &pipelineLayoutInfo, nullptr, &_layout) != VK_SUCCESS) {
-        printf("Failed to create pipeline layout!\n");
-        fflush(stdout);
+        LOG("Failed to create pipeline layout!\n");
         throw std::runtime_error("Failed to create pipeline layout!");
     }
         
@@ -198,8 +198,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     pipelineInfo.pDynamicState = nullptr;               // Динамическое состояние отрисовки
     
     if (vkCreateGraphicsPipelines(_device->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
-        printf("Failed to create graphics pipeline!\n");
-        fflush(stdout);
+        LOG("Failed to create graphics pipeline!\n");
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 }
