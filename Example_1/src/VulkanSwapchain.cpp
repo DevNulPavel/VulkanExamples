@@ -182,7 +182,8 @@ void VulkanSwapchain::createSwapChain() {
     
     // Удаляем старый свопчейн, если был, обазательно удаляется после создания нового
     if (oldSwapChain != VK_NULL_HANDLE) {
-        vkDestroySwapchainKHR(_device->getDevice(), oldSwapChain, nullptr);
+		// Удалится вместе со старой ссылкой
+        //vkDestroySwapchainKHR(_device->getDevice(), oldSwapChain, nullptr);
         _oldSwapchain = nullptr;
         oldSwapChain = VK_NULL_HANDLE;
     }

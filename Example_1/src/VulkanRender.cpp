@@ -151,7 +151,9 @@ void VulkanRender::rebuildRendering(){
     // Создаем свопчейн + получаем изображения свопчейна
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
+	VulkanSwapchainPtr newVulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, vulkanSwapchain);
+	vulkanSwapchain = nullptr;
+	vulkanSwapchain = newVulkanSwapchain;
     
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
@@ -651,12 +653,14 @@ void VulkanRender::drawFrame() {
      LOG("Wait duration (vkQueueWaitIdle(_queue)): %lldmicroSec\n", elapsedMicroSec);*/
     
     // TODO: ???
-    vulkanRenderQueue->wait();
-    vulkanPresentQueue->wait();
+#ifdef __APPLE__
+	vulkanRenderQueue->wait();
+	vulkanPresentQueue->wait();
+#endif // 
     
     // TODO: ???
     //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-    //vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+    vulkanRenderFences[vulkanImageIndex]->waitAndReset();
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
@@ -701,7 +705,7 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, /*vulkanRenderFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
