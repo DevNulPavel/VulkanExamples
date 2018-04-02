@@ -42,6 +42,8 @@ public:
     static void destroyRender();
 
 public:
+    // Ресайз окна
+    void windowResized(GLFWwindow* window, uint32_t width, uint32_t height);
     // Обновляем юниформ буффер
     void updateUniformBuffer(float delta);
     // Непосредственно отрисовка кадра
@@ -93,6 +95,9 @@ public:
     
 private:
     void init(GLFWwindow* window);
+    
+    // Перестраиваем рендеринг при ошибках или ресайзе
+    void rebuildRendering();
     
     // Создаем буфферы для глубины
     void createWindowDepthResources();

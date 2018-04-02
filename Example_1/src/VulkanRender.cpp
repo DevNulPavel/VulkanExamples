@@ -123,6 +123,48 @@ void VulkanRender::init(GLFWwindow* window){
     createRenderModelCommandBuffers();
 }
 
+// Ресайз окна
+void VulkanRender::windowResized(GLFWwindow* window, uint32_t width, uint32_t height){
+    rebuildRendering();
+}
+
+// Перестраиваем рендеринг при ошибках
+void VulkanRender::rebuildRendering(){
+    // Ждем завершения работы Vulkan
+    vulkanRenderQueue->wait();
+    vulkanPresentQueue->wait();
+    vulkanLogicalDevice->wait();
+    
+    // Обновляем данные о свопчейне для устройства
+    vulkanPhysicalDevice->updateSwapchainSupportDetails();
+    
+    // Создаем свопчейн + получаем изображения свопчейна
+    VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
+    VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
+    vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
+    
+    // Создаем текстуры для буффера глубины
+    createWindowDepthResources();
+    
+    // Создаем рендер проход
+    createMainRenderPass();
+    
+    // Создаем фреймбуфферы для вьюшек изображений окна
+    createWindowFrameBuffers();
+    
+    // Создание пайплайна отрисовки
+    createGraphicsPipeline();
+    
+    // Обновляем лаяут текстуры глубины на правильный
+    updateWindowDepthTextureLayout();
+    
+    // Создаем коммандные буфферы отрисовки модели
+    createRenderModelCommandBuffers();
+    
+    // Обнуляем индекс отрисовки
+    vulkanImageIndex = 0;
+}
+
 // Создаем буфферы для глубины
 void VulkanRender::createWindowDepthResources() {
     // Определяем подходящий формат изображения для глубины
@@ -171,6 +213,8 @@ void VulkanRender::createMainRenderPass(){
 
 // Создаем фреймбуфферы для вьюшек изображений окна
 void VulkanRender::createWindowFrameBuffers(){
+    vulkanWindowFrameBuffers.clear();
+    
     std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
     vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
     
@@ -572,7 +616,7 @@ void VulkanRender::drawFrame() {
                                             &swapchainImageIndex);
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        //recreateSwapChain();
+        rebuildRendering();
         return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
@@ -580,7 +624,7 @@ void VulkanRender::drawFrame() {
     
     // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
     if (vulkanImageIndex != swapchainImageIndex) {
-		LOG("Vulkan image index not equal to swapchain image index!\n");
+		LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
     }
     
     VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
@@ -636,7 +680,7 @@ void VulkanRender::drawFrame() {
     
     // В случае проблем - пересоздаем свопчейн
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
-        //recreateSwapChain();
+        rebuildRendering();
         return;
     } else if (presentResult != VK_SUCCESS) {
 		LOG("failed to present swap chain image!\n");

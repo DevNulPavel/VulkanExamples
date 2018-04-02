@@ -48,31 +48,11 @@ void createFences(){
     }
 }
 
-
-
-// Вызывается при различных ресайзах окна
-void recreateSwapChain() {
-    // Ждем завершения работы Vulkan
-    vkQueueWaitIdle(RenderI->vulkanRenderQueue->getQueue());
-    vkQueueWaitIdle(RenderI->vulkanPresentQueue->getQueue());
-    vkDeviceWaitIdle(RenderI->vulkanLogicalDevice->getDevice());
-    
-    // Заново пересоздаем свопчейны, старые удалятся внутри
-    //createSwapChain();
-    //getSwapchainImages();
-    //createImageViews();
-    //createDepthResources();
-    //updateDepthTextureLayout();
-    //createRenderPass();
-    //createFramebuffers();
-    //createGraphicsPipeline();
-    //createCommandBuffers();
-}
-
 // Коллбек, вызываемый при изменении размеров окна приложения
 void onGLFWWindowResized(GLFWwindow* window, int width, int height) {
     if (width == 0 || height == 0) return;
-    recreateSwapChain();
+    
+    RenderI->windowResized(window, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
 #ifndef _MSVC_LANG

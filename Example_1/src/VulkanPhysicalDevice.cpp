@@ -109,6 +109,11 @@ VulkanSurfacePtr VulkanPhysicalDevice::getBaseSurface() const{
     return _vulkanSurface;
 }
 
+// Обновляем информацию о свопчейне после ресайза окна
+void VulkanPhysicalDevice::updateSwapchainSupportDetails(){
+    _swapchainSuppportDetails = querySwapChainSupport(_device);
+}
+
 // Проверяем, поддерживает ли девайс цепочку свопинга
 bool VulkanPhysicalDevice::checkDeviceRequiredExtensionSupport(VkPhysicalDevice device) {
     // Получаем количество расширений

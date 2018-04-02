@@ -21,6 +21,7 @@ public:
 						 const std::vector<const char*>& layers,
 						 VulkanSurfacePtr surface);
     ~VulkanPhysicalDevice();
+    void updateSwapchainSupportDetails();   // Обновляем информацию о свопчейне после ресайза окна
     VkPhysicalDevice getDevice() const;
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
     VulkanSwapChainSupportDetails getSwapChainSupportDetails() const;
