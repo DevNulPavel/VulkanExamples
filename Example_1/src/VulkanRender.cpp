@@ -521,7 +521,7 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
      inheritanceInfo.queryFlags = 0;
      inheritanceInfo.pipelineStatistics = 0;*/
     
-    buffer->begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT); // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT); // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     
     // Информация о запуске рендер-прохода
     std::array<VkClearValue, 2> clearValues = {};
@@ -622,10 +622,8 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
      );*/
     
     // Заканчиваем подготовку коммандного буффера
-    if (vkEndCommandBuffer(buffer->getBuffer()) != VK_SUCCESS) {
-        LOG("Failed to record command buffer!\n");
-        throw std::runtime_error("Failed to record command buffer!");
-    }
+	buffer->end();
+
     return buffer;
 }
 

@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include "Helpers.h"
 
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool):
@@ -68,15 +69,24 @@ void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags, const VkCo
     beginInfo.pInheritanceInfo = &inheritance;
     
     // Запускаем буффер комманд
-    vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+	if (vkBeginCommandBuffer(_commandBuffer, &beginInfo) != VK_SUCCESS) {
+		LOG("Failed to begin command buffer!\n");
+		throw std::runtime_error("Failed to begin command buffer!");
+	}
 }
 
 void VulkanCommandBuffer::end() {
     // Заканчиваем прием комманд
-    vkEndCommandBuffer(_commandBuffer);
+	if (vkEndCommandBuffer(_commandBuffer) != VK_SUCCESS) {
+		LOG("Failed to record command buffer!\n");
+		throw std::runtime_error("Failed to record command buffer!");
+	}
 }
 
 void VulkanCommandBuffer::reset(VkCommandBufferResetFlags flags) {
     // Заканчиваем прием комманд
-    vkResetCommandBuffer(_commandBuffer, flags);
+	if (vkResetCommandBuffer(_commandBuffer, flags) != VK_SUCCESS) {
+		LOG("Failed to reset command buffer!\n");
+		throw std::runtime_error("Failed to reset command buffer!");
+	}
 }
