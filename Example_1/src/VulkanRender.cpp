@@ -189,17 +189,14 @@ void VulkanRender::rebuildRendering(){
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
     
-    // Создаем рендер проход
-    createModelRenderPass();
-    
-    // Создаем фреймбуфферы для вьюшек изображений окна
-    //createModelFrameBuffers();
-    
-    // Создание пайплайна отрисовки
-    createModelGraphicsPipeline();
-    
     // Обновляем лаяут текстуры глубины на правильный
     updateWindowDepthTextureLayout();
+    
+    // Создаем фреймбуфферы для вьюшек изображений окна
+    createWindowFrameBuffers();
+    
+    // Создание пайплайна отрисовки
+    createPostGraphicsPipeline();
     
     // Создаем коммандные буфферы отрисовки модели
     createCommandBuffers();
