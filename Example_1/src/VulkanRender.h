@@ -83,10 +83,10 @@ public:
     uint32_t modelImageIndex;
     VulkanBufferPtr modelVertexBuffer;
     VulkanBufferPtr modelIndexBuffer;
-    VulkanBufferPtr modelUniformStagingBuffer;
-    VulkanBufferPtr modelUniformGPUBuffer;
+    std::vector<VulkanBufferPtr> modelUniformStagingBuffer;
+    std::vector<VulkanBufferPtr> modelUniformGPUBuffer;
     VulkanDescriptorPoolPtr modelDescriptorPool;
-    VulkanDescriptorSetPtr modelDescriptorSet;
+    std::vector<VulkanDescriptorSetPtr> modelDescriptorSet;
     std::vector<VulkanCommandBufferPtr> modelDrawCommandBuffers;
     
     float rotateAngle;

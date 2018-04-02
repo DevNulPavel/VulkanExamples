@@ -412,37 +412,46 @@ void VulkanRender::createModelBuffers(){
 
 // Создаем буффер юниформов
 void VulkanRender::createModelUniformBuffer() {
+    modelUniformStagingBuffer.clear();
+    modelUniformGPUBuffer.clear();
+    
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
     
-    // Буффер для юниформов для CPU
-    modelUniformStagingBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
-                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
-                                                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+    for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
+        // Буффер для юниформов для CPU
+        VulkanBufferPtr stagBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
+                                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
+                                                                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+                                                                   bufferSize);
+        
+        // Буффер для юниформов на GPU
+        VulkanBufferPtr normalBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
+                                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                                                               VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, // Испольузется как получаетель + юниформ буффер
                                                                bufferSize);
-    
-    // Буффер для юниформов на GPU
-    modelUniformGPUBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
-                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
-                                                           VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, // Испольузется как получаетель + юниформ буффер
-                                                           bufferSize);
-    
-    // Обновляем юниформ буффер
-    UniformBufferObject ubo = {};
-    memset(&ubo, 0, sizeof(UniformBufferObject));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
-    
-    // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
-    // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
-    //ubo.proj[1][1] *= -1;
-    
-    // Отгружаем данные
-    modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
-    
-    // Закидываем задачу на копирование буффера
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
-    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+        
+        // Обновляем юниформ буффер
+        UniformBufferObject ubo = {};
+        memset(&ubo, 0, sizeof(UniformBufferObject));
+        ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
+        
+        // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
+        // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
+        //ubo.proj[1][1] *= -1;
+        
+        // Отгружаем данные
+        stagBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
+        
+        // Закидываем задачу на копирование буффера
+        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+        copyBuffer(commandBuffer, stagBuffer, normalBuffer);
+        endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+        
+        modelUniformStagingBuffer.push_back(stagBuffer);
+        modelUniformGPUBuffer.push_back(normalBuffer);
+    }
 }
 
 // Создаем пул дескрипторов ресурсов
@@ -452,10 +461,10 @@ void VulkanRender::createModelDescriptorPool() {
     poolSizes.resize(2);
     // Юниформ буффер
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 1;
+    poolSizes[0].descriptorCount = vulkanSwapchain->getImageViews().size();
     // Семплер для текстуры
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = 1;
+    poolSizes[1].descriptorCount = vulkanSwapchain->getImageViews().size();
     
     // Создаем пул
     modelDescriptorPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes);
@@ -463,26 +472,30 @@ void VulkanRender::createModelDescriptorPool() {
 
 // Создаем набор дескрипторов ресурсов
 void VulkanRender::createModelDescriptorSet() {
-    modelDescriptorSet = std::make_shared<VulkanDescriptorSet>(vulkanLogicalDevice, vulkanDescriptorSetLayout, modelDescriptorPool);
-    
-    VulkanDescriptorSetUpdateConfig vertexBufferSet;
-    vertexBufferSet.binding = 0; // Биндится на 0м значении в шейдере
-    vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
-    vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer->getBuffer();
-    vertexBufferSet.bufferInfo.offset = 0;
-    vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
-    
-    VulkanDescriptorSetUpdateConfig samplerSet;
-    samplerSet.binding = 1; // Биндится на 1м значении в шейдере
-    samplerSet.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    samplerSet.imageInfo.imageView = modelTextureImageView->getImageView();
-    samplerSet.imageInfo.sampler = modelTextureSampler->getSampler();
-    
-    std::vector<VulkanDescriptorSetUpdateConfig> configs;
-    configs.push_back(vertexBufferSet);
-    configs.push_back(samplerSet);
-    modelDescriptorSet->updateDescriptorSet(configs);
+    for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
+        VulkanDescriptorSetPtr set = std::make_shared<VulkanDescriptorSet>(vulkanLogicalDevice, vulkanDescriptorSetLayout, modelDescriptorPool);
+        
+        VulkanDescriptorSetUpdateConfig vertexBufferSet;
+        vertexBufferSet.binding = 0; // Биндится на 0м значении в шейдере
+        vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
+        vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer[i]->getBuffer();
+        vertexBufferSet.bufferInfo.offset = 0;
+        vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
+        
+        VulkanDescriptorSetUpdateConfig samplerSet;
+        samplerSet.binding = 1; // Биндится на 1м значении в шейдере
+        samplerSet.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        samplerSet.imageInfo.imageView = modelTextureImageView->getImageView();
+        samplerSet.imageInfo.sampler = modelTextureSampler->getSampler();
+        
+        std::vector<VulkanDescriptorSetUpdateConfig> configs;
+        configs.push_back(vertexBufferSet);
+        configs.push_back(samplerSet);
+        set->updateDescriptorSet(configs);
+        
+        modelDescriptorSet.push_back(set);
+    }
 }
 
 VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex){
@@ -534,17 +547,17 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
     
     // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    VkDescriptorSet set = modelDescriptorSet->getSet();
+    VkDescriptorSet set = modelDescriptorSet[frameIndex]->getSet();
     vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 0, nullptr);
     
     // Push константы для динамической отрисовки
-    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    /*glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
     vkCmdPushConstants(buffer->getBuffer(),
                        vulkanPipeline->getLayout(),
                        VK_SHADER_STAGE_VERTEX_BIT,
                        0,
                        sizeof(model),
-                       (unsigned char*)&model);
+                       (unsigned char*)&model);*/
     
     // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
     // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
@@ -618,6 +631,27 @@ void VulkanRender::createRenderModelCommandBuffers() {
 // Обновляем юниформ буффер
 void VulkanRender::updateRender(float delta){
     rotateAngle += delta * 30.0f;
+    
+    // Обновляем юниформ буффер
+    UniformBufferObject* data = (UniformBufferObject*)malloc(sizeof(UniformBufferObject));
+    UniformBufferObject ubo = *data;
+    memset(&ubo, 0, sizeof(UniformBufferObject));
+    ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
+    
+    // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
+    // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
+    //ubo.proj[1][1] *= -1;
+    
+    // Отгружаем данные
+    modelUniformStagingBuffer[vulkanImageIndex]->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
+    
+    // Закидываем задачу на копирование буффера
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+    copyBufferWithBarrier(commandBuffer, modelUniformStagingBuffer[vulkanImageIndex], modelUniformGPUBuffer[vulkanImageIndex]);
+    //endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+    endSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Непосредственно отрисовка кадра
@@ -705,10 +739,10 @@ VulkanRender::~VulkanRender(){
     vulkanLogicalDevice->wait();
     
     modelDrawCommandBuffers.clear();
-    modelDescriptorSet = nullptr;
+    modelDescriptorSet.clear();
     modelDescriptorPool = nullptr;
-    modelUniformGPUBuffer = nullptr;
-    modelUniformStagingBuffer = nullptr;
+    modelUniformGPUBuffer.clear();
+    modelUniformStagingBuffer.clear();
     modelVertexBuffer = nullptr;
     modelIndexBuffer = nullptr;
     modelTextureSampler = nullptr;

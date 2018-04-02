@@ -359,6 +359,71 @@ void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer,
     vkCmdCopyBuffer(commandBuffer->getBuffer(), srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
 }
 
+// Копирование буффера
+void copyBufferWithBarrier(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer) {
+    {
+        // Создаем барьер памяти для картинок
+        VkBufferMemoryBarrier barrier = {};
+        memset(&barrier, 0, sizeof(VkBufferMemoryBarrier));
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.buffer = srcBuffer->getBuffer();
+        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.offset = 0;
+        barrier.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
+        
+        // Закидываем в очередь барьер конвертации использования для изображения
+        vkCmdPipelineBarrier(commandBuffer->getBuffer(),
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                             0,
+                             0, nullptr,
+                             1, &barrier,
+                             0, nullptr);
+    }
+    
+    // Ставим в очередь копирование буффера
+    VkBufferCopy copyRegion = {};
+    memset(&copyRegion, 0, sizeof(VkBufferCopy));
+    copyRegion.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
+    vkCmdCopyBuffer(commandBuffer->getBuffer(), srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
+    
+//    VkStructureType    sType;
+//    const void*        pNext;
+//    VkAccessFlags      srcAccessMask;
+//    VkAccessFlags      dstAccessMask;
+//    uint32_t           srcQueueFamilyIndex;
+//    uint32_t           dstQueueFamilyIndex;
+//    VkBuffer           buffer;
+//    VkDeviceSize       offset;
+//    VkDeviceSize       size;
+    
+    // Создаем барьер памяти для картинок
+    {
+        VkBufferMemoryBarrier barrier = {};
+        memset(&barrier, 0, sizeof(VkBufferMemoryBarrier));
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.buffer = dstBuffer->getBuffer();
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.offset = 0;
+        barrier.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
+        
+        // Закидываем в очередь барьер конвертации использования для изображения
+        vkCmdPipelineBarrier(commandBuffer->getBuffer(),
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                             0,
+                             0, nullptr,
+                             1, &barrier,
+                             0, nullptr);
+    }
+}
+
 // Создание буфферов
 VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, VkBufferUsageFlagBits usage, unsigned char* data, size_t bufferSize){
     
