@@ -50,7 +50,8 @@ public:
                    VulkanPipelineCullingConfig cullingConfig,
                    VulkanPipelineBlendConfig blendConfig,
                    VulkanDescriptorSetLayoutPtr descriptorSetLayout,
-                   VulkanRenderPassPtr renderPass);
+                   VulkanRenderPassPtr renderPass,
+                   const std::vector<VkPushConstantRange>& pushConstants = std::vector<VkPushConstantRange>());
     ~VulkanPipeline();
     VkPipelineLayout getLayout() const;
     VkPipeline getPipeline() const;
@@ -70,6 +71,7 @@ private:
     VulkanPipelineBlendConfig _blendConfig;
     VulkanDescriptorSetLayoutPtr _descriptorSetLayout;
     VulkanRenderPassPtr _renderPass;
+    std::vector<VkPushConstantRange> _pushConstants;
     
     VkPipelineLayout _layout;
     VkPipeline _pipeline;

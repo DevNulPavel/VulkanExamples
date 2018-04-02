@@ -8,7 +8,7 @@ layout(location = 2) in vec2 inTexCoord;
 
 // Uniforms
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
+	mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;

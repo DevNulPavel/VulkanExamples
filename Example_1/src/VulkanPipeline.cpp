@@ -35,7 +35,8 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
                                VulkanPipelineCullingConfig cullingConfig,
                                VulkanPipelineBlendConfig blendConfig,
                                VulkanDescriptorSetLayoutPtr descriptorSetLayout,
-                               VulkanRenderPassPtr renderPass):
+                               VulkanRenderPassPtr renderPass,
+                               const std::vector<VkPushConstantRange>& pushConstants):
     _device(device),
     _vertexShader(vertexShader),
     _fragmentShader(fragmentShader),
@@ -48,7 +49,8 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     _cullingConfig(cullingConfig),
     _blendConfig(blendConfig),
     _descriptorSetLayout(descriptorSetLayout),
-    _renderPass(renderPass){
+    _renderPass(renderPass),
+    _pushConstants(pushConstants){
         
     // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -166,8 +168,8 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = setLayouts; // Устанавливаем лаяут
-    pipelineLayoutInfo.pushConstantRangeCount = 0;  // TODO: Пуш-константы??
-    pipelineLayoutInfo.pPushConstantRanges = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(_pushConstants.size());  // TODO: Пуш-константы??
+    pipelineLayoutInfo.pPushConstantRanges = (_pushConstants.size() > 0) ? _pushConstants.data() : nullptr;
     // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам, но без изменения??
     
     if (vkCreatePipelineLayout(_device->getDevice(), &pipelineLayoutInfo, nullptr, &_layout) != VK_SUCCESS) {

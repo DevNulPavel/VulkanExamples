@@ -301,6 +301,15 @@ void VulkanRender::createGraphicsPipeline() {
     blendConfig.srcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blendConfig.dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     
+    // Push константы
+    std::vector<VkPushConstantRange> pushConstants;
+    VkPushConstantRange pushConstantRange = {};
+    memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(float);
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstants.push_back(pushConstantRange);
+    
     // Пайплайн
     vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
                                                       vulkanVertexModule, vulkanFragmentModule,
@@ -313,7 +322,8 @@ void VulkanRender::createGraphicsPipeline() {
                                                       cullingConfig,
                                                       blendConfig,
                                                       vulkanDescriptorSetLayout,
-                                                      vulkanRenderPass);
+                                                      vulkanRenderPass,
+                                                      pushConstants);
 }
 
 
@@ -512,9 +522,18 @@ void VulkanRender::createRenderModelCommandBuffers() {
         // Привязываем индексный буффер к пайплайну
         vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
         
-        // Подключаем дескрипторы ресурсов для юниформ буффера
+        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
         VkDescriptorSet set = modelDescriptorSet->getSet();
         vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 0, nullptr);
+        
+        // Push константы для динамической отрисовки
+        float colorChange = 1.0f;
+        vkCmdPushConstants(buffer->getBuffer(),
+                           vulkanPipeline->getLayout(),
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(colorChange),
+                           (unsigned char*)&colorChange);
         
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
@@ -581,9 +600,10 @@ void VulkanRender::createRenderModelCommandBuffers() {
 }
 
 // Обновляем юниформ буффер
-void VulkanRender::updateUniformBuffer(float delta){
+void VulkanRender::updateRender(float delta){
     rotateAngle += delta * 30.0f;
     
+    // Обновляем юниформ буффер
     UniformBufferObject ubo = {};
     memset(&ubo, 0, sizeof(UniformBufferObject));
     ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -593,7 +613,8 @@ void VulkanRender::updateUniformBuffer(float delta){
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
     // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
     //ubo.proj[1][1] *= -1;
-    
+
+    // Отгружаем данные
     modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
     
     // Закидываем задачу на копирование буффера

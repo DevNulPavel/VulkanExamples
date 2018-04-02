@@ -45,7 +45,7 @@ public:
     // Ресайз окна
     void windowResized(GLFWwindow* window, uint32_t width, uint32_t height);
     // Обновляем юниформ буффер
-    void updateUniformBuffer(float delta);
+    void updateRender(float delta);
     // Непосредственно отрисовка кадра
     void drawFrame();
     

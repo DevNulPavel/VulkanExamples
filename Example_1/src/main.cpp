@@ -95,7 +95,7 @@ int local_main(int argc, char** argv) {
         glfwPollEvents();
         
         // Обновляем юниформы
-        VulkanRender::getInstance()->updateUniformBuffer(lastFrameDuration);
+        VulkanRender::getInstance()->updateRender(lastFrameDuration);
         
         // Непосредственно отрисовка кадра
         VulkanRender::getInstance()->drawFrame();
