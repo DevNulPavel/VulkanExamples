@@ -71,8 +71,14 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем свопчейн + получаем изображения свопчейна
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
     
+    // Создаем пулл комманд для отрисовки
+    vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
+    
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
+    
+    // Обновляем лаяут текстуры глубины на правильный
+    updateWindowDepthTextureLayout();
     
     // Создаем рендер проход
     createMainRenderPass();
@@ -88,12 +94,6 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
-    
-    // Создаем пулл комманд для отрисовки
-    vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
-    
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
     
     // Грузим текстуру
     modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "res/textures/chalet.jpg");
@@ -146,17 +146,14 @@ void VulkanRender::rebuildRendering(){
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
     
-    // Создаем рендер проход
-    createMainRenderPass();
+    // Обновляем лаяут текстуры глубины на правильный
+    updateWindowDepthTextureLayout();
     
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
     
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
-    
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
     
     // Создаем коммандные буфферы отрисовки модели
     createRenderModelCommandBuffers();
@@ -256,8 +253,8 @@ void VulkanRender::createDescriptorsSetLayout(){
 // Грузим шейдеры
 void VulkanRender::loadShaders(){
     // Читаем байт-код шейдеров
-    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/vert.spv");
-    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/frag.spv");
+    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/shader_vert.spv");
+    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/shader_frag.spv");
     
     // Создаем шейдерные модули
     vulkanVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);
