@@ -340,7 +340,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
                           0,
                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     
-    endAndQueueSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 
@@ -599,7 +599,7 @@ void VulkanRender::updateUniformBuffer(float delta){
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
     copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
-    endAndQueueSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Непосредственно отрисовка кадра

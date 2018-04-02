@@ -219,8 +219,8 @@ VulkanCommandBufferPtr beginSingleTimeCommands(VulkanLogicalDevicePtr device, Vu
     return buffer;
 }
 
-// Завершение коммандного буффера + отправка в очередь
-void endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue) {
+// Завершение коммандного буффера + отправка в очередь c ОЖИДАНИЕМ завершения
+void endAndQueueWaitSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue) {
     commandBuffer->end();
     queue->submitBuffer(commandBuffer);
     queue->wait();
@@ -335,7 +335,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
          endAndQueueSingleTimeCommands(commandBuffer, queue);
      }*/
     
-    endAndQueueSingleTimeCommands(commandBuffer, queue);
+    endAndQueueWaitSingleTimeCommands(commandBuffer, queue);
     
     // Удаляем временные объекты
     staggingImage = nullptr;
@@ -352,7 +352,6 @@ void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer,
     copyRegion.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
     vkCmdCopyBuffer(commandBuffer->getBuffer(), srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
 }
-
 
 // Создание буфферов
 VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, VkBufferUsageFlagBits usage, unsigned char* data, size_t bufferSize){
@@ -374,7 +373,7 @@ VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePt
     // Ставим задачу на копирование буфферов
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
     copyBuffer(commandBuffer, staggingBuffer, resultBuffer);
-    endAndQueueSingleTimeCommands(commandBuffer, queue);
+    endAndQueueWaitSingleTimeCommands(commandBuffer, queue);
     
     // Удаляем временный буффер, если есть
     staggingBuffer = nullptr;

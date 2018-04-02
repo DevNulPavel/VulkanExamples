@@ -18,7 +18,6 @@
 // Подбираем тип памяти буффера вершин
 uint32_t findMemoryType(VkPhysicalDevice device, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-
 // Подбираем формат текстуры в зависимости от доступных на устройстве
 VkFormat findSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
@@ -47,8 +46,8 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
 // Запуск коммандного буффера на получение комманд
 VulkanCommandBufferPtr beginSingleTimeCommands(VulkanLogicalDevicePtr device, VulkanCommandPoolPtr pool);
 
-// Завершение коммандного буффера + отправка в очередь
-void endAndQueueSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue);
+// Завершение коммандного буффера + отправка в очередь c ОЖИДАНИЕМ завершения!
+void endAndQueueWaitSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr queue);
 
 // Создание текстуры из изображения на диске
 VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, const std::string& path);
