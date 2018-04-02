@@ -70,7 +70,7 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
     range.baseArrayLayer = 0;
     range.layerCount = 1;
     range.baseMipLevel = startMipmapLevel;
-    range.levelCount = levelsCount;    // TODO: Сколько уровней надо конвертить?? Как параметр для мипмапов VK_REMAINING_MIP_LEVELS
+    range.levelCount = levelsCount;    // Сколько уровней надо конвертить?? Как параметр для мипмапов VK_REMAINING_MIP_LEVELS
     range.aspectMask = aspectFlags;
     
     // Создаем барьер памяти для картинок
@@ -100,8 +100,6 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
 
 // Закидываем в очередь операцию копирования текстуры
 void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel) {
-    // TODO: Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
-    
     // Описание ресурса
     VkImageSubresourceLayers subResource = {};
     memset(&subResource, 0, sizeof(VkImageSubresourceLayers));
@@ -201,7 +199,6 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
                               VK_ACCESS_TRANSFER_READ_BIT);
     }
     
-    // TODO: Fix it
     // After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
     transitionImageLayout(commandBuffer,
                           image,
@@ -249,12 +246,16 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                  VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
                                                                  VK_IMAGE_TILING_LINEAR,             // Тайлинг
                                                                  VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                                                                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных // TODO: For test
+                                                                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
                                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // Настраиваем работу с памятью так, чтобы было доступно на CPU
                                                                  1);
     
     // Отгружаем данные во временную текстуру
     staggingImage->uploadDataToImage(VK_IMAGE_ASPECT_COLOR_BIT, 0, static_cast<unsigned char*>(pixels), imageSize);
+    
+    // Учищаем буффер данных картинки
+    stbi_image_free(pixels);
+    pixels = nullptr;
     
     uint32_t mipmapLevels = floor(log2(std::max(texWidth, texHeight))) + 1;
     
@@ -268,9 +269,12 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                                                                mipmapLevels);
     
+    // TODO: Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+    
     // Конвертирование исходной буфферной текстуры с данными в формат копирования на GPU
     {
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         transitionImageLayout(commandBuffer,
                               staggingImage,
                               VK_IMAGE_LAYOUT_PREINITIALIZED,
@@ -281,12 +285,12 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
 							  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_HOST_WRITE_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT);
-        endAndQueueSingleTimeCommands(commandBuffer, queue);
+        //endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
     // Конвертирование конечной буфферной текстуры в формат получателя
     {
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         transitionImageLayout(commandBuffer,
                               resultImage,
                               VK_IMAGE_LAYOUT_UNDEFINED,
@@ -297,21 +301,21 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
 							  VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT);
-        endAndQueueSingleTimeCommands(commandBuffer, queue);
+        //endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
     // Копируем данные в пределах GPU из временной текстуры в целевую
     {
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         copyImage(commandBuffer, staggingImage, resultImage, VK_IMAGE_ASPECT_COLOR_BIT, 0);
-        endAndQueueSingleTimeCommands(commandBuffer, queue);
+        //endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
     // Генерируем мипмапы для текстуры
     {
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+        //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         generateMipmapsForImage(commandBuffer, resultImage);
-        endAndQueueSingleTimeCommands(commandBuffer, queue);
+        //endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
     // Конвертируем использование текстуры в оптимальное для рендеринга
@@ -331,12 +335,11 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
          endAndQueueSingleTimeCommands(commandBuffer, queue);
      }*/
     
+    endAndQueueSingleTimeCommands(commandBuffer, queue);
+    
     // Удаляем временные объекты
     staggingImage = nullptr;
     
-    // Учищаем буффер данных картинки
-    // TODO: Наверное можно удалить раньше
-    stbi_image_free(pixels);
     
     return resultImage;
 }
