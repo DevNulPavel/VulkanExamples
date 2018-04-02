@@ -30,24 +30,6 @@
 
 GLFWwindow* window = nullptr;
 
-
-
-VkFence vulkanFence = VK_NULL_HANDLE;
-
-// Создаем преграды для проверки завершения комманд отрисовки
-void createFences(){
-    VkFenceCreateInfo createInfo = {};
-    memset(&createInfo, 0, sizeof(VkFenceCreateInfo));
-    createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    createInfo.pNext = NULL;
-    createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Изначально создаем вытавленным
-    VkResult fenceCreateStatus = vkCreateFence(RenderI->vulkanLogicalDevice->getDevice(), &createInfo, nullptr, &vulkanFence);
-    if (fenceCreateStatus != VK_SUCCESS) {
-        LOG("Failed to create fence!");
-        throw std::runtime_error("Failed to create fence!");
-    }
-}
-
 // Коллбек, вызываемый при изменении размеров окна приложения
 void onGLFWWindowResized(GLFWwindow* window, int width, int height) {
     if (width == 0 || height == 0) return;
@@ -81,11 +63,7 @@ int local_main(int argc, char** argv) {
     }
 
     // Создаем рендер
-    VulkanRender::initInstance(window);
-    
-    // Создаем преграды для проверки завершения комманд отрисовки
-    createFences();
-    
+    VulkanRender::initInstance(window);    
     
     // Цикл обработки графики
     std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
@@ -119,8 +97,6 @@ int local_main(int argc, char** argv) {
             glfwSetWindowTitle(window, outText);
         }
    }
-    
-    vkDestroyFence(RenderI->vulkanLogicalDevice->getDevice(), vulkanFence, nullptr);
         
     VulkanRender::destroyRender();
     

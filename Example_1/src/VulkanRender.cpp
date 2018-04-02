@@ -67,7 +67,7 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем семафоры для отображения и ренедринга
     vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
-    
+        
     // Создаем свопчейн + получаем изображения свопчейна
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
     
@@ -664,19 +664,9 @@ void VulkanRender::drawFrame() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
     
-    // Синхронизация с ожиданием на CPU завершения очереди выполнения комманд
-    /*
-     //VkResult fenceStatus = vkGetFenceStatus(vulkanLogicalDevice, vulkanFence);
-     //VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
-     VkResult waitStatus = vkWaitForFences(vulkanLogicalDevice, 1, &vulkanFence, VK_TRUE, std::numeric_limits<uint64_t>::max()-1);
-     if (waitStatus == VK_SUCCESS) {
-     VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
-     //LOG("Fence waited + reset!\n");
-     }*/
-    
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
     if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo,  VK_NULL_HANDLE/*vulkanFence*/) != VK_SUCCESS) {
-		LOG("Failed to submit draw command buffer!\n");
+        LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
     
@@ -708,7 +698,7 @@ void VulkanRender::drawFrame() {
     }
 }
 
-VulkanRender::~VulkanRender(){
+VulkanRender::~VulkanRender(){    
     // Ждем завершения работы Vulkan
     vulkanRenderQueue->wait();
     vulkanPresentQueue->wait();

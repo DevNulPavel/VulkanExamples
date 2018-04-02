@@ -216,6 +216,8 @@ set(ALL_SOURCES
     src/VulkanQueue.cpp
     src/VulkanSemafore.h
     src/VulkanSemafore.cpp
+    src/VulkanFence.h
+    src/VulkanFence.cpp
     src/VulkanSwapchain.h
     src/VulkanSwapchain.cpp
     src/VulkanImage.h
