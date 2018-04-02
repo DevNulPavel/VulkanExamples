@@ -58,9 +58,6 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
 // Копирование буффера
 void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer);
 
-// Копирование буффера
-void copyBufferWithBarrier(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer);
-
 // Создание буфферов
 VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, VkBufferUsageFlagBits usage, unsigned char* data, size_t bufferSize);
 

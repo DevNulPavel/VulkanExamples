@@ -530,6 +530,19 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     renderPassInfo.clearValueCount = clearValues.size();
     renderPassInfo.pClearValues = clearValues.data();
     
+    // Обновляем юниформ буффер
+    // Доступно только ВНЕ рендер прохода!!!
+    UniformBufferObject ubo = {};
+    memset(&ubo, 0, sizeof(UniformBufferObject));
+    ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
+    
+    vkCmdUpdateBuffer(buffer->getBuffer(),
+                      modelUniformGPUBuffer[frameIndex]->getBuffer(),
+                      0, sizeof(UniformBufferObject),
+                      (unsigned char*)&ubo);
+    
     // Запуск рендер-прохода
     // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
     // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
@@ -631,27 +644,6 @@ void VulkanRender::createRenderModelCommandBuffers() {
 // Обновляем юниформ буффер
 void VulkanRender::updateRender(float delta){
     rotateAngle += delta * 30.0f;
-    
-    // Обновляем юниформ буффер
-    UniformBufferObject* data = (UniformBufferObject*)malloc(sizeof(UniformBufferObject));
-    UniformBufferObject ubo = *data;
-    memset(&ubo, 0, sizeof(UniformBufferObject));
-    ubo.model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
-    
-    // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
-    // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
-    //ubo.proj[1][1] *= -1;
-    
-    // Отгружаем данные
-    modelUniformStagingBuffer[vulkanImageIndex]->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
-    
-    // Закидываем задачу на копирование буффера
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    copyBufferWithBarrier(commandBuffer, modelUniformStagingBuffer[vulkanImageIndex], modelUniformGPUBuffer[vulkanImageIndex]);
-    //endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
-    endSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Непосредственно отрисовка кадра
