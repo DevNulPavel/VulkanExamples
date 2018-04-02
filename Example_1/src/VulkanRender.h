@@ -14,6 +14,7 @@
 #include "VulkanLogicalDevice.h"
 #include "VulkanQueue.h"
 #include "VulkanSemafore.h"
+#include "VulkanFence.h"
 #include "VulkanSwapchain.h"
 #include "VulkanImage.h"
 #include "VulkanImageView.h"
@@ -62,6 +63,7 @@ public:
     VulkanQueuePtr vulkanPresentQueue;
     VulkanSemaforePtr vulkanImageAvailableSemaphore;
     VulkanSemaforePtr vulkanRenderFinishedSemaphore;
+    std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanSwapchainPtr vulkanSwapchain;
     VulkanImagePtr vulkanWindowDepthImage;
     VulkanImageViewPtr vulkanWindowDepthImageView;

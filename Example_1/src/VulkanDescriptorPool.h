@@ -12,14 +12,17 @@
 
 struct VulkanDescriptorPool {
 public:
-    VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice, const std::vector<VkDescriptorPoolSize>& poolSize);
+    VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice, const std::vector<VkDescriptorPoolSize>& poolSize, uint32_t maxSets);
     ~VulkanDescriptorPool();
     VkDescriptorPool getPool() const;
+    std::vector<VkDescriptorPoolSize> getBasePoolSize() const;
+    uint32_t getBaseMaxSets() const;
     VulkanLogicalDevicePtr getBaseDevice() const;
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;
     std::vector<VkDescriptorPoolSize> _poolSize;
+    uint32_t _maxSets;
     VkDescriptorPool _pool;
     
 private:

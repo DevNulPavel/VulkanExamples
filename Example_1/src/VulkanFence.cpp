@@ -38,8 +38,10 @@ VulkanLogicalDevicePtr VulkanFence::getBaseDevice() const{
 
 void VulkanFence::waitAndReset(){
     // Синхронизация с ожиданием на CPU завершения очереди выполнения комманд
-    //VkResult fenceStatus = vkGetFenceStatus(vulkanLogicalDevice, vulkanFence);
-    //VkResult resetFenceStatus = vkResetFences(vulkanLogicalDevice, 1, &vulkanFence);
+    VkResult fenceStatus = vkGetFenceStatus(_device->getDevice(), _fence);
+    if (fenceStatus != VK_SUCCESS) {
+        LOG("Fence not set!\n");
+    }
     VkResult waitStatus = vkWaitForFences(_device->getDevice(), 1, &_fence, VK_TRUE, std::numeric_limits<uint64_t>::max()-1);
     if (waitStatus == VK_SUCCESS) {
         /*VkResult resetFenceStatus = */vkResetFences(_device->getDevice(), 1, &_fence);

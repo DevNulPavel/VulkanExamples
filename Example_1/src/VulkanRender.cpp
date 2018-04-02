@@ -67,9 +67,16 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем семафоры для отображения и ренедринга
     vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
-        
+    
     // Создаем свопчейн + получаем изображения свопчейна
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
+    
+    // Создаем барьеры для защиты от переполнения очереди заданий рендеринга
+    vulkanRenderFences.reserve(vulkanSwapchain->getImageViews().size());
+    for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
+        VulkanFencePtr fence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        vulkanRenderFences.push_back(fence);
+    }
     
     // Создаем пулл комманд для отрисовки
     vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
@@ -154,6 +161,15 @@ void VulkanRender::rebuildRendering(){
     
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
+    
+    // Обновление юниформ буффера
+    createModelUniformBuffer();
+    
+    // Создаем пул дескрипторов ресурсов
+    createModelDescriptorPool();
+    
+    // Создаем набор дескрипторов ресурсов
+    createModelDescriptorSet();
     
     // Создаем коммандные буфферы отрисовки модели
     createRenderModelCommandBuffers();
@@ -458,7 +474,7 @@ void VulkanRender::createModelDescriptorPool() {
     poolSizes[1].descriptorCount = 1;
     
     // Создаем пул
-    modelDescriptorPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes);
+    modelDescriptorPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes, 1);
 }
 
 // Создаем набор дескрипторов ресурсов
@@ -622,6 +638,22 @@ void VulkanRender::updateRender(float delta){
 
 // Непосредственно отрисовка кадра
 void VulkanRender::drawFrame() {
+    // TODO: Помогает против подвисания на ресайзах и тд
+    /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
+    vulkanRenderQueue->wait();
+    vulkanPresentQueue->wait();
+    std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
+    int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+     LOG("Wait duration (vkQueueWaitIdle(_queue)): %lldmicroSec\n", elapsedMicroSec);*/
+    
+    // TODO: ???
+    vulkanRenderQueue->wait();
+    vulkanPresentQueue->wait();
+    
+    // TODO: ???
+    vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+    
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
@@ -665,7 +697,7 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo,  VK_NULL_HANDLE/*vulkanFence*/) != VK_SUCCESS) {
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
@@ -724,6 +756,9 @@ VulkanRender::~VulkanRender(){
     vulkanWindowDepthImageView = nullptr;
     vulkanWindowDepthImage = nullptr;
     vulkanSwapchain = nullptr;
+    vulkanRenderFences.clear();
+    vulkanImageAvailableSemaphore = nullptr;
+    vulkanRenderFinishedSemaphore = nullptr;
     vulkanRenderQueue = nullptr;
     vulkanPresentQueue = nullptr;
     vulkanLogicalDevice = nullptr;
