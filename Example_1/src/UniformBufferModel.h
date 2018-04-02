@@ -1,12 +1,12 @@
-#ifndef UNIFORM_BUFFER_H
-#define UNIFORM_BUFFER_H
+#ifndef UNIFORM_BUFFER_MODEL_H
+#define UNIFORM_BUFFER_MODEL_H
 
 // GLM
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-struct UniformBufferObject {
+struct UniformBufferModel {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;

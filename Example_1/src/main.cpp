@@ -21,10 +21,6 @@
 #include "VulkanRender.h"
 #include "CommonDefines.h"
 #include "CommonConstants.h"
-#include "Vertex.h"
-#include "Figures.h"
-#include "UniformBuffer.h"
-#include "VulkanHelpers.h"
 #include "Helpers.h"
 
 

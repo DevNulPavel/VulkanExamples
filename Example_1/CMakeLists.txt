@@ -248,12 +248,16 @@ set(ALL_SOURCES
     src/VulkanDescriptorSet.cpp
     src/Helpers.h
     src/Helpers.cpp
-    src/Vertex.h
-    src/Vertex.cpp
+    src/Vertex3D.h
+    src/Vertex3D.cpp
+    src/Vertex2D.h
+    src/Vertex2D.cpp
     src/Figures.h
     src/Figures.cpp
-    src/UniformBuffer.h
-    src/UniformBuffer.cpp)
+    src/UniformBufferModel.h
+    src/UniformBufferModel.cpp
+    src/UniformBufferPost.h
+    src/UniformBufferPost.cpp)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 

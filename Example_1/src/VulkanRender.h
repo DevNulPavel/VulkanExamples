@@ -29,8 +29,10 @@
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
 
-#include "Vertex.h"
-#include "UniformBuffer.h"
+#include "Vertex3D.h"
+#include "Vertex2D.h"
+#include "UniformBufferModel.h"
+#include "UniformBufferPost.h"
 
 
 #define RenderI VulkanRender::getInstance()
@@ -54,6 +56,7 @@ private:
     ~VulkanRender();
     
 public:
+    // Vulkan
     VulkanInstancePtr vulkanInstance;
     VulkanSurfacePtr vulkanWindowSurface;
     VulkanPhysicalDevicePtr vulkanPhysicalDevice;
@@ -65,18 +68,35 @@ public:
     VulkanSwapchainPtr vulkanSwapchain;
     VulkanImagePtr vulkanWindowDepthImage;
     VulkanImageViewPtr vulkanWindowDepthImageView;
-    VulkanRenderPassPtr vulkanRenderPass;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
-    VulkanDescriptorSetLayoutPtr vulkanDescriptorSetLayout;
-    VulkanShaderModulePtr vulkanVertexModule;
-    VulkanShaderModulePtr vulkanFragmentModule;
-    VulkanPipelinePtr vulkanPipeline;
     VulkanCommandPoolPtr vulkanRenderCommandPool;
+    VulkanSamplerPtr vulkanTextureSampler;
     
+    // PostProcess
+    VulkanImagePtr postImage;
+    VulkanImageViewPtr postImageView;
+    VulkanFrameBufferPtr postFrameBuffers;
+    VulkanDescriptorSetLayoutPtr postDescriptorSetLayout;
+    VulkanShaderModulePtr postVertexModule;
+    VulkanShaderModulePtr postFragmentModule;
+    VulkanRenderPassPtr postRenderPass;
+    VulkanPipelinePtr postPipeline;
+    VulkanBufferPtr postVertexBuffer;
+    VulkanBufferPtr postIndexBuffer;
+    VulkanBufferPtr postUniformStagingBuffer;
+    VulkanBufferPtr postUniformGPUBuffer;
+    VulkanDescriptorPoolPtr postDescriptorPool;
+    VulkanDescriptorSetPtr postDescriptorSet;
+    
+    // Model
+    VulkanShaderModulePtr modelVertexModule;
+    VulkanShaderModulePtr modelFragmentModule;
+    VulkanPipelinePtr modelPipeline;
+    VulkanRenderPassPtr modelRenderPass;
+    VulkanDescriptorSetLayoutPtr modelDescriptorSetLayout;
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;
-    VulkanSamplerPtr modelTextureSampler;
-    std::vector<Vertex> modelVertices;
+    std::vector<Vertex3D> modelVertices;
     std::vector<uint32_t> modelIndices;
     size_t modelTotalVertexesCount;
     size_t modelTotalIndexesCount;
@@ -87,8 +107,10 @@ public:
     VulkanBufferPtr modelUniformGPUBuffer;
     VulkanDescriptorPoolPtr modelDescriptorPool;
     VulkanDescriptorSetPtr modelDescriptorSet;
-    std::vector<VulkanCommandBufferPtr> modelDrawCommandBuffers;
     
+    std::vector<VulkanCommandBufferPtr> drawCommandBuffers;
+    
+    float totalTime;
     float rotateAngle;
     
     uint32_t vulkanImageIndex;
@@ -96,23 +118,48 @@ public:
 private:
     void init(GLFWwindow* window);
     
+    // Создаем общие Vulkan объекты
+    void initSharedVulkanObjects(GLFWwindow* window);
     // Перестраиваем рендеринг при ошибках или ресайзе
     void rebuildRendering();
-    
     // Создаем буфферы для глубины
     void createWindowDepthResources();
-    // Создание рендер прохода
-    void createMainRenderPass();
-    // Создаем фреймбуфферы для вьюшек изображений окна
-    void createWindowFrameBuffers();
-    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
-    void createDescriptorsSetLayout();
-    // Грузим шейдеры
-    void loadShaders();
-    // Создание пайплайна отрисовки
-    void createGraphicsPipeline();
     // Обновляем лаяут текстуры глубины на правильный
     void updateWindowDepthTextureLayout();
+    
+    // Создание текстуры, в которую будет происходить отрисовка
+    void createPostFrameBufferTexture();
+    // Создаем фреймбуфферы для отрисовки в текстуру постобработки
+    void createPostFrameBuffer();
+    // Создаем структуру дескрипторов для постобработки (юниформ буффер, семплер и тд)
+    void createPostDescriptorsSetLayout();
+    // Загружаем шейдеры постобработки
+    void loadPostShaders();
+    // Создание рендер прохода
+    void createPostRenderPass();
+    // Создание пайплайна отрисовки
+    void createPostGraphicsPipeline();
+    // Создание буфферов вершин
+    void createPostBuffers();
+    // Создаем буффер юниформов
+    void createPostUniformBuffer();
+    // Создаем пул дескрипторов ресурсов
+    void createPostDescriptorPool();
+    // Создаем набор дескрипторов ресурсов
+    void createPostDescriptorSet();
+    
+    // Создание рендер прохода
+    void createModelRenderPass();
+
+    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+    void createModelDescriptorsSetLayout();
+    // Грузим шейдеры модели
+    void loadModelShaders();
+    // Создание пайплайна отрисовки
+    void createModelGraphicsPipeline();
+    
+    // Создаем фреймбуфферы для отрисовки на экран
+    void createWindowFrameBuffers();
     
     // Грузим данные для модели
     void loadModelSrcData();
@@ -124,8 +171,9 @@ private:
     void createModelDescriptorPool();
     // Создаем набор дескрипторов ресурсов
     void createModelDescriptorSet();
+    
     // Создаем коммандные буфферы
-    void createRenderModelCommandBuffers();
+    void createCommandBuffers();
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
