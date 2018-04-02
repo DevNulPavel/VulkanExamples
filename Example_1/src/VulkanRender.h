@@ -63,6 +63,7 @@ public:
     VulkanQueuePtr vulkanPresentQueue;
     VulkanSemaforePtr vulkanImageAvailableSemaphore;
     VulkanSemaforePtr vulkanRenderFinishedSemaphore;
+    std::vector<VulkanFencePtr> vulkanPresentFences;
     std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanSwapchainPtr vulkanSwapchain;
     VulkanImagePtr vulkanWindowDepthImage;

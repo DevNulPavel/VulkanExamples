@@ -73,9 +73,12 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем барьеры для защиты от переполнения очереди заданий рендеринга
     vulkanRenderFences.reserve(vulkanSwapchain->getImageViews().size());
+    vulkanPresentFences.reserve(vulkanSwapchain->getImageViews().size());
     for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
-        VulkanFencePtr fence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
-        vulkanRenderFences.push_back(fence);
+        VulkanFencePtr renderFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        vulkanRenderFences.push_back(renderFence);
+        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        vulkanPresentFences.push_back(presentFence);
     }
     
     // Создаем пулл комманд для отрисовки
@@ -652,7 +655,8 @@ void VulkanRender::drawFrame() {
     vulkanPresentQueue->wait();
     
     // TODO: ???
-    vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+    //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+    //vulkanRenderFences[vulkanImageIndex]->waitAndReset();
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
@@ -660,7 +664,7 @@ void VulkanRender::drawFrame() {
                                             vulkanSwapchain->getSwapchain(),
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
-                                            VK_NULL_HANDLE,
+                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE,
                                             &swapchainImageIndex);
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -697,7 +701,7 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, /*vulkanRenderFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
@@ -756,6 +760,7 @@ VulkanRender::~VulkanRender(){
     vulkanWindowDepthImageView = nullptr;
     vulkanWindowDepthImage = nullptr;
     vulkanSwapchain = nullptr;
+    vulkanPresentFences.clear();
     vulkanRenderFences.clear();
     vulkanImageAvailableSemaphore = nullptr;
     vulkanRenderFinishedSemaphore = nullptr;
