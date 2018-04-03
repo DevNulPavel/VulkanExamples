@@ -112,7 +112,10 @@ void VulkanRender::init(GLFWwindow* window){
     modelTextureImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, modelTextureImage, VK_IMAGE_ASPECT_COLOR_BIT);
     
     // Создаем семплер для текстуры
-    modelTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+    modelTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice,
+                                                          VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                                          modelTextureImage->getBaseMipmapsCount());
     
     // Грузим данные для модели
     loadModelSrcData();

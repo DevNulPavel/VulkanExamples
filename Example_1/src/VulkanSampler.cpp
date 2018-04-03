@@ -5,11 +5,12 @@
 #include "Helpers.h"
 
 
-VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, VkFilter magFilter, VkSamplerAddressMode mode):
+VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, VkFilter magFilter, VkSamplerAddressMode mode, uint32_t maxMipLevels):
     _device(device),
     _minFiler(minFiler),
     _magFilter(magFilter),
-    _mode(mode){
+    _mode(mode),
+    _maxMipLevels(maxMipLevels){
         
     // Описание семплирования для текстуры
     VkSamplerCreateInfo samplerInfo = {};
@@ -29,7 +30,7 @@ VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, V
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+    samplerInfo.maxLod = static_cast<float>(_maxMipLevels);
     
     // Создаем семплер
     if (vkCreateSampler(_device->getDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS) {
