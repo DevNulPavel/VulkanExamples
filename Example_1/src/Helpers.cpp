@@ -31,6 +31,15 @@ std::vector<unsigned char> readFile(const std::string& filename) {
     return buffer;
 }
 
+std::chrono::high_resolution_clock::time_point timestampBegin(){
+    return std::chrono::high_resolution_clock::now();
+}
+
+void timestampEndMicroSec(const std::chrono::high_resolution_clock::time_point& time1, const char* infoText){
+    std::chrono::high_resolution_clock::duration elapsed = std::chrono::high_resolution_clock::now() - time1;
+    int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+    LOG("%s: %lldmicroSec\n", infoText, elapsedMicroSec);
+}
 
 #ifdef _MSVC_LANG
 int __cdecl LOG(const char *format, ...) {

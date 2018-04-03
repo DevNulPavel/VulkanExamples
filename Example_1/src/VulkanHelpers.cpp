@@ -145,7 +145,7 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
 		VK_ACCESS_TRANSFER_WRITE_BIT);
 
     // Copy down mips from n-1 to n
-    for (int32_t i = 1; i < image->getBaseMipmapsCount(); i++){
+    for (int32_t i = 1; i < static_cast<int32_t>(image->getBaseMipmapsCount()); i++){
         // Transiton current mip level to transfer dest
         transitionImageLayout(commandBuffer,
                               image,

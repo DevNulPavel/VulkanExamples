@@ -50,7 +50,7 @@ std::vector<VkLayerProperties> VulkanInstance::getAllValidationLayers(){
 
 // Проверяем, что все запрошенные слои нам доступны
 bool VulkanInstance::checkAllLayersInVectorAvailable(const std::vector<VkLayerProperties>& allLayers, const std::vector<const char*>& testLayers){
-    for(int i = 0; i < testLayers.size(); i++) {
+    for(int i = 0; i < static_cast<int>(testLayers.size()); i++) {
         const char* layerName = testLayers[i];
         bool layerFound = false;
         
@@ -75,12 +75,24 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
     // Список всех слоев
     std::vector<VkLayerProperties> allValidationLayers = getAllValidationLayers();
     for(const VkLayerProperties& layerInfo: allValidationLayers){
-        LOG("Validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
+        LOG("Instance validation layer available: %s (%s)\n", layerInfo.layerName, layerInfo.description);
     }
-    
+
     // Возможные отладочные слои
     std::vector<const char*> result;
     result.push_back("VK_LAYER_LUNARG_standard_validation");
+#ifdef __WINNT__
+//    result.push_back("VK_LAYER_LUNARG_api_dump");
+//    result.push_back("VK_LAYER_LUNARG_device_simulation");
+//    result.push_back("VK_LAYER_LUNARG_screenshot");
+//    result.push_back("VK_LAYER_LUNARG_vktrace");
+    result.push_back("VK_LAYER_LUNARG_assistant_layer");
+    result.push_back("VK_LAYER_LUNARG_core_validation");
+    result.push_back("VK_LAYER_LUNARG_object_tracker");
+    result.push_back("VK_LAYER_LUNARG_parameter_validation");
+    result.push_back("VK_LAYER_GOOGLE_threading");
+    result.push_back("VK_LAYER_GOOGLE_unique_objects");
+#endif
     if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
         result.clear();
         result.push_back("VK_LAYER_LUNARG_image");

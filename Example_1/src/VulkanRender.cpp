@@ -367,7 +367,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
                           0, 1,
                           aspectMask,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-						  VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                           0,
                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     
@@ -410,10 +410,10 @@ void VulkanRender::loadModelSrcData(){
     modelTotalVertexesCount = modelVertices.size();
     modelTotalIndexesCount = modelIndices.size();
     
-	LOG("Model loading complete: %ld vertexes, %ld triangles, %ld indexes\n",
-           modelTotalVertexesCount,
-           modelTotalVertexesCount/3,
-           modelTotalIndexesCount);
+    LOG("Model loading complete: %lld vertexes, %lld triangles, %lld indexes\n",
+           static_cast<long long int>(modelTotalVertexesCount),
+           static_cast<long long int>(modelTotalVertexesCount/3),
+           static_cast<long long int>(modelTotalIndexesCount));
 }
 
 // Создание буфферов вершин
@@ -641,26 +641,21 @@ void VulkanRender::updateRender(float delta){
 
 // Непосредственно отрисовка кадра
 void VulkanRender::drawFrame() {
-    // TODO: Помогает против подвисания на ресайзах и тд
-    /*std::chrono::high_resolution_clock::time_point time1 = std::chrono::high_resolution_clock::now();
-    vulkanRenderQueue->wait();
-    vulkanPresentQueue->wait();
-    std::chrono::high_resolution_clock::time_point time2 = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::duration elapsed = time2 - time1;
-    int64_t elapsedMicroSec = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-     LOG("Wait duration (vkQueueWaitIdle(_queue)): %lldmicroSec\n", elapsedMicroSec);*/
-    
     // TODO: ???
 #ifdef __APPLE__
+    // TODO: Помогает против подвисания на ресайзах и тд
 	vulkanRenderQueue->wait();
 	vulkanPresentQueue->wait();
 #endif // 
     
+    TIME_BEGIN_OFF(DRAW_TIME);
+
     // TODO: ???
     //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
     vulkanRenderFences[vulkanImageIndex]->waitAndReset();
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
+    TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
                                             vulkanSwapchain->getSwapchain(),
@@ -668,6 +663,7 @@ void VulkanRender::drawFrame() {
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
                                             /*vulkanPresentFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE,
                                             &swapchainImageIndex);
+    TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         rebuildRendering();
@@ -682,10 +678,12 @@ void VulkanRender::drawFrame() {
     }
     
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
+    TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
     VulkanCommandBufferPtr buffer = makeModelCommandBuffer(vulkanImageIndex);
     modelDrawCommandBuffers[vulkanImageIndex] = buffer;
     VkCommandBuffer drawBuffer = buffer->getBuffer();
-    
+    TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
+
     // Настраиваем отправление в очередь комманд отрисовки
     // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
     VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore()}; // Семафор ожидания картинки для вывода туда графики
@@ -734,6 +732,8 @@ void VulkanRender::drawFrame() {
 		LOG("failed to present swap chain image!\n");
         throw std::runtime_error("failed to present swap chain image!");
     }
+
+    TIME_END_MICROSEC_OFF(DRAW_TIME, "Total Draw method time");
 }
 
 VulkanRender::~VulkanRender(){    

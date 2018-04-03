@@ -163,7 +163,11 @@ void VulkanSwapchain::createSwapChain() {
     }
     
     createInfo.preTransform = _swapChainSupportDetails.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
+#ifdef __WINNT__
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
+#else
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
+#endif
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     
@@ -185,7 +189,7 @@ void VulkanSwapchain::createSwapChain() {
 		// Удалится вместе со старой ссылкой
         //vkDestroySwapchainKHR(_device->getDevice(), oldSwapChain, nullptr);
         _oldSwapchain = nullptr;
-        oldSwapChain = VK_NULL_HANDLE;
+        //oldSwapChain = VK_NULL_HANDLE;
     }
     
     // Сохраняем формат и размеры изображения
