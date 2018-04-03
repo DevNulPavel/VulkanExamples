@@ -675,12 +675,6 @@ void VulkanRender::drawFrame() {
 #endif // 
     
     TIME_BEGIN_OFF(DRAW_TIME);
-
-    // TODO: ???
-    //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	TIME_BEGIN_OFF(WAIT_FENCE);
-    vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence wait time");
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
@@ -689,7 +683,7 @@ void VulkanRender::drawFrame() {
                                             vulkanSwapchain->getSwapchain(),
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
-                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE,
+                                            vulkanPresentFences[vulkanImageIndex]->getFence() /*VK_NULL_HANDLE*/,
                                             &swapchainImageIndex);
     TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
     
@@ -704,6 +698,11 @@ void VulkanRender::drawFrame() {
     if (vulkanImageIndex != swapchainImageIndex) {
 		LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
     }
+
+	// Ожидаем доступность закидывания задач на рендеринг
+	TIME_BEGIN(WAIT_FENCE);
+	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+	TIME_END_MICROSEC(WAIT_FENCE, "Fence render wait time");
     
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
     TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
@@ -734,10 +733,11 @@ void VulkanRender::drawFrame() {
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
     
-    // Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
-    // TODO: Операции на семафорах - нужно ли вообще это???
-    vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapchain->getImageViews().size();
-    
+	// Ждем доступности отображения
+	TIME_BEGIN(WAIT_FENCE_PRESENT);
+	vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+	TIME_END_MICROSEC(WAIT_FENCE_PRESENT, "Present fence wait time");
+
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
     VkPresentInfoKHR presentInfo = {};
@@ -752,6 +752,10 @@ void VulkanRender::drawFrame() {
     // Закидываем в очередь задачу отображения картинки
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue->getQueue(), &presentInfo);
     
+	// Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
+	// TODO: Операции на семафорах - нужно ли вообще это???
+	vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapchain->getImageViews().size();
+
     // В случае проблем - пересоздаем свопчейн
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
         rebuildRendering();
