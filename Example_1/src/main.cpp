@@ -50,6 +50,8 @@ int local_main(int argc, char** argv) {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     // Мультисемплинг
     //glfwWindowHint(GLFW_SAMPLES, 4);
+	// Frame rate
+	glfwWindowHint(GLFW_REFRESH_RATE, 60);
     
     // Создаем окно
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);
@@ -70,6 +72,7 @@ int local_main(int argc, char** argv) {
     double lastFrameDuration = 1.0/60.0;
     int totalFrames = 0;
     while (!glfwWindowShouldClose(window)) {
+		std::chrono::high_resolution_clock::time_point drawBegin = std::chrono::high_resolution_clock::now();
         glfwPollEvents();
         
         // Обновляем юниформы
@@ -79,8 +82,8 @@ int local_main(int argc, char** argv) {
         VulkanRender::getInstance()->drawFrame();
         
         // Стабилизация времени кадра
-        std::chrono::high_resolution_clock::duration curFrameDuration = std::chrono::high_resolution_clock::now() - lastDrawTime;
-        std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/59.0 * 1000.0)) - curFrameDuration;
+        std::chrono::high_resolution_clock::duration drawCallDuration = std::chrono::high_resolution_clock::now() - drawBegin;
+        std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - drawCallDuration;
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
             std::this_thread::sleep_for(sleepDuration);
         }
@@ -90,10 +93,13 @@ int local_main(int argc, char** argv) {
         
         // FPS
         totalFrames++;
-        if (totalFrames > 30) {
+        if (totalFrames >= 30) {
             totalFrames = 0;
-            char outText[64];
-            sprintf(outText, "Possible FPS: %d, sleep duration: %lldms", static_cast<int>(1.0/lastFrameDuration), std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count());
+            char outText[128];
+            sprintf(outText, "Possible FPS: %d, CPU draw duration %lldms, sleep duration: %lldms", 
+				static_cast<int>(1.0/lastFrameDuration), 
+				std::chrono::duration_cast<std::chrono::milliseconds>(drawCallDuration).count(),
+				std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count());
             glfwSetWindowTitle(window, outText);
         }
    }
