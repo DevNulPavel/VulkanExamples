@@ -5,7 +5,10 @@
 #include "Helpers.h"
 
 
-VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, VkFilter magFilter, VkSamplerAddressMode mode, uint32_t maxMipLevels):
+VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device,
+                             VkFilter minFiler, VkFilter magFilter,
+                             VkSamplerAddressMode mode,
+                             uint32_t maxMipLevels, uint32_t minMipLevel, float mipLevelBias):
     _device(device),
     _minFiler(minFiler),
     _magFilter(magFilter),
@@ -28,8 +31,8 @@ VulkanSampler::VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, V
     samplerInfo.compareEnable = VK_FALSE;
     samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
+    samplerInfo.mipLodBias = mipLevelBias;
+    samplerInfo.minLod = static_cast<float>(minMipLevel);
     samplerInfo.maxLod = static_cast<float>(_maxMipLevels);
     
     // Создаем семплер
@@ -61,4 +64,8 @@ VkFilter VulkanSampler::getBaseMagFilter() const{
 
 VkSamplerAddressMode VulkanSampler::getBaseMode() const{
     return _mode;
+}
+
+uint32_t VulkanSampler::getBaseMaxMipLevel() const{
+    return _maxMipLevels;
 }

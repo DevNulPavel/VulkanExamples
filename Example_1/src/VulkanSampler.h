@@ -12,13 +12,17 @@
 
 struct VulkanSampler {
 public:
-    VulkanSampler(VulkanLogicalDevicePtr device, VkFilter minFiler, VkFilter magFilter, VkSamplerAddressMode mode, uint32_t maxMipLevels);
+    VulkanSampler(VulkanLogicalDevicePtr device,
+                  VkFilter minFiler, VkFilter magFilter,
+                  VkSamplerAddressMode mode,
+                  uint32_t maxMipLevels, uint32_t minMipLevel = 0, float mipLevelBias = 0.0f);
     ~VulkanSampler();
     VkSampler getSampler() const;
     VulkanLogicalDevicePtr getBaseDevice() const;
     VkFilter getBaseMinFiler() const;
     VkFilter getBaseMagFilter() const;
     VkSamplerAddressMode getBaseMode() const;
+    uint32_t getBaseMaxMipLevel() const;
     
 private:
     VulkanLogicalDevicePtr _device;
