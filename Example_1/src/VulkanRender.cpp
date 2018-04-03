@@ -641,7 +641,6 @@ void VulkanRender::updateRender(float delta){
 
 // Непосредственно отрисовка кадра
 void VulkanRender::drawFrame() {
-    // TODO: ???
 #ifdef __APPLE__
     // TODO: Помогает против подвисания на ресайзах и тд
 	vulkanRenderQueue->wait();
@@ -652,7 +651,9 @@ void VulkanRender::drawFrame() {
 
     // TODO: ???
     //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+	TIME_BEGIN_OFF(WAIT_FENCE);
     vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence wait time");
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     TIME_BEGIN_OFF(NEXT_IMAGE_TIME);

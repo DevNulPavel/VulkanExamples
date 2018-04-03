@@ -163,7 +163,7 @@ void VulkanSwapchain::createSwapChain() {
     }
     
     createInfo.preTransform = _swapChainSupportDetails.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
-#ifdef __WINNT__
+#if defined(__WINNT__) || defined(_WINDOWS)
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
 #else
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
