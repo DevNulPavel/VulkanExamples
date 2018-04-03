@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <limits>
 #include "CommonConstants.h"
 #include "Helpers.h"
 
