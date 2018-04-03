@@ -334,6 +334,11 @@ void VulkanRender::createGraphicsPipeline() {
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pushConstants.push_back(pushConstantRange);
     
+    // Динамически изменяемые параметры
+    std::vector<VkDynamicState> dynamicStates;
+    dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
+    dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+    
     // Пайплайн
     vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
                                                       vulkanVertexModule, vulkanFragmentModule,
@@ -347,7 +352,8 @@ void VulkanRender::createGraphicsPipeline() {
                                                       blendConfig,
                                                       vulkanDescriptorSetLayout,
                                                       vulkanRenderPass,
-                                                      pushConstants);
+                                                      pushConstants,
+                                                      dynamicStates);
 }
 
 
@@ -545,6 +551,24 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
     // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
     vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    
+    // Динамически изменяемый параметр в пайплайне
+    VkViewport viewport = {};
+    memset(&viewport, 0, sizeof(VkViewport));
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(vulkanSwapchain->getSwapChainExtent().width);
+    viewport.height = static_cast<float>(vulkanSwapchain->getSwapChainExtent().height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(buffer->getBuffer(), 0, 1, &viewport);
+    
+    // Динамически изменяемый параметр в пайплайне
+    VkRect2D scissor = {};
+    memset(&scissor, 0, sizeof(VkRect2D));
+    scissor.offset = {0, 0};
+    scissor.extent = vulkanSwapchain->getSwapChainExtent();
+    vkCmdSetScissor(buffer->getBuffer(), 0, 1, &scissor);
     
     // Устанавливаем пайплайн у коммандного буффера
     vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());

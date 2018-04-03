@@ -36,7 +36,8 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
                                VulkanPipelineBlendConfig blendConfig,
                                VulkanDescriptorSetLayoutPtr descriptorSetLayout,
                                VulkanRenderPassPtr renderPass,
-                               const std::vector<VkPushConstantRange>& pushConstants):
+                               const std::vector<VkPushConstantRange>& pushConstants,
+                               const std::vector<VkDynamicState>& dynamicStates):
     _device(device),
     _vertexShader(vertexShader),
     _fragmentShader(fragmentShader),
@@ -50,7 +51,8 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     _blendConfig(blendConfig),
     _descriptorSetLayout(descriptorSetLayout),
     _renderPass(renderPass),
-    _pushConstants(pushConstants){
+    _pushConstants(pushConstants),
+    _dynamicStates(dynamicStates){
         
     // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -161,6 +163,14 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
         
+    // Динамически изменяемы состояния у пайплайна
+    VkPipelineDynamicStateCreateInfo dynamicInfo = {};
+    memset(&dynamicInfo, 0, sizeof(VkPipelineDynamicStateCreateInfo));
+    dynamicInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicInfo.flags = 0;
+    dynamicInfo.dynamicStateCount = static_cast<uint32_t>(_dynamicStates.size());
+    dynamicInfo.pDynamicStates = _dynamicStates.data();
+    
     // Лаяут пайплайна
     VkDescriptorSetLayout setLayouts[] = {_descriptorSetLayout->getLayout()};   // Лаяют для юниформ буффер и семплера
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -168,15 +178,14 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = setLayouts; // Устанавливаем лаяут
-    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(_pushConstants.size());  // TODO: Пуш-константы??
-    pipelineLayoutInfo.pPushConstantRanges = (_pushConstants.size() > 0) ? _pushConstants.data() : nullptr;
-    // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам, но без изменения??
+    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(_pushConstants.size());
+    pipelineLayoutInfo.pPushConstantRanges = (_pushConstants.size() > 0) ? _pushConstants.data() : nullptr; // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам
     
     if (vkCreatePipelineLayout(_device->getDevice(), &pipelineLayoutInfo, nullptr, &_layout) != VK_SUCCESS) {
         LOG("Failed to create pipeline layout!\n");
         throw std::runtime_error("Failed to create pipeline layout!");
     }
-        
+    
     // TODO: Наследование позволяет ускорить переключение пайплайнов с общим родителем
     
     // Непосредственно создание пайплайна
@@ -193,11 +202,11 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     pipelineInfo.pDepthStencilState = &depthStencil;    // Настройки работы с глубиной
     pipelineInfo.pMultisampleState = &multisampling;    // Настройки семплирования для антиалиассинга
     pipelineInfo.pColorBlendState = &colorBlending;     // Настройка смешивания цветов
+    pipelineInfo.pDynamicState = &dynamicInfo;               // Динамическое состояние отрисовки
     pipelineInfo.layout = _layout;                      // Лаяут пайплайна (Описание буфферов юниформов и семплеров)
     pipelineInfo.renderPass = _renderPass->getPass();         // Рендер-проход
     pipelineInfo.subpass = 0;   // Для какого
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;   // Родительский пайплайн
-    pipelineInfo.pDynamicState = nullptr;               // Динамическое состояние отрисовки
     
     if (vkCreateGraphicsPipelines(_device->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
         LOG("Failed to create graphics pipeline!\n");
