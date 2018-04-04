@@ -77,7 +77,7 @@ void VulkanRender::init(GLFWwindow* window){
     for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
         VulkanFencePtr renderFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
         vulkanRenderFences.push_back(renderFence);
-        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, false);
         vulkanPresentFences.push_back(presentFence);
     }
     

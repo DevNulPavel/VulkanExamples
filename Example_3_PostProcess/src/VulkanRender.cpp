@@ -909,7 +909,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         // Push константы для динамической отрисовки
         float effectCoeff = 1.0f;
         vkCmdPushConstants(buffer->getBuffer(),
-                           modelPipeline->getLayout(),
+                           postPipeline->getLayout(),
                            VK_SHADER_STAGE_FRAGMENT_BIT,
                            0,
                            sizeof(float),
