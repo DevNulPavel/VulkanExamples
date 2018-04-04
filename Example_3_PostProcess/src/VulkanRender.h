@@ -68,14 +68,14 @@ public:
     std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanSwapchainPtr vulkanSwapchain;
     VulkanCommandPoolPtr vulkanRenderCommandPool;
-    VulkanImagePtr vulkanWindowDepthImage;
-    VulkanImageViewPtr vulkanWindowDepthImageView;
-    VulkanRenderPassPtr vulkanRenderToWindowRenderPass;
+    VulkanImagePtr postDepthImage;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
     std::vector<VulkanCommandBufferPtr> vulkanDrawCommandBuffers;
     
     VulkanImagePtr postImage;
     VulkanImageViewPtr postImageView;
+    VulkanImageViewPtr ostDepthImageView;
+    VulkanRenderPassPtr vulkanRenderToWindowRenderPass;
     VulkanRenderPassPtr postRenderToRenderPass;
     VulkanFrameBufferPtr postFrameBuffer;
     VulkanDescriptorSetLayoutPtr postDescriptorSetLayout;
@@ -120,9 +120,9 @@ private:
     // Создаем рабочие объекты Vulkan
     void createSharedVulkanObjects(GLFWwindow* window);
     // Создаем буфферы для глубины
-    void createWindowDepthResources();
+    void createPostDepthResources();
     // Обновляем лаяут текстуры глубины на правильный
-    void updateWindowDepthTextureLayout();
+    void updatePostDepthTextureLayout();
     // Создание рендер прохода
     void createRenderToWindowsRenderPass();
     

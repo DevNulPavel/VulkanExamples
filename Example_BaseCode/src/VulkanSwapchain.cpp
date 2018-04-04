@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <set>
 #include <algorithm>
-#include "CommonConstants.h"
 #include "VulkanQueue.h"
 
 
@@ -112,7 +111,7 @@ VkExtent2D VulkanSwapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& cap
         return capabilities.currentExtent;
     }
     
-    VkExtent2D actualExtent = {WINDOW_WIDTH, WINDOW_HEIGHT};
+    VkExtent2D actualExtent = {10000, 10000};
     
     actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
     actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));

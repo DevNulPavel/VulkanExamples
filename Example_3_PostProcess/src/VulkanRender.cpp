@@ -15,6 +15,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define TARGET_FBO_TEXTURE_WIDTH 1024
+#define TARGET_FBO_TEXTURE_HEIGHT 768
 
 static VulkanRender* renderInstance = nullptr;
 
@@ -52,6 +54,12 @@ void VulkanRender::init(GLFWwindow* window){
     
     // Создаем картинки для отрисовки в текстуру
     createPostImageAndView();
+    
+    // Создаем текстуры для буффера глубины
+    createPostDepthResources();
+    
+    // Обновляем лаяут текстуры глубины на правильный
+    updatePostDepthTextureLayout();
     
     // Создаем рендер проход
     createRenderToPostRenderPass();
@@ -153,10 +161,10 @@ void VulkanRender::rebuildRendering(){
 	vulkanSwapchain = newVulkanSwapchain;
     
     // Создаем текстуры для буффера глубины
-    createWindowDepthResources();
+    createPostDepthResources();
     
     // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
+    updatePostDepthTextureLayout();
     
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
@@ -221,67 +229,8 @@ void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
     // Создаем пулл комманд для отрисовки
     vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
     
-    // Создаем текстуры для буффера глубины
-    createWindowDepthResources();
-    
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
-    
     // Создание рендер прохода
     createRenderToWindowsRenderPass();
-}
-
-// Создаем буфферы для глубины
-void VulkanRender::createWindowDepthResources() {
-    // Определяем подходящий формат изображения для глубины
-    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(),
-                                                     candidates,
-                                                     VK_IMAGE_TILING_OPTIMAL,
-                                                     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    
-    // Создаем изображение для глубины
-    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
-    uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
-    vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                           width, height,               // Размеры
-                                                           vulkanDepthFormat,           // Формат текстуры
-                                                           VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
-                                                           VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, // Использоваться будет в качестве аттачмента глубины
-                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
-                                                           1);                          // 1 уровень мипмапов
-    
-    // Создаем вью для изображения буффера глубины
-    vulkanWindowDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
-                                                                   vulkanWindowDepthImage,
-                                                                   VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
-}
-
-
-// Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updateWindowDepthTextureLayout(){
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    
-    VkImageAspectFlags aspectMask;
-    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
-        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    
-    // Конвертируем в формат, пригодный для глубины
-    transitionImageLayout(commandBuffer,
-                          vulkanWindowDepthImage,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          0, 1,
-                          aspectMask,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                          0,
-                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    
-    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Создание рендер прохода
@@ -303,15 +252,69 @@ void VulkanRender::createPostImageAndView(){
     // Изображение
     postImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
                                               //vulkanSwapchain->getSwapChainExtent().width, vulkanSwapchain->getSwapChainExtent().height,
-                                              vulkanSwapchain->getSwapChainExtent().width/2, vulkanSwapchain->getSwapChainExtent().height/2,
+                                              TARGET_FBO_TEXTURE_WIDTH, TARGET_FBO_TEXTURE_HEIGHT,
                                               VK_FORMAT_R8G8B8A8_UNORM,
                                               VK_IMAGE_TILING_OPTIMAL,
                                               VK_IMAGE_LAYOUT_UNDEFINED,
                                               VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                               1);
+    
     //  Вьюшка
     postImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, postImage, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+// Создаем буфферы для глубины
+void VulkanRender::createPostDepthResources() {
+    // Определяем подходящий формат изображения для глубины
+    std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+    VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(),
+                                                     candidates,
+                                                     VK_IMAGE_TILING_OPTIMAL,
+                                                     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    
+    // Создаем изображение для глубины
+    uint32_t width = TARGET_FBO_TEXTURE_WIDTH;
+    uint32_t height = TARGET_FBO_TEXTURE_HEIGHT;
+    postDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
+                                                         width, height,               // Размеры
+                                                         vulkanDepthFormat,           // Формат текстуры
+                                                         VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
+                                                         VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
+                                                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, // Использоваться будет в качестве аттачмента глубины
+                                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                                                         1);                          // 1 уровень мипмапов
+    
+    // Создаем вью для изображения буффера глубины
+    ostDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
+                                                                 postDepthImage,
+                                                                 VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
+}
+
+
+// Обновляем лаяут текстуры глубины на правильный
+void VulkanRender::updatePostDepthTextureLayout(){
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+    
+    VkImageAspectFlags aspectMask;
+    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (hasStencilComponent(postDepthImage->getBaseFormat())) {
+        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    
+    // Конвертируем в формат, пригодный для глубины
+    transitionImageLayout(commandBuffer,
+                          postDepthImage,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                          0, 1,
+                          aspectMask,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                          0,
+                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Создание рендер прохода
@@ -320,11 +323,11 @@ void VulkanRender::createRenderToPostRenderPass(){
     imageConfig.format = postImage->getBaseFormat();
     imageConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
     imageConfig.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Сохраняем для отрисовки
-    imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED; // TODO: Layout
-    imageConfig.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // TODO: Layout
-    imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;   // TODO: Layout
+    imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageConfig.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     VulkanRenderPassConfig depthConfig;
-    depthConfig.format = vulkanWindowDepthImage->getBaseFormat();
+    depthConfig.format = postDepthImage->getBaseFormat();
     depthConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
     depthConfig.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Не важен результат
     depthConfig.initLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -338,7 +341,7 @@ void VulkanRender::createPostFrameBuffer(){
     // Вьюшка текстуры отображения + глубины
     std::vector<VulkanImageViewPtr> views;
     views.push_back(postImageView);
-    views.push_back(vulkanWindowDepthImageView);
+    views.push_back(ostDepthImageView);
     postFrameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice,
                                                           postRenderToRenderPass,
                                                           views,
@@ -421,6 +424,8 @@ void VulkanRender::createPostGraphicsPipeline() {
     
     // Динамически изменяемые параметры
     std::vector<VkDynamicState> dynamicStates;
+    //dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+    //dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
     
     // Пайплайн
     postPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
@@ -566,6 +571,8 @@ void VulkanRender::createModelGraphicsPipeline() {
     
     // Динамически изменяемые параметры
     std::vector<VkDynamicState> dynamicStates;
+    //dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+    //dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
     
     // Пайплайн
     modelPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
@@ -661,7 +668,7 @@ void VulkanRender::createModelUniformBuffer() {
     ModelUniformBuffer ubo = {};
     memset(&ubo, 0, sizeof(ModelUniformBuffer));
     ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), postImage->getBaseSize().width / (float)postImage->getBaseSize().height, 0.1f, 10.0f);
+    ubo.proj = glm::perspective(glm::radians(45.0f), (float)postImage->getBaseSize().width / (float)postImage->getBaseSize().height, 0.1f, 10.0f);
     
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
     // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
@@ -716,7 +723,7 @@ void VulkanRender::createModelDescriptorSet() {
     modelDescriptorSet->updateDescriptorSet(configs);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Создаем коммандные буфферы отрисовки модели
 void VulkanRender::resetCommandBuffers() {
@@ -756,6 +763,15 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
     
     // Отрисовка модели
     {
+        // Изменяем лаяут текстуры, в которую рисуем
+        transitionImageLayout(buffer,
+                              postImage,
+                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                              0, 1,
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                              VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
         clearValues[0].color = {{0.3f, 0.3f, 0.3f, 1.0f}};
@@ -766,14 +782,30 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         renderPassInfo.renderPass = postRenderToRenderPass->getPass();   // Рендер проход
         renderPassInfo.framebuffer = postFrameBuffer->getBuffer();
         renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = postImage->getBaseSize();
+        renderPassInfo.renderArea.extent = postImage->getBaseSize(); //{postImage->getBaseSize().width, postImage->getBaseSize().width}; // TODO: ???? не работает
         renderPassInfo.clearValueCount = clearValues.size();
         renderPassInfo.pClearValues = clearValues.data();
         
         // Запуск рендер-прохода
-        // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
-        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
         vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Настраиваем вьюпорт
+//        VkViewport viewport = {};
+//        memset(&viewport, 0, sizeof(VkViewport));
+//        viewport.x = 0.0f;
+//        viewport.y = 0.0f;
+//        viewport.width = static_cast<float>(postImage->getBaseSize().width);
+//        viewport.height = static_cast<float>(postImage->getBaseSize().height);
+//        viewport.minDepth = 0.0f;
+//        viewport.maxDepth = 1.0f;
+//        vkCmdSetViewport(buffer->getBuffer(), 0, 1, &viewport);
+        
+        // Выставляем сциссор
+//        VkRect2D scissor = {};
+//        memset(&scissor, 0, sizeof(VkRect2D));
+//        scissor.offset = {0, 0};
+//        scissor.extent = postImage->getBaseSize();
+//        vkCmdSetScissor(buffer->getBuffer(), 0, 1, &scissor);
         
         // Устанавливаем пайплайн у коммандного буффера
         vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline->getPipeline());
@@ -799,15 +831,6 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
                            sizeof(model),
                            (unsigned char*)&model);
         
-        // Изменяем лаяут текстуры, в которую рисуем
-        transitionImageLayout(buffer,
-                              postImage,
-                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                              0, 1,
-                              VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-        
         // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
         // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
@@ -819,6 +842,15 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
     
     // Отрисовка текстуры пост эффекта
     {
+        // Изменяем лаяут текстуры, для использования как текстуру отрисовки
+        transitionImageLayout(buffer,
+                              postImage,
+                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              0, 1,
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+        
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
         clearValues[0].color = {{0.4f, 0.1f, 0.1f, 1.0f}};
@@ -835,18 +867,25 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         renderPassInfo.pClearValues = clearValues.data();
         
         // Запуск рендер-прохода
-        // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
-        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
         vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         
-        // Изменяем лаяут текстуры, для использования как текстуру отрисовки
-        transitionImageLayout(buffer,
-                              postImage,
-                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                              0, 1,
-                              VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+        // Настраиваем вьюпорт
+//        VkViewport viewport = {};
+//        memset(&viewport, 0, sizeof(VkViewport));
+//        viewport.x = 0.0f;
+//        viewport.y = 0.0f;
+//        viewport.width = static_cast<float>(vulkanSwapchain->getSwapChainExtent().width);
+//        viewport.height = static_cast<float>(vulkanSwapchain->getSwapChainExtent().height);
+//        viewport.minDepth = 0.0f;
+//        viewport.maxDepth = 1.0f;
+//        vkCmdSetViewport(buffer->getBuffer(), 0, 1, &viewport);
+        
+        // Выставляем сциссор
+//        VkRect2D scissor = {};
+//        memset(&scissor, 0, sizeof(VkRect2D));
+//        scissor.offset = {0, 0};
+//        scissor.extent = vulkanSwapchain->getSwapChainExtent();
+//        vkCmdSetScissor(buffer->getBuffer(), 0, 1, &scissor);
         
         // Устанавливаем пайплайн у коммандного буффера
         vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, postPipeline->getPipeline());
@@ -1019,8 +1058,8 @@ VulkanRender::~VulkanRender(){
     modelDescriptorSetLayout = nullptr;
     vulkanWindowFrameBuffers.clear();
     postRenderToRenderPass = nullptr;
-    vulkanWindowDepthImageView = nullptr;
-    vulkanWindowDepthImage = nullptr;
+    ostDepthImageView = nullptr;
+    postDepthImage = nullptr;
     vulkanSwapchain = nullptr;
     vulkanPresentFences.clear();
     vulkanRenderFences.clear();

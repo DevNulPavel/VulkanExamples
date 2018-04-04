@@ -3,7 +3,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <set>
-#include "CommonConstants.h"
 #include "VulkanQueue.h"
 
 

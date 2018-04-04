@@ -1,7 +1,6 @@
 #include "VulkanSurface.h"
 #include <cstdio>
 #include <stdexcept>
-#include "CommonConstants.h"
 #include "Helpers.h"
 
 

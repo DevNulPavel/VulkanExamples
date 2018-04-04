@@ -32,7 +32,7 @@ const std::vector<uint16_t> CUBE_INDICES = {
     4, 5, 6, 6, 7, 4
 };
 
-const float QUAD_SIZE = 1.0f;
+const float QUAD_SIZE = 0.5f;
 
 const std::vector<Vertex2D> QUAD_VERTEXES = {
     {{-QUAD_SIZE, -QUAD_SIZE}, {0.0f, 0.0f}},

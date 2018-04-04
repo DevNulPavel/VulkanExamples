@@ -13,6 +13,6 @@ out gl_PerVertex {
 layout(location = 0) out vec2 fragTexCoord;
 
 void main() {
-    gl_Position = vec4(inPosition, 0.0, 1.0);
+    gl_Position = vec4(inPosition, 0.5, 1.0);
     fragTexCoord = inTexCoord;
 }
