@@ -7,12 +7,11 @@
 VulkanFrameBuffer::VulkanFrameBuffer(VulkanLogicalDevicePtr device,
                                      VulkanRenderPassPtr renderPass,
                                      const std::vector<VulkanImageViewPtr>& imageViews,
-                                     uint32_t width, uint32_t height):
+                                     VkExtent2D size):
     _device(device),
     _renderPass(renderPass),
     _imageViews(imageViews),
-    _width(width),
-    _height(height){
+    _size(size){
         
     // Список аттачментов
     std::vector<VkImageView> attachments;
@@ -28,8 +27,8 @@ VulkanFrameBuffer::VulkanFrameBuffer(VulkanLogicalDevicePtr device,
     framebufferInfo.renderPass = _renderPass->getPass();  // Совместимый рендер-проход
     framebufferInfo.attachmentCount = attachments.size();   // Аттачменты
     framebufferInfo.pAttachments = attachments.data();      // Данные аттачментов
-    framebufferInfo.width = _width;    // Размеры
-    framebufferInfo.height = _height;  // Размеры
+    framebufferInfo.width = _size.width;    // Размеры
+    framebufferInfo.height = _size.height;  // Размеры
     framebufferInfo.layers = 1;
     
     if (vkCreateFramebuffer(_device->getDevice(), &framebufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
@@ -58,11 +57,7 @@ std::vector<VulkanImageViewPtr> VulkanFrameBuffer::getBaseImageViews() const{
     return _imageViews;
 }
 
-uint32_t VulkanFrameBuffer::getBaseWidth() const{
-    return _width;
-}
-
-uint32_t VulkanFrameBuffer::getBaseHeight() const{
-    return _height;
+VkExtent2D VulkanFrameBuffer::getBaseSize() const{
+    return _size;
 }
 

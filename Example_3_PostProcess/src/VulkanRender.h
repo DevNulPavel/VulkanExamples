@@ -74,7 +74,7 @@ public:
     
     VulkanImagePtr postImage;
     VulkanImageViewPtr postImageView;
-    VulkanImageViewPtr ostDepthImageView;
+    VulkanImageViewPtr postDepthImageView;
     VulkanRenderPassPtr vulkanRenderToWindowRenderPass;
     VulkanRenderPassPtr postRenderToRenderPass;
     VulkanFrameBufferPtr postFrameBuffer;

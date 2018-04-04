@@ -17,21 +17,19 @@ public:
     VulkanFrameBuffer(VulkanLogicalDevicePtr device,
                       VulkanRenderPassPtr renderPass,
                       const std::vector<VulkanImageViewPtr>& imageViews,
-                      uint32_t width, uint32_t height);
+                      VkExtent2D size);
     ~VulkanFrameBuffer();
     VkFramebuffer getBuffer() const;
     VulkanLogicalDevicePtr getBaseDevice() const;
     VulkanRenderPassPtr getBaseRenderPass() const;
     std::vector<VulkanImageViewPtr> getBaseImageViews() const;
-    uint32_t getBaseWidth() const;
-    uint32_t getBaseHeight() const;
+    VkExtent2D getBaseSize() const;
     
 private:
     VulkanLogicalDevicePtr _device;
     VulkanRenderPassPtr _renderPass;
     std::vector<VulkanImageViewPtr> _imageViews;
-    uint32_t _width;
-    uint32_t _height;
+    VkExtent2D _size;
     VkFramebuffer _buffer;
     
 private:

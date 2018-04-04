@@ -20,7 +20,7 @@ public:
                 VkExtent2D size,
                 bool needDestroy);
     VulkanImage(VulkanLogicalDevicePtr logicDevice,
-                uint32_t width, uint32_t height,
+                VkExtent2D size,
                 VkFormat format,
                 VkImageTiling tiling,
                 VkImageLayout layout,

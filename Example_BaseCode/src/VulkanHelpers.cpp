@@ -248,7 +248,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
     // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
     VulkanImagePtr staggingImage = std::make_shared<VulkanImage>(device,
-                                                                 texWidth, texHeight,
+                                                                 VkExtent2D({static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)}),
                                                                  VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
                                                                  VK_IMAGE_TILING_LINEAR,             // Тайлинг
                                                                  VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -267,7 +267,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     
     // Создаем рабочее изображение для последующего использования
     VulkanImagePtr resultImage = std::make_shared<VulkanImage>(device,
-                                                               texWidth, texHeight,
+                                                               VkExtent2D({static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)}),
                                                                VK_FORMAT_R8G8B8A8_UNORM,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
                                                                VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)

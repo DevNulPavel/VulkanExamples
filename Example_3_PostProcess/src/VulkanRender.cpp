@@ -256,7 +256,7 @@ void VulkanRender::createPostImageAndView(){
     // Изображение
     postImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
                                               //vulkanSwapchain->getSwapChainExtent().width, vulkanSwapchain->getSwapChainExtent().height,
-                                              TARGET_FBO_TEXTURE_WIDTH, TARGET_FBO_TEXTURE_HEIGHT,
+                                              VkExtent2D({TARGET_FBO_TEXTURE_WIDTH, TARGET_FBO_TEXTURE_HEIGHT}),
                                               VK_FORMAT_R8G8B8A8_UNORM,
                                               VK_IMAGE_TILING_OPTIMAL,
                                               VK_IMAGE_LAYOUT_UNDEFINED,
@@ -281,16 +281,16 @@ void VulkanRender::createPostDepthResources() {
     uint32_t width = TARGET_FBO_TEXTURE_WIDTH;
     uint32_t height = TARGET_FBO_TEXTURE_HEIGHT;
     postDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                         width, height,               // Размеры
-                                                         vulkanDepthFormat,           // Формат текстуры
-                                                         VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
-                                                         VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-                                                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, // Использоваться будет в качестве аттачмента глубины
-                                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
-                                                         1);                          // 1 уровень мипмапов
+                                                   VkExtent2D({width, height}), // Размеры
+                                                   vulkanDepthFormat,           // Формат текстуры
+                                                   VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
+                                                   VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
+                                                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, // Использоваться будет в качестве аттачмента глубины
+                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,   // Хранится только на GPU
+                                                   1);                          // 1 уровень мипмапов
     
     // Создаем вью для изображения буффера глубины
-    ostDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
+    postDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                  postDepthImage,
                                                                  VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
 }
@@ -345,11 +345,11 @@ void VulkanRender::createPostFrameBuffer(){
     // Вьюшка текстуры отображения + глубины
     std::vector<VulkanImageViewPtr> views;
     views.push_back(postImageView);
-    views.push_back(ostDepthImageView);
+    views.push_back(postDepthImageView);
     postFrameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice,
                                                           postRenderToRenderPass,
                                                           views,
-                                                          postImage->getBaseSize().width, postImage->getBaseSize().height);
+                                                          postImage->getBaseSize());
 }
 
 // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
@@ -743,8 +743,6 @@ void VulkanRender::createWindowFrameBuffers(){
     std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
     vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
     
-    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
-    uint32_t heigth = vulkanSwapchain->getSwapChainExtent().height;
     for (const VulkanImageViewPtr& view: windowImagesViews) {
         // Вьюшка текстуры отображения + глубины
         std::vector<VulkanImageViewPtr> views;
@@ -752,7 +750,7 @@ void VulkanRender::createWindowFrameBuffers(){
         //views.push_back(vulkanWindowDepthImageView); // не использется тектура глубины
         
         // Создаем фреймбуффер
-        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderToWindowRenderPass, views, width, heigth);
+        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderToWindowRenderPass, views, vulkanSwapchain->getSwapChainExtent());
         vulkanWindowFrameBuffers.push_back(frameBuffer);
     }
 }
@@ -1062,7 +1060,7 @@ VulkanRender::~VulkanRender(){
     modelDescriptorSetLayout = nullptr;
     vulkanWindowFrameBuffers.clear();
     postRenderToRenderPass = nullptr;
-    ostDepthImageView = nullptr;
+    postDepthImageView = nullptr;
     postDepthImage = nullptr;
     vulkanSwapchain = nullptr;
     vulkanPresentFences.clear();

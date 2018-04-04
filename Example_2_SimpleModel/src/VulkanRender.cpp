@@ -199,7 +199,7 @@ void VulkanRender::createWindowDepthResources() {
     uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
     uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
     vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                           width, height,               // Размеры
+                                                           VkExtent2D({width, height}),               // Размеры
                                                            vulkanDepthFormat,           // Формат текстуры
                                                            VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
                                                            VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -239,8 +239,6 @@ void VulkanRender::createWindowFrameBuffers(){
     std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
     vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
     
-    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
-    uint32_t heigth = vulkanSwapchain->getSwapChainExtent().height;
     for (const VulkanImageViewPtr& view: windowImagesViews) {
         // Вьюшка текстуры отображения + глубины
         std::vector<VulkanImageViewPtr> views;
@@ -248,7 +246,7 @@ void VulkanRender::createWindowFrameBuffers(){
         views.push_back(vulkanWindowDepthImageView);
         
         // Создаем фреймбуффер
-        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderPass, views, width, heigth);
+        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderPass, views, vulkanSwapchain->getSwapChainExtent());
         vulkanWindowFrameBuffers.push_back(frameBuffer);
     }
 }

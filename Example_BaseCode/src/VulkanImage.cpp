@@ -43,7 +43,7 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr device, VkImage image, VkFormat 
 }
 
 VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
-                         uint32_t width, uint32_t height,
+                         VkExtent2D size,
                          VkFormat format,
                          VkImageTiling tiling,
                          VkImageLayout layout,
@@ -54,7 +54,7 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
     _image(VK_NULL_HANDLE),
     _imageMemory(VK_NULL_HANDLE),
     _format(format),
-    _size({width, height}),
+    _size(size),
     _tiling(tiling),
     _layout(layout),
     _usage(usage),
@@ -62,7 +62,7 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
     _mipmapsCount(mipmapsCount),
     _needDestroy(true){
         
-    createImage(width, height,
+    createImage(_size.width, _size.height,
                 format,
                 tiling,
                 layout,
