@@ -134,7 +134,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         // Очередь отображения
         VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
         vkGetDeviceQueue(_device, vulkanPresentQueueFamilyIndex, queuesIndexes[1], &vulkanPresentQueue);
-        _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[1], vulkanGraphicsQueue));
+        _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[1], vulkanPresentQueue));
     }
 }
 

@@ -176,16 +176,13 @@ void VulkanRender::rebuildRendering(){
     createWindowFrameBuffers();
     
     // Создание пайплайна отрисовки
-    createModelGraphicsPipeline();
-    
-    // Обновление юниформ буффера
-    createModelUniformBuffer();
-    
-    // Создаем пул дескрипторов ресурсов
-    createModelDescriptorPool();
+	createPostGraphicsPipeline();
+
+	// Создаем пул дескрипторов ресурсов
+	createPostRenderDescriptorPool();
     
     // Создаем набор дескрипторов ресурсов
-    createModelDescriptorSet();
+	createPostRenderDescriptorSet();
     
     // Создаем коммандные буфферы отрисовки модели
     resetCommandBuffers();
