@@ -1,5 +1,9 @@
-set(PROJECT_NAME "VulkanDemo1")
-set(EXECUTABLE_NAME "VulkanDemo1")
+set(PROJECT_NAME "VulkanBaseCode")
+set(VULKAN_BASE_LIBRARY_NAME "VulkanBaseCode")
+set(VULKAN_BASE_LIBRARY_LINK_LIBS "")
+set(VULKAN_BASE_LIBRARY_INCLUDES "")
+
+
 set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
 
 
@@ -67,7 +71,7 @@ else()
     message(FATAL_ERROR "Vulkan lib not found!")
 endif()
 
-# # Список фреймворков OSX для MoltenVK
+# Список фреймворков OSX для MoltenVK
 if(APPLE)
     set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES}
         "-framework Metal"
@@ -75,6 +79,12 @@ if(APPLE)
         "-framework QuartzCore"
         "-framework IOKit"
         "-framework Foundation")
+endif()
+
+##############
+# Системные библиотеки
+if(UNIX)
+    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} m)
 endif()
 
 
@@ -85,10 +95,64 @@ endif()
 message("******** Source libraries search ***********")
 
 ##############
-# BaseCode library
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../Example_BaseCode" "${CMAKE_CURRENT_BINARY_DIR}/Example_BaseCode")
-include_directories(${VULKAN_BASE_LIBRARY_INCLUDES})
-set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${VULKAN_BASE_LIBRARY_LINK_LIBS})
+# GLM library (Header Only mode)
+message("GLM added")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glm")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/glm")
+
+
+##############
+# GLFW library
+# Устанавливаем нужные нам настройки
+message("GLFW added")
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
+option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
+option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
+option(GLFW_INSTALL "Generate installation target" OFF)
+if(APPLE)
+    option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" ON)
+else()
+    option(GLFW_VULKAN_STATIC "Use the Vulkan loader statically linked into application" OFF)
+endif()
+option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
+if (WIN32)
+    option(GLFW_USE_HYBRID_HPG "Force use of high-performance GPU on hybrid systems" ON)
+endif()
+if (APPLE)
+    option(GLFW_USE_CHDIR "Make glfwInit chdir to Contents/Resources" ON)
+    option(GLFW_USE_MENUBAR "Populate the menu bar on first window creation" ON)
+    option(GLFW_USE_RETINA "Use the full resolution of Retina displays" ON)
+endif()
+if (UNIX AND NOT APPLE)
+    option(GLFW_USE_WAYLAND "Use Wayland for window creation" OFF)
+    option(GLFW_USE_MIR     "Use Mir for window creation" OFF)
+endif()
+if (MSVC)
+    option(USE_MSVC_RUNTIME_LIBRARY_DLL "Use MSVC runtime library DLL" ON)
+endif()
+
+# Добавляем библиотеку
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include")
+set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} glfw ${GLFW_LIBRARIES})
+message("GLFW link libraries list: ${GLFW_LIBRARIES}")
+
+
+##############
+# stb_image library
+message("STB added")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/stb_image")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/stb_image")
+
+
+##############
+# stb_image library
+message("TinyObj added")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/tiny_obj_loader")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/tiny_obj_loader")
+
 
 
 
@@ -139,21 +203,62 @@ print_current_cmake_config()
 # Исходники
 ####################################################
 set(ALL_SOURCES 
-    src/main.cpp
-    src/VulkanRender.h
-    src/VulkanRender.cpp
+    src/VulkanHelpers.h
+    src/VulkanHelpers.cpp
+    src/VulkanInstance.h
+    src/VulkanInstance.cpp
+    src/VulkanSurface.h
+    src/VulkanSurface.cpp
+    src/VulkanPhysicalDevice.h
+    src/VulkanPhysicalDevice.cpp
+    src/VulkanQueuesFamiliesIndexes.h
+    src/VulkanQueuesFamiliesIndexes.cpp
+    src/VulkanSwapChainSupportDetails.h
+    src/VulkanSwapChainSupportDetails.cpp
+    src/VulkanLogicalDevice.h
+    src/VulkanLogicalDevice.cpp
+    src/VulkanQueue.h
+    src/VulkanQueue.cpp
+    src/VulkanSemafore.h
+    src/VulkanSemafore.cpp
+    src/VulkanFence.h
+    src/VulkanFence.cpp
+    src/VulkanSwapchain.h
+    src/VulkanSwapchain.cpp
+    src/VulkanImage.h
+    src/VulkanImage.cpp
+    src/VulkanImageView.h
+    src/VulkanImageView.cpp
     src/CommonDefines.h
     src/CommonConstants.h
+    src/VulkanRenderPass.h
+    src/VulkanRenderPass.cpp
+    src/VulkanFrameBuffer.h
+    src/VulkanFrameBuffer.cpp
+    src/VulkanDescriptorSetLayout.h
+    src/VulkanDescriptorSetLayout.cpp
+    src/VulkanShaderModule.h
+    src/VulkanShaderModule.cpp
+    src/VulkanPipeline.h
+    src/VulkanPipeline.cpp
+    src/VulkanCommandPool.h
+    src/VulkanCommandPool.cpp
+    src/VulkanCommandBuffer.h
+    src/VulkanCommandBuffer.cpp
+    src/VulkanSampler.h
+    src/VulkanSampler.cpp
+    src/VulkanBuffer.h
+    src/VulkanBuffer.cpp
+    src/VulkanDescriptorPool.h
+    src/VulkanDescriptorPool.cpp
+    src/VulkanDescriptorSet.h
+    src/VulkanDescriptorSet.cpp
     src/Helpers.h
-    src/Helpers.cpp
-    src/Vertex.h
-    src/Vertex.cpp
-    src/Figures.h
-    src/Figures.cpp
-    src/UniformBuffer.h
-    src/UniformBuffer.cpp)
+    src/Helpers.cpp)
 
 source_group("Sources" FILES ${ALL_SOURCES})
+
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # тип сборки
 #if(NOT CMAKE_BUILD_TYPE)
@@ -161,44 +266,27 @@ source_group("Sources" FILES ${ALL_SOURCES})
 #endif()
 
 
-
 ####################################################
 # Генерация
 ####################################################
 message("******** Generating started ***********")
 # Из найденных исходников выставляем генерацию бинарника
-if(MSVC)
-    add_executable(${EXECUTABLE_NAME} WIN32 ${ALL_SOURCES})
-else()
-    add_executable(${EXECUTABLE_NAME} ${ALL_SOURCES})
-endif()
+add_library(${VULKAN_BASE_LIBRARY_NAME} STATIC ${ALL_SOURCES})
 
 # Конкретные пути к бинарнику
-set_target_properties(${EXECUTABLE_NAME}
+set_target_properties(${VULKAN_BASE_LIBRARY_NAME}
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG   ${CMAKE_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
 # Библиотеки, с которыми будем ликовать
-target_link_libraries(${EXECUTABLE_NAME} ${LIBS_LINK_NAMES})
+# target_link_libraries(${VULKAN_BASE_LIBRARY_NAME} ${LIBS_LINK_NAMES})
 
-# Создаем символьную ссылку на ресурсы (Для исполняемго файла, после выбора)
-if (WIN32)
-    string(REGEX REPLACE "/" "\\\\" SOURCE_RES_PATH "${CMAKE_SOURCE_DIR}/res")
-    string(REGEX REPLACE "/" "\\\\" RESULT_RES_PATH "${CMAKE_BINARY_DIR}/res/")
-	message("Copy command: xcopy \"${SOURCE_RES_PATH}\" \"${RESULT_RES_PATH}\" /H /Y /C /R /S")
-    #message("COPY RES COMMAND = copy ${SOURCE_RES_PATH} ${RESULT_RES_PATH} /y")
-    add_custom_command (
-        TARGET ${EXECUTABLE_NAME}
-        POST_BUILD
-        COMMAND xcopy "${SOURCE_RES_PATH}" "${RESULT_RES_PATH}\\" /H /Y /C /R /S
-    )
-else()
-    add_custom_command (
-        TARGET ${EXECUTABLE_NAME}
-        POST_BUILD
-        COMMAND rm -f ${CMAKE_BINARY_DIR}/res
-        COMMAND ln -s ../res ${CMAKE_BINARY_DIR}/res
-    )
-endif()
+set(VULKAN_BASE_LIBRARY_LINK_LIBS ${VULKAN_BASE_LIBRARY_LINK_LIBS} ${VULKAN_BASE_LIBRARY_NAME} ${LIBS_LINK_NAMES})
+
+# Export
+set(VULKAN_BASE_LIBRARY_NAME ${VULKAN_BASE_LIBRARY_NAME}  PARENT_SCOPE)
+set(VULKAN_BASE_LIBRARY_LINK_LIBS ${VULKAN_BASE_LIBRARY_LINK_LIBS}  PARENT_SCOPE)
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} PARENT_SCOPE)
+
