@@ -2,8 +2,8 @@
 #include <array>
 #include <limits>
 #include <numeric>
-#include "Helpers.h"
-#include "Vertex.h"
+#include <Helpers.h>
+#include "Figures.h"
 
 // TinyObj
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -45,65 +45,54 @@ VulkanRender::VulkanRender(){
 }
 
 void VulkanRender::init(GLFWwindow* window){
-    // Создание инстанса Vulkan
-    vulkanInstance = std::make_shared<VulkanInstance>();
+    // Создаем рабочие объекты Vulkan
+    createSharedVulkanObjects(window);
     
-    // Создаем плоскость отрисовки
-    vulkanWindowSurface = std::make_shared<VulkanSurface>(window, vulkanInstance);
+    ////////////////////////////////////////////////////////////////////////////////
     
-    // Получаем физическое устройство
-    std::vector<const char*> vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
-    std::vector<const char*> vulkanDeviceExtensions;
-	vulkanDeviceExtensions.push_back("VK_KHR_swapchain");
-    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanDeviceExtensions, vulkanInstanceValidationLayers, vulkanWindowSurface);
-
-    // Создаем логическое устройство
-    VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
-    VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
-    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
-    vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
-    
-    // Создаем семафоры для отображения и ренедринга
-    vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
-    vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
-    
-    // Создаем свопчейн + получаем изображения свопчейна
-    vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
-    
-    // Создаем барьеры для защиты от переполнения очереди заданий рендеринга
-    vulkanRenderFences.reserve(vulkanSwapchain->getImageViews().size());
-    vulkanPresentFences.reserve(vulkanSwapchain->getImageViews().size());
-    for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
-        VulkanFencePtr renderFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
-        vulkanRenderFences.push_back(renderFence);
-        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
-        vulkanPresentFences.push_back(presentFence);
-    }
-    
-    // Создаем пулл комманд для отрисовки
-    vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
-    
-    // Создаем текстуры для буффера глубины
-    createWindowDepthResources();
-    
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
+    // Создаем картинки для отрисовки в текстуру
+    createPostImageAndView();
     
     // Создаем рендер проход
-    createMainRenderPass();
+    createRenderToPostRenderPass();
     
-    // Создаем фреймбуфферы для вьюшек изображений окна
-    createWindowFrameBuffers();
+    // Создаем фреймбуффер для отрисовки в текстуру
+    createPostFrameBuffer();
     
     // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
-    createDescriptorsSetLayout();
+    createPostDescriptorsSetLayout();
     
     // Грузим шейдеры
-    loadShaders();
+    loadPostShaders();
     
     // Создание пайплайна отрисовки
-    createGraphicsPipeline();
+    createPostGraphicsPipeline();
+    
+    // Создание буфферов вершин
+    createPostBuffers();
+    
+    // Создаем семплер для текстуры
+    postTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice,
+                                                          VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                                                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                                          1);
+    
+    // Создаем пул дескрипторов ресурсов
+    createPostRenderDescriptorPool();
+    
+    // Создаем набор дескрипторов ресурсов
+    createPostRenderDescriptorSet();
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    
+    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+    createModelDescriptorsSetLayout();
+    
+    // Грузим шейдеры
+    loadModelShaders();
+    
+    // Создание пайплайна отрисовки
+    createModelGraphicsPipeline();
     
     // Грузим текстуру
     modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "res/textures/chalet.jpg");
@@ -132,8 +121,13 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем набор дескрипторов ресурсов
     createModelDescriptorSet();
     
+    //////////////////////////////
+    
     // Создаем коммандные буфферы отрисовки модели
-    createRenderModelCommandBuffers();
+    resetCommandBuffers();
+    
+    // Создаем фреймбуфферы для вьюшек изображений окна
+    createWindowFrameBuffers();
 }
 
 // Ресайз окна
@@ -168,7 +162,7 @@ void VulkanRender::rebuildRendering(){
     createWindowFrameBuffers();
     
     // Создание пайплайна отрисовки
-    createGraphicsPipeline();
+    createModelGraphicsPipeline();
     
     // Обновление юниформ буффера
     createModelUniformBuffer();
@@ -180,10 +174,61 @@ void VulkanRender::rebuildRendering(){
     createModelDescriptorSet();
     
     // Создаем коммандные буфферы отрисовки модели
-    createRenderModelCommandBuffers();
+    resetCommandBuffers();
     
     // Обнуляем индекс отрисовки
     vulkanImageIndex = 0;
+}
+
+// Создаем рабочие объекты Vulkan
+void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
+    // Создание инстанса Vulkan
+    vulkanInstance = std::make_shared<VulkanInstance>();
+    
+    // Создаем плоскость отрисовки
+    vulkanWindowSurface = std::make_shared<VulkanSurface>(window, vulkanInstance);
+    
+    // Получаем физическое устройство
+    std::vector<const char*> vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
+    std::vector<const char*> vulkanDeviceExtensions;
+    vulkanDeviceExtensions.push_back("VK_KHR_swapchain");
+    vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanDeviceExtensions, vulkanInstanceValidationLayers, vulkanWindowSurface);
+    
+    // Создаем логическое устройство
+    VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
+    VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
+    vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
+    
+    // Создаем семафоры для отображения и ренедринга
+    vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    vulkanRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    
+    // Создаем свопчейн + получаем изображения свопчейна
+    vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
+    
+    // Создаем барьеры для защиты от переполнения очереди заданий рендеринга
+    vulkanRenderFences.reserve(vulkanSwapchain->getImageViews().size());
+    vulkanPresentFences.reserve(vulkanSwapchain->getImageViews().size());
+    for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
+        VulkanFencePtr renderFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        vulkanRenderFences.push_back(renderFence);
+        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        vulkanPresentFences.push_back(presentFence);
+    }
+    
+    // Создаем пулл комманд для отрисовки
+    vulkanRenderCommandPool = std::make_shared<VulkanCommandPool>(vulkanLogicalDevice, vulkanQueuesFamiliesIndexes.renderQueuesFamilyIndex);
+    
+    // Создаем текстуры для буффера глубины
+    createWindowDepthResources();
+    
+    // Обновляем лаяут текстуры глубины на правильный
+    updateWindowDepthTextureLayout();
+    
+    // Создание рендер прохода
+    createRenderToWindowsRenderPass();
 }
 
 // Создаем буфферы для глубины
@@ -213,8 +258,34 @@ void VulkanRender::createWindowDepthResources() {
                                                                    VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
 }
 
+
+// Обновляем лаяут текстуры глубины на правильный
+void VulkanRender::updateWindowDepthTextureLayout(){
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+    
+    VkImageAspectFlags aspectMask;
+    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
+        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    
+    // Конвертируем в формат, пригодный для глубины
+    transitionImageLayout(commandBuffer,
+                          vulkanWindowDepthImage,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                          0, 1,
+                          aspectMask,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                          0,
+                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+}
+
 // Создание рендер прохода
-void VulkanRender::createMainRenderPass(){
+void VulkanRender::createRenderToWindowsRenderPass(){
     VulkanRenderPassConfig imageConfig;
     imageConfig.format = vulkanSwapchain->getSwapChainImageFormat();
     imageConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
@@ -222,6 +293,36 @@ void VulkanRender::createMainRenderPass(){
     imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageConfig.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    vulkanRenderToWindowRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Создаем картинки для отрисовки в текстуру
+void VulkanRender::createPostImageAndView(){
+    // Изображение
+    postImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
+                                              //vulkanSwapchain->getSwapChainExtent().width, vulkanSwapchain->getSwapChainExtent().height,
+                                              vulkanSwapchain->getSwapChainExtent().width/2, vulkanSwapchain->getSwapChainExtent().height/2,
+                                              VK_FORMAT_R8G8B8A8_UNORM,
+                                              VK_IMAGE_TILING_OPTIMAL,
+                                              VK_IMAGE_LAYOUT_UNDEFINED,
+                                              VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                              1);
+    //  Вьюшка
+    postImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, postImage, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+// Создание рендер прохода
+void VulkanRender::createRenderToPostRenderPass(){
+    VulkanRenderPassConfig imageConfig;
+    imageConfig.format = postImage->getBaseFormat();
+    imageConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
+    imageConfig.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Сохраняем для отрисовки
+    imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED; // TODO: Layout
+    imageConfig.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // TODO: Layout
+    imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;   // TODO: Layout
     VulkanRenderPassConfig depthConfig;
     depthConfig.format = vulkanWindowDepthImage->getBaseFormat();
     depthConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
@@ -229,67 +330,51 @@ void VulkanRender::createMainRenderPass(){
     depthConfig.initLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthConfig.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthConfig.refLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    vulkanRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig, depthConfig);
+    postRenderToRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig, depthConfig);
 }
 
-// Создаем фреймбуфферы для вьюшек изображений окна
-void VulkanRender::createWindowFrameBuffers(){
-    vulkanWindowFrameBuffers.clear();
-    
-    std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
-    vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
-    
-    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
-    uint32_t heigth = vulkanSwapchain->getSwapChainExtent().height;
-    for (const VulkanImageViewPtr& view: windowImagesViews) {
-        // Вьюшка текстуры отображения + глубины
-        std::vector<VulkanImageViewPtr> views;
-        views.push_back(view);
-        views.push_back(vulkanWindowDepthImageView);
-        
-        // Создаем фреймбуффер
-        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderPass, views, width, heigth);
-        vulkanWindowFrameBuffers.push_back(frameBuffer);
-    }
+// Создаем фреймбуффер для отрисовки в текстуру
+void VulkanRender::createPostFrameBuffer(){
+    // Вьюшка текстуры отображения + глубины
+    std::vector<VulkanImageViewPtr> views;
+    views.push_back(postImageView);
+    views.push_back(vulkanWindowDepthImageView);
+    postFrameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice,
+                                                          postRenderToRenderPass,
+                                                          views,
+                                                          postImage->getBaseSize().width, postImage->getBaseSize().width);
 }
 
 // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
-void VulkanRender::createDescriptorsSetLayout(){
-    VulkanDescriptorSetConfig uniformBuffer;
-    uniformBuffer.binding = 0; // Юниформ буффер биндим на 0 индекс
-    uniformBuffer.desriptorsCount = 1; // 1н дескриптор
-    uniformBuffer.desriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
-    uniformBuffer.descriptorStageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Используется в вершинном шейдере
-    
+void VulkanRender::createPostDescriptorsSetLayout(){
     VulkanDescriptorSetConfig sampler;
-    sampler.binding = 1;         // Семплер будет на 1м индексе
+    sampler.binding = 0;         // Семплер будет на 0м индексе
     sampler.desriptorsCount = 1; // 1н дескриптор
     sampler.desriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // Тип - семплер
     sampler.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
-
+    
     std::vector<VulkanDescriptorSetConfig> configs;
-    configs.push_back(uniformBuffer);
     configs.push_back(sampler);
     
-    vulkanDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
+    postDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
 }
 
 // Грузим шейдеры
-void VulkanRender::loadShaders(){
+void VulkanRender::loadPostShaders(){
     // Читаем байт-код шейдеров
-    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/shader_vert.spv");
-    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/shader_frag.spv");
+    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/post_shader_vert.spv");
+    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/post_shader_frag.spv");
     
     // Создаем шейдерные модули
-    vulkanVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);
-    vulkanFragmentModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, fragShaderCode);
+    postVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);
+    postFragmentModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, fragShaderCode);
 }
 
 // Создание пайплайна отрисовки
-void VulkanRender::createGraphicsPipeline() {
+void VulkanRender::createPostGraphicsPipeline() {
     // Описание вершин, шага по вершинам и описание данных
-    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex::getAttributeDescriptions();
+    VkVertexInputBindingDescription bindingDescription = Vertex2D::getBindingDescription();
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex2D::getAttributeDescriptions();
     
     // Настраиваем вьюпорт
     VkViewport viewport = {};
@@ -306,6 +391,151 @@ void VulkanRender::createGraphicsPipeline() {
     memset(&scissor, 0, sizeof(VkRect2D));
     scissor.offset = {0, 0};
     scissor.extent = vulkanSwapchain->getSwapChainExtent();
+    
+    // Настройка глубины
+    VulkanPipelineDepthConfig depthConfig;
+    depthConfig.depthTestEnabled = VK_FALSE;
+    depthConfig.depthWriteEnabled = VK_FALSE;
+    depthConfig.depthFunc = VK_COMPARE_OP_LESS;
+    
+    // Настройки кулинга
+    VulkanPipelineCullingConfig cullingConfig;
+    cullingConfig.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    cullingConfig.cullMode = VK_CULL_MODE_BACK_BIT;
+    
+    // Блендинг
+    VulkanPipelineBlendConfig blendConfig;
+    blendConfig.enabled = VK_FALSE;
+    blendConfig.blendOp = VK_BLEND_OP_ADD;
+    blendConfig.srcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blendConfig.dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    
+    // Push константы
+    std::vector<VkPushConstantRange> pushConstants;
+    VkPushConstantRange pushConstantRange = {};
+    memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(float);
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstants.push_back(pushConstantRange);
+    
+    // Динамически изменяемые параметры
+    std::vector<VkDynamicState> dynamicStates;
+    
+    // Пайплайн
+    postPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
+                                                    postVertexModule, postFragmentModule,
+                                                    depthConfig,
+                                                    bindingDescription,
+                                                    attributeDescriptions,
+                                                    VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                                                    viewport,
+                                                    scissor,
+                                                    cullingConfig,
+                                                    blendConfig,
+                                                    postDescriptorSetLayout,
+                                                    vulkanRenderToWindowRenderPass,
+                                                    pushConstants,
+                                                    dynamicStates);
+}
+
+// Создание буфферов вершин
+void VulkanRender::createPostBuffers(){
+    // Создаем рабочий буффер
+    postVertexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool,
+                                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                           (unsigned char*)QUAD_VERTEXES.data(), sizeof(QUAD_VERTEXES[0]) * QUAD_VERTEXES.size());
+    
+    // Создаем рабочий буффер
+    postIndexBuffer = createBufferForData(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool,
+                                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                          (unsigned char*)QUAD_INDICES.data(), sizeof(QUAD_INDICES[0]) * QUAD_INDICES.size());
+}
+
+// Создаем пул дескрипторов ресурсов
+void VulkanRender::createPostRenderDescriptorPool() {
+    // Структура с типами пулов
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    poolSizes.resize(1);
+    // Семплер для текстуры
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[0].descriptorCount = 1;
+    
+    // Создаем пул
+    postDescriptorPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes, 1);
+}
+
+// Создаем набор дескрипторов ресурсов
+void VulkanRender::createPostRenderDescriptorSet() {
+    postDescriptorSet = std::make_shared<VulkanDescriptorSet>(vulkanLogicalDevice, postDescriptorSetLayout, postDescriptorPool);
+    
+    VulkanDescriptorSetUpdateConfig samplerSet;
+    samplerSet.binding = 0; // Биндится на 1м значении в шейдере
+    samplerSet.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    samplerSet.imageInfo.imageView = postImageView->getImageView();
+    samplerSet.imageInfo.sampler = postTextureSampler->getSampler();
+    
+    std::vector<VulkanDescriptorSetUpdateConfig> configs;
+    configs.push_back(samplerSet);
+    postDescriptorSet->updateDescriptorSet(configs);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+void VulkanRender::createModelDescriptorsSetLayout(){
+    VulkanDescriptorSetConfig uniformBuffer;
+    uniformBuffer.binding = 0; // Юниформ буффер биндим на 0 индекс
+    uniformBuffer.desriptorsCount = 1; // 1н дескриптор
+    uniformBuffer.desriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
+    uniformBuffer.descriptorStageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Используется в вершинном шейдере
+    
+    VulkanDescriptorSetConfig sampler;
+    sampler.binding = 1;         // Семплер будет на 1м индексе
+    sampler.desriptorsCount = 1; // 1н дескриптор
+    sampler.desriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // Тип - семплер
+    sampler.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
+
+    std::vector<VulkanDescriptorSetConfig> configs;
+    configs.push_back(uniformBuffer);
+    configs.push_back(sampler);
+    
+    modelDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
+}
+
+// Грузим шейдеры
+void VulkanRender::loadModelShaders(){
+    // Читаем байт-код шейдеров
+    std::vector<unsigned char> vertShaderCode = readFile("res/shaders/model_shader_vert.spv");
+    std::vector<unsigned char> fragShaderCode = readFile("res/shaders/model_shader_frag.spv");
+    
+    // Создаем шейдерные модули
+    modelVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);
+    modelFragmentModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, fragShaderCode);
+}
+
+// Создание пайплайна отрисовки
+void VulkanRender::createModelGraphicsPipeline() {
+    // Описание вершин, шага по вершинам и описание данных
+    VkVertexInputBindingDescription bindingDescription = Vertex3D::getBindingDescription();
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex3D::getAttributeDescriptions();
+    
+    // Настраиваем вьюпорт
+    VkViewport viewport = {};
+    memset(&viewport, 0, sizeof(VkViewport));
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(postImage->getBaseSize().width);
+    viewport.height = static_cast<float>(postImage->getBaseSize().height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    
+    // Выставляем сциссор
+    VkRect2D scissor = {};
+    memset(&scissor, 0, sizeof(VkRect2D));
+    scissor.offset = {0, 0};
+    scissor.extent = postImage->getBaseSize();
     
     // Настройка глубины
     VulkanPipelineDepthConfig depthConfig;
@@ -336,12 +566,10 @@ void VulkanRender::createGraphicsPipeline() {
     
     // Динамически изменяемые параметры
     std::vector<VkDynamicState> dynamicStates;
-    dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
-    dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
     
     // Пайплайн
-    vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
-                                                      vulkanVertexModule, vulkanFragmentModule,
+    modelPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
+                                                      modelVertexModule, modelFragmentModule,
                                                       depthConfig,
                                                       bindingDescription,
                                                       attributeDescriptions,
@@ -350,37 +578,10 @@ void VulkanRender::createGraphicsPipeline() {
                                                       scissor,
                                                       cullingConfig,
                                                       blendConfig,
-                                                      vulkanDescriptorSetLayout,
-                                                      vulkanRenderPass,
+                                                      modelDescriptorSetLayout,
+                                                      postRenderToRenderPass,
                                                       pushConstants,
                                                       dynamicStates);
-}
-
-
-
-// Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updateWindowDepthTextureLayout(){
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    
-    VkImageAspectFlags aspectMask;
-    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
-        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    
-    // Конвертируем в формат, пригодный для глубины
-    transitionImageLayout(commandBuffer,
-                          vulkanWindowDepthImage,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          0, 1,
-                          aspectMask,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                          0,
-                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    
-    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 
@@ -398,7 +599,7 @@ void VulkanRender::loadModelSrcData(){
     
     for (const auto& shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
-            Vertex vertex = {};
+            Vertex3D vertex = {};
             vertex.pos = {
                 attrib.vertices[3 * index.vertex_index + 0],
                 attrib.vertices[3 * index.vertex_index + 1],
@@ -442,13 +643,13 @@ void VulkanRender::createModelBuffers(){
 
 // Создаем буффер юниформов
 void VulkanRender::createModelUniformBuffer() {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    VkDeviceSize bufferSize = sizeof(ModelUniformBuffer);
     
     // Буффер для юниформов для CPU
-    modelUniformStagingBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
-                                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
-                                                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
-                                                               bufferSize);
+    VulkanBufferPtr staggingBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
+                                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,    // Хранится в оперативке CPU
+                                                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
+                                                                    bufferSize);
     
     // Буффер для юниформов на GPU
     modelUniformGPUBuffer = std::make_shared<VulkanBuffer>(vulkanLogicalDevice,
@@ -457,21 +658,21 @@ void VulkanRender::createModelUniformBuffer() {
                                                            bufferSize);
     
     // Обновляем юниформ буффер
-    UniformBufferObject ubo = {};
-    memset(&ubo, 0, sizeof(UniformBufferObject));
+    ModelUniformBuffer ubo = {};
+    memset(&ubo, 0, sizeof(ModelUniformBuffer));
     ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f), RenderI->vulkanSwapchain->getSwapChainExtent().width / (float)RenderI->vulkanSwapchain->getSwapChainExtent().height, 0.1f, 10.0f);
+    ubo.proj = glm::perspective(glm::radians(45.0f), postImage->getBaseSize().width / (float)postImage->getBaseSize().height, 0.1f, 10.0f);
     
     // GLM был разработан для OpenGL, где координата Y клип координат перевернута,
     // самым простым путем решения данного вопроса будет изменить знак оси Y в матрице проекции
     //ubo.proj[1][1] *= -1;
     
     // Отгружаем данные
-    modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
+    staggingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(ModelUniformBuffer));
     
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
+    copyBuffer(commandBuffer, staggingBuffer, modelUniformGPUBuffer);
     endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
@@ -493,14 +694,14 @@ void VulkanRender::createModelDescriptorPool() {
 
 // Создаем набор дескрипторов ресурсов
 void VulkanRender::createModelDescriptorSet() {
-    modelDescriptorSet = std::make_shared<VulkanDescriptorSet>(vulkanLogicalDevice, vulkanDescriptorSetLayout, modelDescriptorPool);
+    modelDescriptorSet = std::make_shared<VulkanDescriptorSet>(vulkanLogicalDevice, modelDescriptorSetLayout, modelDescriptorPool);
     
     VulkanDescriptorSetUpdateConfig vertexBufferSet;
     vertexBufferSet.binding = 0; // Биндится на 0м значении в шейдере
     vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
     vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer->getBuffer();
     vertexBufferSet.bufferInfo.offset = 0;
-    vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
+    vertexBufferSet.bufferInfo.range = sizeof(ModelUniformBuffer);
     
     VulkanDescriptorSetUpdateConfig samplerSet;
     samplerSet.binding = 1; // Биндится на 1м значении в шейдере
@@ -515,150 +716,173 @@ void VulkanRender::createModelDescriptorSet() {
     modelDescriptorSet->updateDescriptorSet(configs);
 }
 
-VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex){
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Создаем коммандные буфферы отрисовки модели
+void VulkanRender::resetCommandBuffers() {
+    // Ресайзим массив
+    vulkanDrawCommandBuffers.clear();
+    vulkanDrawCommandBuffers.resize(vulkanSwapchain->getImageViews().size());
+}
+
+// Создаем фреймбуфферы для вьюшек изображений окна
+void VulkanRender::createWindowFrameBuffers(){
+    vulkanWindowFrameBuffers.clear();
+    
+    std::vector<VulkanImageViewPtr> windowImagesViews = vulkanSwapchain->getImageViews();
+    vulkanWindowFrameBuffers.reserve(windowImagesViews.size());
+    
+    uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
+    uint32_t heigth = vulkanSwapchain->getSwapChainExtent().height;
+    for (const VulkanImageViewPtr& view: windowImagesViews) {
+        // Вьюшка текстуры отображения + глубины
+        std::vector<VulkanImageViewPtr> views;
+        views.push_back(view);
+        //views.push_back(vulkanWindowDepthImageView); // не использется тектура глубины
+        
+        // Создаем фреймбуффер
+        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, postRenderToRenderPass, views, width, heigth);
+        vulkanWindowFrameBuffers.push_back(frameBuffer);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex){
     VulkanCommandBufferPtr buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
     
-    // Настройка наследования
-    /*VkCommandBufferInheritanceInfo inheritanceInfo = {};
-     memset(&inheritanceInfo, 0, sizeof(VkCommandBufferInheritanceInfo));
-     inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-     inheritanceInfo.pNext = nullptr;
-     inheritanceInfo.renderPass = vulkanRenderPass->getPass();
-     inheritanceInfo.subpass = 0;
-     inheritanceInfo.framebuffer = vulkanWindowFrameBuffers[i]->getBuffer();
-     inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-     inheritanceInfo.queryFlags = 0;
-     inheritanceInfo.pipelineStatistics = 0;*/
+    // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
-    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT); // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+    // Отрисовка модели
+    {
+        // Информация о запуске рендер-прохода
+        std::array<VkClearValue, 2> clearValues = {};
+        clearValues[0].color = {{0.3f, 0.3f, 0.3f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        VkRenderPassBeginInfo renderPassInfo = {};
+        memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = postRenderToRenderPass->getPass();   // Рендер проход
+        renderPassInfo.framebuffer = postFrameBuffer->getBuffer();
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = postImage->getBaseSize();
+        renderPassInfo.clearValueCount = clearValues.size();
+        renderPassInfo.pClearValues = clearValues.data();
+        
+        // Запуск рендер-прохода
+        // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
+        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
+        vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Устанавливаем пайплайн у коммандного буффера
+        vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline->getPipeline());
+        
+        // Привязываем вершинный буффер к пайлпайну
+        VkBuffer vertexBuffers[] = {modelVertexBuffer->getBuffer()};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(buffer->getBuffer(), 0, 1, vertexBuffers, offsets);
+        
+        // Привязываем индексный буффер к пайплайну
+        vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
+        
+        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+        VkDescriptorSet set = modelDescriptorSet->getSet();
+        vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline->getLayout(), 0, 1, &set, 0, nullptr);
+        
+        // Push константы для динамической отрисовки
+        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+        vkCmdPushConstants(buffer->getBuffer(),
+                           modelPipeline->getLayout(),
+                           VK_SHADER_STAGE_VERTEX_BIT,
+                           0,
+                           sizeof(model),
+                           (unsigned char*)&model);
+        
+        // Изменяем лаяут текстуры, в которую рисуем
+        transitionImageLayout(buffer,
+                              postImage,
+                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                              0, 1,
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                              VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        
+        // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
+        // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+        
+        // Заканчиваем рендер проход
+        vkCmdEndRenderPass(buffer->getBuffer());
+    }
     
-    // Информация о запуске рендер-прохода
-    std::array<VkClearValue, 2> clearValues = {};
-    clearValues[0].color = {{0.5f, 0.5f, 0.5f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
-    
-    VkRenderPassBeginInfo renderPassInfo = {};
-    memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = vulkanRenderPass->getPass();   // Рендер проход
-    renderPassInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex]->getBuffer();    // Фреймбуффер смены кадров
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
-    renderPassInfo.clearValueCount = clearValues.size();
-    renderPassInfo.pClearValues = clearValues.data();
-    
-    // Запуск рендер-прохода
-    // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
-    // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
-    vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    
-    // Динамически изменяемый параметр в пайплайне
-    VkViewport viewport = {};
-    memset(&viewport, 0, sizeof(VkViewport));
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(vulkanSwapchain->getSwapChainExtent().width);
-    viewport.height = static_cast<float>(vulkanSwapchain->getSwapChainExtent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(buffer->getBuffer(), 0, 1, &viewport);
-    
-    // Динамически изменяемый параметр в пайплайне
-    VkRect2D scissor = {};
-    memset(&scissor, 0, sizeof(VkRect2D));
-    scissor.offset = {0, 0};
-    scissor.extent = vulkanSwapchain->getSwapChainExtent();
-    vkCmdSetScissor(buffer->getBuffer(), 0, 1, &scissor);
-    
-    // Устанавливаем пайплайн у коммандного буффера
-    vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());
-    
-    // Привязываем вершинный буффер к пайлпайну
-    VkBuffer vertexBuffers[] = {modelVertexBuffer->getBuffer()};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(buffer->getBuffer(), 0, 1, vertexBuffers, offsets);
-    
-    // Привязываем индексный буффер к пайплайну
-    vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-    
-    // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    VkDescriptorSet set = modelDescriptorSet->getSet();
-    vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 0, nullptr);
-    
-    // Push константы для динамической отрисовки
-    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    vkCmdPushConstants(buffer->getBuffer(),
-                       vulkanPipeline->getLayout(),
-                       VK_SHADER_STAGE_VERTEX_BIT,
-                       0,
-                       sizeof(model),
-                       (unsigned char*)&model);
-    
-    // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-    // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
-    // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-    vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
-    
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    /*// Начинаем вводить комманды для следующего подпрохода рендеринга
-     vkCmdNextSubpass(vulkanCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
-     
-     // Устанавливаем пайплайн у коммандного буффера
-     vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
-     
-     // Привязываем вершинный буффер к пайлпайну
-     vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
-     
-     // Привязываем индексный буффер к пайплайну
-     vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-     
-     // Подключаем дескрипторы ресурсов для юниформ буффера
-     vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
-     
-     // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-     // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
-     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-     vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanTotalIndexesCount/2, 1, 0, 0, 0);*/
-    
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    // Заканчиваем рендер проход
-    vkCmdEndRenderPass(buffer->getBuffer());
-    
-    /*VkImageMemoryBarrier imageMemoryBarrier = {};
-     memset(&imageMemoryBarrier, 0, sizeof(VkImageMemoryBarrier));
-     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-     imageMemoryBarrier.pNext = nullptr;
-     imageMemoryBarrier.srcAccessMask = 0;
-     imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_MEMORY_READ_BIT;
-     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-     imageMemoryBarrier.srcQueueFamilyIndex = 0;
-     imageMemoryBarrier.dstQueueFamilyIndex = 0;
-     imageMemoryBarrier.image = vulkanSwapChainImages[i];
-     imageMemoryBarrier.subresourceRange = {VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-     
-     vkCmdPipelineBarrier(vulkanCommandBuffers[i],
-     VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     0,
-     0, nullptr,
-     0, nullptr,
-     1, &imageMemoryBarrier
-     );*/
+    // Отрисовка текстуры пост эффекта
+    {
+        // Информация о запуске рендер-прохода
+        std::array<VkClearValue, 2> clearValues = {};
+        clearValues[0].color = {{0.4f, 0.1f, 0.1f, 1.0f}};
+        clearValues[1].depthStencil = {1.0f, 0};
+        
+        VkRenderPassBeginInfo renderPassInfo = {};
+        memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = vulkanRenderToWindowRenderPass->getPass();   // Рендер проход
+        renderPassInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex]->getBuffer();
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();    // Какую области чистим
+        renderPassInfo.clearValueCount = clearValues.size();
+        renderPassInfo.pClearValues = clearValues.data();
+        
+        // Запуск рендер-прохода
+        // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
+        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
+        vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Изменяем лаяут текстуры, для использования как текстуру отрисовки
+        transitionImageLayout(buffer,
+                              postImage,
+                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              0, 1,
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+        
+        // Устанавливаем пайплайн у коммандного буффера
+        vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, postPipeline->getPipeline());
+        
+        // Привязываем вершинный буффер к пайлпайну
+        VkBuffer vertexBuffers[] = {postVertexBuffer->getBuffer()};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(buffer->getBuffer(), 0, 1, vertexBuffers, offsets);
+        
+        // Привязываем индексный буффер к пайплайну
+        vkCmdBindIndexBuffer(buffer->getBuffer(), postIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT16);
+        
+        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+        VkDescriptorSet set = postDescriptorSet->getSet();
+        vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, postPipeline->getLayout(), 0, 1, &set, 0, nullptr);
+        
+        // Push константы для динамической отрисовки
+        float effectCoeff = 1.0f;
+        vkCmdPushConstants(buffer->getBuffer(),
+                           modelPipeline->getLayout(),
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(float),
+                           (unsigned char*)&effectCoeff);
+        
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        vkCmdDrawIndexed(buffer->getBuffer(), QUAD_INDICES.size(), 1, 0, 0, 0);
+        
+        // Заканчиваем рендер проход
+        vkCmdEndRenderPass(buffer->getBuffer());
+    }
     
     // Заканчиваем подготовку коммандного буффера
 	buffer->end();
 
     return buffer;
-}
-
-// Создаем коммандные буфферы отрисовки модели
-void VulkanRender::createRenderModelCommandBuffers() {
-    // Ресайзим массив
-    modelDrawCommandBuffers.clear();
-    modelDrawCommandBuffers.resize(vulkanSwapchain->getImageViews().size());
 }
 
 // Обновляем юниформ буффер
@@ -674,10 +898,10 @@ void VulkanRender::drawFrame() {
 	vulkanPresentQueue->wait();
 #endif // 
     
-    TIME_BEGIN(DRAW_TIME);
+    TIME_BEGIN_OFF(DRAW_TIME);
     
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
-    TIME_BEGIN(NEXT_IMAGE_TIME);
+    TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
                                             vulkanSwapchain->getSwapchain(),
@@ -685,7 +909,7 @@ void VulkanRender::drawFrame() {
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
                                             vulkanPresentFences[vulkanImageIndex]->getFence() /*VK_NULL_HANDLE*/,
                                             &swapchainImageIndex);
-    TIME_END_MICROSEC(NEXT_IMAGE_TIME, "Next image index wait time");
+    TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         rebuildRendering();
@@ -700,16 +924,16 @@ void VulkanRender::drawFrame() {
     }
 
 	// Ожидаем доступность закидывания задач на рендеринг
-	TIME_BEGIN(WAIT_FENCE);
+	TIME_BEGIN_OFF(WAIT_FENCE);
 	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC(WAIT_FENCE, "Fence render wait time");
+	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
 
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
-    TIME_BEGIN(MAKE_MODEL_DRAW_BUFFER);
-    VulkanCommandBufferPtr buffer = makeModelCommandBuffer(vulkanImageIndex);
-    modelDrawCommandBuffers[vulkanImageIndex] = buffer;
+    TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
+    VulkanCommandBufferPtr buffer = makeRenderCommandBuffer(vulkanImageIndex);
+    vulkanDrawCommandBuffers[vulkanImageIndex] = buffer;
     VkCommandBuffer drawBuffer = buffer->getBuffer();
-    TIME_END_MICROSEC(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
+    TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
 
     // Настраиваем отправление в очередь комманд отрисовки
     // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
@@ -728,17 +952,17 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-	TIME_BEGIN(SUBMIT_TIME);
+	TIME_BEGIN_OFF(SUBMIT_TIME);
     if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
-	TIME_END_MICROSEC(SUBMIT_TIME, "Submit wait time");
+	TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
     
 	// Ждем доступности отображения
-	TIME_BEGIN(WAIT_FENCE_PRESENT);
+	TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
 	vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC(WAIT_FENCE_PRESENT, "Present fence wait time");
+	TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
 
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
@@ -752,9 +976,9 @@ void VulkanRender::drawFrame() {
     presentInfo.pImageIndices = &swapchainImageIndex;
     
     // Закидываем в очередь задачу отображения картинки
-	TIME_BEGIN(PRESENT_DURATION);
+	TIME_BEGIN_OFF(PRESENT_DURATION);
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue->getQueue(), &presentInfo);
-	TIME_END_MICROSEC(PRESENT_DURATION, "Present wait time");
+	TIME_END_MICROSEC_OFF(PRESENT_DURATION, "Present wait time");
 
 	// Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
 	// TODO: Операции на семафорах - нужно ли вообще это???
@@ -769,8 +993,8 @@ void VulkanRender::drawFrame() {
         throw std::runtime_error("failed to present swap chain image!");
     }
 
-    TIME_END_MICROSEC(DRAW_TIME, "Total Draw method time");
-	LOG("\n\n");
+    TIME_END_MICROSEC_OFF(DRAW_TIME, "Total Draw method time");
+	//LOG("\n\n");
 }
 
 VulkanRender::~VulkanRender(){    
@@ -779,23 +1003,22 @@ VulkanRender::~VulkanRender(){
     vulkanPresentQueue->wait();
     vulkanLogicalDevice->wait();
     
-    modelDrawCommandBuffers.clear();
+    vulkanDrawCommandBuffers.clear();
     modelDescriptorSet = nullptr;
     modelDescriptorPool = nullptr;
     modelUniformGPUBuffer = nullptr;
-    modelUniformStagingBuffer = nullptr;
     modelVertexBuffer = nullptr;
     modelIndexBuffer = nullptr;
     modelTextureSampler = nullptr;
     modelTextureImage = nullptr;
     modelTextureImageView = nullptr;
     vulkanRenderCommandPool = nullptr;
-    vulkanPipeline = nullptr;
-    vulkanVertexModule = nullptr;
-    vulkanFragmentModule = nullptr;
-    vulkanDescriptorSetLayout = nullptr;
+    modelPipeline = nullptr;
+    modelVertexModule = nullptr;
+    modelFragmentModule = nullptr;
+    modelDescriptorSetLayout = nullptr;
     vulkanWindowFrameBuffers.clear();
-    vulkanRenderPass = nullptr;
+    postRenderToRenderPass = nullptr;
     vulkanWindowDepthImageView = nullptr;
     vulkanWindowDepthImage = nullptr;
     vulkanSwapchain = nullptr;

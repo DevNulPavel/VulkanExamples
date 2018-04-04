@@ -7,31 +7,32 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "VulkanHelpers.h"
-#include "VulkanInstance.h"
-#include "VulkanSurface.h"
-#include "VulkanPhysicalDevice.h"
-#include "VulkanLogicalDevice.h"
-#include "VulkanQueue.h"
-#include "VulkanSemafore.h"
-#include "VulkanFence.h"
-#include "VulkanSwapchain.h"
-#include "VulkanImage.h"
-#include "VulkanImageView.h"
-#include "VulkanRenderPass.h"
-#include "VulkanFrameBuffer.h"
-#include "VulkanDescriptorSetLayout.h"
-#include "VulkanShaderModule.h"
-#include "VulkanPipeline.h"
-#include "VulkanCommandPool.h"
-#include "VulkanCommandBuffer.h"
-#include "VulkanSampler.h"
-#include "VulkanBuffer.h"
-#include "VulkanDescriptorPool.h"
-#include "VulkanDescriptorSet.h"
+#include <VulkanHelpers.h>
+#include <VulkanInstance.h>
+#include <VulkanSurface.h>
+#include <VulkanPhysicalDevice.h>
+#include <VulkanLogicalDevice.h>
+#include <VulkanQueue.h>
+#include <VulkanSemafore.h>
+#include <VulkanFence.h>
+#include <VulkanSwapchain.h>
+#include <VulkanImage.h>
+#include <VulkanImageView.h>
+#include <VulkanRenderPass.h>
+#include <VulkanFrameBuffer.h>
+#include <VulkanDescriptorSetLayout.h>
+#include <VulkanShaderModule.h>
+#include <VulkanPipeline.h>
+#include <VulkanCommandPool.h>
+#include <VulkanCommandBuffer.h>
+#include <VulkanSampler.h>
+#include <VulkanBuffer.h>
+#include <VulkanDescriptorPool.h>
+#include <VulkanDescriptorSet.h>
 
-#include "Vertex.h"
-#include "UniformBuffer.h"
+#include "Vertex2D.h"
+#include "Vertex3D.h"
+#include "ModelUniformBuffer.h"
 
 
 #define RenderI VulkanRender::getInstance()
@@ -66,31 +67,45 @@ public:
     std::vector<VulkanFencePtr> vulkanPresentFences;
     std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanSwapchainPtr vulkanSwapchain;
+    VulkanCommandPoolPtr vulkanRenderCommandPool;
     VulkanImagePtr vulkanWindowDepthImage;
     VulkanImageViewPtr vulkanWindowDepthImageView;
-    VulkanRenderPassPtr vulkanRenderPass;
+    VulkanRenderPassPtr vulkanRenderToWindowRenderPass;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
-    VulkanDescriptorSetLayoutPtr vulkanDescriptorSetLayout;
-    VulkanShaderModulePtr vulkanVertexModule;
-    VulkanShaderModulePtr vulkanFragmentModule;
-    VulkanPipelinePtr vulkanPipeline;
-    VulkanCommandPoolPtr vulkanRenderCommandPool;
+    std::vector<VulkanCommandBufferPtr> vulkanDrawCommandBuffers;
     
+    VulkanImagePtr postImage;
+    VulkanImageViewPtr postImageView;
+    VulkanRenderPassPtr postRenderToRenderPass;
+    VulkanFrameBufferPtr postFrameBuffer;
+    VulkanDescriptorSetLayoutPtr postDescriptorSetLayout;
+    VulkanShaderModulePtr postVertexModule;
+    VulkanShaderModulePtr postFragmentModule;
+    VulkanPipelinePtr postPipeline;
+    VulkanBufferPtr postVertexBuffer;
+    VulkanBufferPtr postIndexBuffer;
+    VulkanSamplerPtr postTextureSampler;
+    VulkanDescriptorPoolPtr postDescriptorPool;
+    VulkanDescriptorSetPtr postDescriptorSet;
+    std::vector<VulkanCommandBufferPtr> postDrawCommandBuffers;
+    
+    VulkanDescriptorSetLayoutPtr modelDescriptorSetLayout;
+    VulkanShaderModulePtr modelVertexModule;
+    VulkanShaderModulePtr modelFragmentModule;
+    VulkanPipelinePtr modelPipeline;
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;
     VulkanSamplerPtr modelTextureSampler;
-    std::vector<Vertex> modelVertices;
+    std::vector<Vertex3D> modelVertices;
     std::vector<uint32_t> modelIndices;
     size_t modelTotalVertexesCount;
     size_t modelTotalIndexesCount;
     uint32_t modelImageIndex;
     VulkanBufferPtr modelVertexBuffer;
     VulkanBufferPtr modelIndexBuffer;
-    VulkanBufferPtr modelUniformStagingBuffer;
     VulkanBufferPtr modelUniformGPUBuffer;
     VulkanDescriptorPoolPtr modelDescriptorPool;
     VulkanDescriptorSetPtr modelDescriptorSet;
-    std::vector<VulkanCommandBufferPtr> modelDrawCommandBuffers;
     
     float rotateAngle;
     
@@ -102,21 +117,42 @@ private:
     // Перестраиваем рендеринг при ошибках или ресайзе
     void rebuildRendering();
     
+    // Создаем рабочие объекты Vulkan
+    void createSharedVulkanObjects(GLFWwindow* window);
     // Создаем буфферы для глубины
     void createWindowDepthResources();
+    // Обновляем лаяут текстуры глубины на правильный
+    void updateWindowDepthTextureLayout();
     // Создание рендер прохода
-    void createMainRenderPass();
+    void createRenderToWindowsRenderPass();
+    
+    // Создаем картинки для отрисовки в текстуру
+    void createPostImageAndView();
+    // Создание рендер прохода
+    void createRenderToPostRenderPass();
+    // Создаем фреймбуффер для отрисовки в текстуру
+    void createPostFrameBuffer();
+    // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
+    void createPostDescriptorsSetLayout();
+    // Грузим шейдеры
+    void loadPostShaders();
+    // Создание пайплайна отрисовки
+    void createPostGraphicsPipeline();
+    // Создание буфферов вершин
+    void createPostBuffers();
+    // Создаем пул дескрипторов ресурсов
+    void createPostRenderDescriptorPool();
+    // Создаем набор дескрипторов ресурсов
+    void createPostRenderDescriptorSet();
+    
     // Создаем фреймбуфферы для вьюшек изображений окна
     void createWindowFrameBuffers();
     // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
-    void createDescriptorsSetLayout();
+    void createModelDescriptorsSetLayout();
     // Грузим шейдеры
-    void loadShaders();
+    void loadModelShaders();
     // Создание пайплайна отрисовки
-    void createGraphicsPipeline();
-    // Обновляем лаяут текстуры глубины на правильный
-    void updateWindowDepthTextureLayout();
-    
+    void createModelGraphicsPipeline();
     // Грузим данные для модели
     void loadModelSrcData();
     // Создание буфферов вершин
@@ -127,10 +163,12 @@ private:
     void createModelDescriptorPool();
     // Создаем набор дескрипторов ресурсов
     void createModelDescriptorSet();
-    // Создаем коммандные буфферы
-    void createRenderModelCommandBuffers();
     
-    VulkanCommandBufferPtr makeModelCommandBuffer(uint32_t frameIndex);
+    // Сбрасываем коммандные буфферы
+    void resetCommandBuffers();
+    
+    // Коммандный буффер рендеринга
+    VulkanCommandBufferPtr makeRenderCommandBuffer(uint32_t frameIndex);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

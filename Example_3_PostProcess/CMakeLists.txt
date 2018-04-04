@@ -1,6 +1,5 @@
-set(PROJECT_NAME "VulkanDemo1")
-set(EXECUTABLE_NAME "VulkanDemo1")
-set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
+set(PROJECT_NAME "VulkanDemo3")
+set(EXECUTABLE_NAME "VulkanDemo3_PostProcess")
 
 
 ####################################################
@@ -146,12 +145,14 @@ set(ALL_SOURCES
     src/CommonConstants.h
     src/Helpers.h
     src/Helpers.cpp
-    src/Vertex.h
-    src/Vertex.cpp
+    src/Vertex2D.h
+    src/Vertex2D.cpp
+    src/Vertex3D.h
+    src/Vertex3D.cpp
     src/Figures.h
     src/Figures.cpp
-    src/UniformBuffer.h
-    src/UniformBuffer.cpp)
+    src/ModelUniformBuffer.h
+    src/ModelUniformBuffer.cpp)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 

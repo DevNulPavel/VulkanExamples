@@ -1,6 +1,6 @@
-set(PROJECT_NAME "VulkanDemo1")
-set(EXECUTABLE_NAME "VulkanDemo1")
-set(OSX_MOLTEN_RELATIVE_PATH "../../MoltenVK/Package/Release/MoltenVK")
+set(PROJECT_NAME "VulkanDemo2_ModelDraw")
+set(EXECUTABLE_NAME "VulkanDemo2_ModelDraw")
+
 
 
 ####################################################
