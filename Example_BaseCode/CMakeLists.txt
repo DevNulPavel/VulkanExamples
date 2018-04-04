@@ -252,7 +252,8 @@ set(ALL_SOURCES
     src/VulkanDescriptorSet.h
     src/VulkanDescriptorSet.cpp
     src/Helpers.h
-    src/Helpers.cpp)
+    src/Helpers.cpp
+	src/TestDefines.h)
 
 source_group("Sources" FILES ${ALL_SOURCES})
 

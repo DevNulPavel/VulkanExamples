@@ -5,9 +5,5 @@
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 
-#ifndef __APPLE__
-	#define VALIDATION_LAYERS_ENABLED
-#endif
-
 
 #endif

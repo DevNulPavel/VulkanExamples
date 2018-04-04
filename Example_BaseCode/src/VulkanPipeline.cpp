@@ -202,7 +202,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     pipelineInfo.pDepthStencilState = &depthStencil;    // Настройки работы с глубиной
     pipelineInfo.pMultisampleState = &multisampling;    // Настройки семплирования для антиалиассинга
     pipelineInfo.pColorBlendState = &colorBlending;     // Настройка смешивания цветов
-    pipelineInfo.pDynamicState = &dynamicInfo;               // Динамическое состояние отрисовки
+    pipelineInfo.pDynamicState = (dynamicInfo.dynamicStateCount > 0) ? &dynamicInfo : nullptr;               // Динамическое состояние отрисовки
     pipelineInfo.layout = _layout;                      // Лаяут пайплайна (Описание буфферов юниформов и семплеров)
     pipelineInfo.renderPass = _renderPass->getPass();         // Рендер-проход
     pipelineInfo.subpass = 0;   // Для какого

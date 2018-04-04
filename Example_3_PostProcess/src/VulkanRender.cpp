@@ -3,7 +3,6 @@
 #include <limits>
 #include <numeric>
 #include <Helpers.h>
-#include "Figures.h"
 
 // TinyObj
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -14,6 +13,11 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include "Figures.h"
+#include "TestDefines.h"
+
+
 
 #define TARGET_FBO_TEXTURE_WIDTH 1024
 #define TARGET_FBO_TEXTURE_HEIGHT 768
@@ -222,7 +226,7 @@ void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
     for (size_t i = 0; i < vulkanSwapchain->getImageViews().size(); i++) {
         VulkanFencePtr renderFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
         vulkanRenderFences.push_back(renderFence);
-        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, true);
+        VulkanFencePtr presentFence = std::make_shared<VulkanFence>(vulkanLogicalDevice, false);
         vulkanPresentFences.push_back(presentFence);
     }
     
@@ -345,7 +349,7 @@ void VulkanRender::createPostFrameBuffer(){
     postFrameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice,
                                                           postRenderToRenderPass,
                                                           views,
-                                                          postImage->getBaseSize().width, postImage->getBaseSize().width);
+                                                          postImage->getBaseSize().width, postImage->getBaseSize().height);
 }
 
 // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
@@ -748,7 +752,7 @@ void VulkanRender::createWindowFrameBuffers(){
         //views.push_back(vulkanWindowDepthImageView); // не использется тектура глубины
         
         // Создаем фреймбуффер
-        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, postRenderToRenderPass, views, width, heigth);
+        VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice, vulkanRenderToWindowRenderPass, views, width, heigth);
         vulkanWindowFrameBuffers.push_back(frameBuffer);
     }
 }
@@ -770,7 +774,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
                               0, 1,
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+			                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
         
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
@@ -845,7 +849,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         // Изменяем лаяут текстуры, для использования как текстуру отрисовки
         transitionImageLayout(buffer,
                               postImage,
-                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                               0, 1,
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,

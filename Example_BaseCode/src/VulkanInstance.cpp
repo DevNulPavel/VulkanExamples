@@ -81,7 +81,7 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
     // Возможные отладочные слои
     std::vector<const char*> result;
     result.push_back("VK_LAYER_LUNARG_standard_validation");
-#ifdef __WINNT__
+#if defined(__WINNT__) || defined(_MSC_BUILD)
 //    result.push_back("VK_LAYER_LUNARG_api_dump");
 //    result.push_back("VK_LAYER_LUNARG_device_simulation");
 //    result.push_back("VK_LAYER_LUNARG_screenshot");
