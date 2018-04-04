@@ -328,7 +328,7 @@ void VulkanRender::createRenderToPostRenderPass(){
     imageConfig.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Чистим цвет
     imageConfig.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Сохраняем для отрисовки
     imageConfig.initLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageConfig.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageConfig.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;	// В каком лаяуте будет изображение после завершения рендер прохода
     imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     VulkanRenderPassConfig depthConfig;
     depthConfig.format = postDepthImage->getBaseFormat();
@@ -609,6 +609,9 @@ void VulkanRender::loadModelSrcData(){
     }
     
     for (const auto& shape : shapes) {
+		modelVertices.reserve(modelVertices.size() + shape.mesh.indices.size());
+		modelIndices.reserve(modelIndices.size() + shape.mesh.indices.size());
+
         for (const auto& index : shape.mesh.indices) {
             Vertex3D vertex = {};
             vertex.pos = {
@@ -840,18 +843,20 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(buffer->getBuffer());
+
     }
     
     // Отрисовка текстуры пост эффекта
     {
         // Изменяем лаяут текстуры, для использования как текстуру отрисовки
-        transitionImageLayout(buffer,
+		// Конвертация в нужный ляут происходит автоматически предыдущим рендер проходом - в дополнительной конвертации нету нужнды
+        /*transitionImageLayout(buffer,
                               postImage,
-                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+							  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                               0, 1,
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);*/
         
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
