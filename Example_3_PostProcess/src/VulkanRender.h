@@ -107,6 +107,7 @@ public:
     VulkanDescriptorPoolPtr modelDescriptorPool;
     VulkanDescriptorSetPtr modelDescriptorSet;
     
+	float totalTime;
     float rotateAngle;
     
     uint32_t vulkanImageIndex;

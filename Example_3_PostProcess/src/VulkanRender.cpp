@@ -2,6 +2,7 @@
 #include <array>
 #include <limits>
 #include <numeric>
+#include <cmath>
 #include <Helpers.h>
 
 // TinyObj
@@ -46,7 +47,8 @@ VulkanRender::VulkanRender(){
     modelTotalVertexesCount = 0;
     modelTotalIndexesCount = 0;
     modelImageIndex = 0;
-    rotateAngle = 0;
+	totalTime = 0.0f;
+    rotateAngle = 0.0f;
     vulkanImageIndex = 0;
 }
 
@@ -256,7 +258,7 @@ void VulkanRender::createPostImageAndView(){
     // Изображение
     postImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
                                               //vulkanSwapchain->getSwapChainExtent().width, vulkanSwapchain->getSwapChainExtent().height,
-                                              VkExtent2D({TARGET_FBO_TEXTURE_WIDTH, TARGET_FBO_TEXTURE_HEIGHT}),
+                                              VkExtent2D{TARGET_FBO_TEXTURE_WIDTH, TARGET_FBO_TEXTURE_HEIGHT},
                                               VK_FORMAT_R8G8B8A8_UNORM,
                                               VK_IMAGE_TILING_OPTIMAL,
                                               VK_IMAGE_LAYOUT_UNDEFINED,
@@ -281,7 +283,7 @@ void VulkanRender::createPostDepthResources() {
     uint32_t width = TARGET_FBO_TEXTURE_WIDTH;
     uint32_t height = TARGET_FBO_TEXTURE_HEIGHT;
     postDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                   VkExtent2D({width, height}), // Размеры
+                                                   VkExtent2D{width, height}, // Размеры
                                                    vulkanDepthFormat,           // Формат текстуры
                                                    VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
                                                    VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -774,8 +776,8 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
                               VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                               0, 1,
                               VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+							  VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+							  VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
         
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
@@ -857,7 +859,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
                               VK_IMAGE_ASPECT_COLOR_BIT,
                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);*/
-        
+
         // Информация о запуске рендер-прохода
         std::array<VkClearValue, 2> clearValues = {};
         clearValues[0].color = {{0.4f, 0.1f, 0.1f, 1.0f}};
@@ -910,7 +912,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
         vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, postPipeline->getLayout(), 0, 1, &set, 0, nullptr);
         
         // Push константы для динамической отрисовки
-        float effectCoeff = 1.0f;
+        float effectCoeff = std::abs(std::sin(totalTime * 3.1415926535 / 10.0f));
         vkCmdPushConstants(buffer->getBuffer(),
                            postPipeline->getLayout(),
                            VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -933,6 +935,7 @@ VulkanCommandBufferPtr VulkanRender::makeRenderCommandBuffer(uint32_t frameIndex
 
 // Обновляем юниформ буффер
 void VulkanRender::updateRender(float delta){
+	totalTime += delta;
     rotateAngle += delta * 30.0f;
 }
 
