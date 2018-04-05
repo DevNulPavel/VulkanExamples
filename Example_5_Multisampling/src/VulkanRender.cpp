@@ -115,7 +115,7 @@ void VulkanRender::init(GLFWwindow* window){
     modelTextureSampler = std::make_shared<VulkanSampler>(vulkanLogicalDevice,
                                                           VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                                                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                                          modelTextureImage->getBaseMipmapsCount());
+                                                          modelTextureImage->getBaseMipmapsCount(), 0, -1.0f);
     
     // Грузим данные для модели
     loadModelSrcData();
@@ -188,7 +188,8 @@ void VulkanRender::rebuildRendering(){
 
 // Создаем буфферы для глубины
 void VulkanRender::createWindowDepthResources() {
-    // Определяем подходящий формат изображения для глубины
+	// Не используется, так как есть текстура с мультисемплингом
+    /*// Определяем подходящий формат изображения для глубины
     std::vector<VkFormat> candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
     VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(),
                                                      candidates,
@@ -233,7 +234,7 @@ void VulkanRender::createWindowDepthResources() {
                           0,
                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     
-    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);*/
 }
 
 // Создание изображения для мультисемплинга и вью для него
@@ -267,37 +268,65 @@ void VulkanRender::createMultisampleImagesAndViews(){
                                                                   multisampleColorImage,
                                                                   VK_IMAGE_ASPECT_COLOR_BIT);
 
+	// Формат глубины
+	std::vector<VkFormat> candidates = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT };
+	VkFormat vulkanDepthFormat = findSupportedFormat(vulkanPhysicalDevice->getDevice(), candidates, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
     // Изображение мультисемплинга глубины
     multisampleDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
                                                           vulkanSwapchain->getSwapChainExtent(),
-                                                          vulkanWindowDepthImage->getBaseFormat(),
+		                                                  vulkanDepthFormat,
                                                           VK_IMAGE_TILING_OPTIMAL,
-                                                          VK_IMAGE_LAYOUT_UNDEFINED,    // Для мультисемпла нужен UNDEFINED?
+                                                          VK_IMAGE_LAYOUT_UNDEFINED,
                                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                                           1,
                                                           samplingValue);
     // Вью изображения мультисемплинга глубины
-	VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
-		aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	VkImageAspectFlags depthAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if (hasStencilComponent(vulkanDepthFormat)) {
+		depthAspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
     multisampleDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                   multisampleDepthImage,
-																  aspectMask);
+		                                                          depthAspectMask);
+
+	// Обновляем лаяут текстур
+	VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+	transitionImageLayout(commandBuffer,
+						  multisampleColorImage,
+		                  VK_IMAGE_LAYOUT_UNDEFINED,
+						  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						  0, 1,
+						  VK_IMAGE_ASPECT_COLOR_BIT,
+						  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						  0,
+						  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+	transitionImageLayout(commandBuffer,
+						  multisampleDepthImage,
+						  VK_IMAGE_LAYOUT_UNDEFINED,
+						  VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					      0, 1,
+					      depthAspectMask,
+					      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+					      VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+					      0,
+					      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+	endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Создание рендер прохода
 void VulkanRender::createMainRenderPass(){
     // Массив аттачментов
-    std::array<VkAttachmentDescription, 4> attachments = {};
+    std::array<VkAttachmentDescription, 3> attachments = {};
     memset(attachments.data(), 0, sizeof(VkAttachmentDescription)*attachments.size());
     
     // Аттачмент мультисемплинга цвета
     attachments[0].format = multisampleColorImage->getBaseFormat();
     attachments[0].samples = multisampleColorImage->getBaseSampleCount();
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;	// Чистим на старт
+    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;	// Сохраняем после
     attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -313,7 +342,7 @@ void VulkanRender::createMainRenderPass(){
     attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    attachments[1].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	// Картинка будет использоваться для отбражения
     
     // Multisampled depth attachment we render to
     attachments[2].format = multisampleDepthImage->getBaseFormat();
@@ -325,41 +354,41 @@ void VulkanRender::createMainRenderPass(){
     attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     
-    // Depth resolve attachment
-    attachments[3].format = vulkanWindowDepthImage->getBaseFormat();
+    // аттачмент резолва глубины - не используется
+    /*attachments[3].format = vulkanWindowDepthImage->getBaseFormat();
     attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;*/
     
-    // Реф цвета
+    // Реф цвета, аттач 0 с мультисемплингом
     VkAttachmentReference colorReference = {};
     memset(&colorReference, 0, sizeof(VkAttachmentReference));
     colorReference.attachment = 0;
     colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     
-    // Реф глубины
+	// Референс для ресолва мультисемплинга для цвета, аттач 1 без семплинга
+	VkAttachmentReference resolveReference = {};
+	memset(&resolveReference, 0, sizeof(VkAttachmentReference));
+	resolveReference.attachment = 1;
+	resolveReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // Реф глубины, аттач 2 с семплингом
     VkAttachmentReference depthReference = {};
     memset(&depthReference, 0, sizeof(VkAttachmentReference));
     depthReference.attachment = 2;
     depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     
-    // Референс для ресолва мультисемплинга // Resolve attachment reference for the color attachment
-    VkAttachmentReference resolveReference = {};
-    memset(&resolveReference, 0, sizeof(VkAttachmentReference));
-    resolveReference.attachment = 1;
-    resolveReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    // Описание попроходов рендеринга
+    // Описание подпроходов рендеринга
     VkSubpassDescription subpass = {};
     memset(&subpass, 0, sizeof(VkSubpassDescription));
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorReference;
-    subpass.pResolveAttachments = &resolveReference;    // Pass our resolve attachments to the sub pass
+    subpass.pResolveAttachments = &resolveReference;    // Проход резолва мультисемплинга
     subpass.pDepthStencilAttachment = &depthReference;
     
     // Зависимости подпроходов
@@ -412,7 +441,7 @@ void VulkanRender::createWindowFrameBuffers(){
         views.push_back(multisampleColorImageView);
         views.push_back(view);
         views.push_back(multisampleDepthImageView);
-        views.push_back(vulkanWindowDepthImageView);
+        //views.push_back(vulkanWindowDepthImageView);
         
         // Создаем фреймбуффер
         VulkanFrameBufferPtr frameBuffer = std::make_shared<VulkanFrameBuffer>(vulkanLogicalDevice,
