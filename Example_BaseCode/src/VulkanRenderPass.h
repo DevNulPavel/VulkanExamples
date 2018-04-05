@@ -23,6 +23,8 @@ struct VulkanRenderPassConfig{
 struct VulkanRenderPass {
 public:
     VulkanRenderPass(VulkanLogicalDevicePtr device,
+                     const VkRenderPassCreateInfo& customPassInfo);
+    VulkanRenderPass(VulkanLogicalDevicePtr device,
                      const VulkanRenderPassConfig& imageConfig,
                      const VulkanRenderPassConfig& depthConfig);
     VulkanRenderPass(VulkanLogicalDevicePtr device,
@@ -31,11 +33,13 @@ public:
     VkRenderPass getPass() const;
     VulkanRenderPassConfig getBaseImageConfig() const;
     VulkanRenderPassConfig getBaseDepthConfig() const;
+    bool isCustom() const;
     
 private:
     VulkanLogicalDevicePtr _device;
     VulkanRenderPassConfig  _imageConfig;
     VulkanRenderPassConfig  _depthConfig;
+    bool _isCustom;
     VkRenderPass _renderPass;
     
 private:

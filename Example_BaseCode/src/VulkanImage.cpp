@@ -49,7 +49,8 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
                          VkImageLayout layout,
                          VkImageUsageFlags usage,
                          VkMemoryPropertyFlags properties,
-                         uint32_t mipmapsCount):
+                         uint32_t mipmapsCount,
+                         VkSampleCountFlagBits sampleCount):
     _logicalDevice(logicDevice),
     _image(VK_NULL_HANDLE),
     _imageMemory(VK_NULL_HANDLE),
@@ -60,6 +61,7 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
     _usage(usage),
     _properties(properties),
     _mipmapsCount(mipmapsCount),
+    _sampleCount(sampleCount),
     _needDestroy(true){
         
     createImage(_size.width, _size.height,
@@ -68,7 +70,8 @@ VulkanImage::VulkanImage(VulkanLogicalDevicePtr logicDevice,
                 layout,
                 usage,
                 properties,
-                mipmapsCount);
+                mipmapsCount,
+                sampleCount);
 }
 
 VulkanImage::~VulkanImage(){
@@ -122,6 +125,10 @@ uint32_t VulkanImage::getBaseMipmapsCount() const{
     return _mipmapsCount;
 }
 
+VkSampleCountFlagBits VulkanImage::getBaseSampleCount() const{
+    return _sampleCount;
+}
+
 void VulkanImage::setNewLayout(VkImageLayout layout){
     _layout = layout;
 }
@@ -133,7 +140,8 @@ void VulkanImage::createImage(uint32_t width, uint32_t height,
                               VkImageLayout layout,
                               VkImageUsageFlags usage,
                               VkMemoryPropertyFlags properties,
-                              uint32_t mipmapsCount) {
+                              uint32_t mipmapsCount,
+                              VkSampleCountFlagBits sampleCount) {
     
     // Для поля initialLayout есть только два возможных значения:
     // VK_IMAGE_LAYOUT_UNDEFINED: Не и используется GPU и первое изменение (transition) отбросит все тексели.
@@ -154,7 +162,7 @@ void VulkanImage::createImage(uint32_t width, uint32_t height,
     imageInfo.tiling = tiling;
     imageInfo.initialLayout = layout; // Текстура заранее с нужными данными
     imageInfo.usage = usage;    // Флаги использования текстуры
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;  // Семплирование данной текстуры
+    imageInfo.samples = sampleCount;  // Семплирование данной текстуры
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Режим междевайного доступа
     
     // Создаем изображение

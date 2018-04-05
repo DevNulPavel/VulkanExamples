@@ -90,11 +90,11 @@ void VulkanRender::init(GLFWwindow* window){
     // Обновляем лаяут текстуры глубины на правильный
     updateWindowDepthTextureLayout();
     
-    // Создаем рендер проход
-    createMainRenderPass();
-    
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
+    
+    // Создаем рендер проход
+    createMainRenderPass();
     
     // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
     createDescriptorsSetLayout();
@@ -211,6 +211,31 @@ void VulkanRender::createWindowDepthResources() {
     vulkanWindowDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                    vulkanWindowDepthImage,
                                                                    VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
+}
+
+// Обновляем лаяут текстуры глубины на правильный
+void VulkanRender::updateWindowDepthTextureLayout(){
+    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
+    
+    VkImageAspectFlags aspectMask;
+    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
+        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    
+    // Конвертируем в формат, пригодный для глубины
+    transitionImageLayout(commandBuffer,
+                          vulkanWindowDepthImage,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                          0, 1,
+                          aspectMask,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                          0,
+                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    
+    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 // Создание рендер прохода
@@ -352,33 +377,6 @@ void VulkanRender::createGraphicsPipeline() {
                                                       vulkanRenderPass,
                                                       pushConstants,
                                                       dynamicStates);
-}
-
-
-
-// Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updateWindowDepthTextureLayout(){
-    VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    
-    VkImageAspectFlags aspectMask;
-    aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
-        aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    
-    // Конвертируем в формат, пригодный для глубины
-    transitionImageLayout(commandBuffer,
-                          vulkanWindowDepthImage,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          0, 1,
-                          aspectMask,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                          0,
-                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    
-    endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
 
@@ -670,7 +668,7 @@ void VulkanRender::drawFrame() {
     // TODO: Помогает против подвисания на ресайзах и тд
 	vulkanRenderQueue->wait();
 	vulkanPresentQueue->wait();
-#endif // 
+#endif
     
     TIME_BEGIN(DRAW_TIME);
     

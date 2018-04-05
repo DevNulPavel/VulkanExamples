@@ -15,13 +15,24 @@ VulkanRenderPassConfig::VulkanRenderPassConfig():
     refLayout(VK_IMAGE_LAYOUT_UNDEFINED){
 }
 
+VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device, const VkRenderPassCreateInfo& customPassInfo):
+    _device(device),
+    _isCustom(true){
+        
+    // Создаем рендер-проход
+    if (vkCreateRenderPass(_device->getDevice(), &customPassInfo, nullptr, &_renderPass) != VK_SUCCESS) {
+        LOG("Failed to create render pass!");
+        throw std::runtime_error("Failed to create render pass!");
+    }
+}
 
 VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
                                    const VulkanRenderPassConfig& imageConfig,
                                    const VulkanRenderPassConfig& depthConfig):
     _device(device),
     _imageConfig(imageConfig),
-    _depthConfig(depthConfig){
+    _depthConfig(depthConfig),
+    _isCustom(false){
         
     // Описание подсоединенного буффера цвета
     VkAttachmentDescription colorAttachment = {};
@@ -98,7 +109,8 @@ VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
 VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device,
                                    const VulkanRenderPassConfig& imageConfig):
     _device(device),
-    _imageConfig(imageConfig){
+    _imageConfig(imageConfig),
+    _isCustom(false){
     
     // Описание подсоединенного буффера цвета
     VkAttachmentDescription colorAttachment = {};
@@ -163,3 +175,6 @@ VkRenderPass VulkanRenderPass::getPass() const{
     return _renderPass;
 }
 
+bool VulkanRenderPass::isCustom() const{
+    return _isCustom;
+}

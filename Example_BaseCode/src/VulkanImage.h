@@ -26,7 +26,8 @@ public:
                 VkImageLayout layout,
                 VkImageUsageFlags usage,
                 VkMemoryPropertyFlags properties,
-                uint32_t mipmapsCount);
+                uint32_t mipmapsCount = 1,
+                VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT);
     ~VulkanImage();
     VkImage getImage() const;
     VkDeviceMemory getImageMemory() const;
@@ -40,6 +41,7 @@ public:
     VkImageUsageFlags getBaseUsage() const;
     VkMemoryPropertyFlags getBaseProperties() const;
     uint32_t getBaseMipmapsCount() const;
+    VkSampleCountFlagBits getBaseSampleCount() const;
     void setNewLayout(VkImageLayout layout);
     
 private:
@@ -53,6 +55,7 @@ private:
     VkImageUsageFlags _usage;
     VkMemoryPropertyFlags _properties;
     uint32_t _mipmapsCount;
+    VkSampleCountFlagBits _sampleCount;
     bool _needDestroy;
     
 private:
@@ -62,7 +65,8 @@ private:
                      VkImageLayout layout,
                      VkImageUsageFlags usage,
                      VkMemoryPropertyFlags properties,
-                     uint32_t mipmapsCount);
+                     uint32_t mipmapsCount,
+                     VkSampleCountFlagBits sampleCount);
 };
 
 typedef std::shared_ptr<VulkanImage> VulkanImagePtr;

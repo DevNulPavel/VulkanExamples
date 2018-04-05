@@ -37,7 +37,10 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
                                VulkanDescriptorSetLayoutPtr descriptorSetLayout,
                                VulkanRenderPassPtr renderPass,
                                const std::vector<VkPushConstantRange>& pushConstants,
-                               const std::vector<VkDynamicState>& dynamicStates):
+                               const std::vector<VkDynamicState>& dynamicStates,
+                               VkSampleCountFlagBits sampleCount,
+                               bool sampleShading,
+                               float minSampleShading):
     _device(device),
     _vertexShader(vertexShader),
     _fragmentShader(fragmentShader),
@@ -52,7 +55,10 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     _descriptorSetLayout(descriptorSetLayout),
     _renderPass(renderPass),
     _pushConstants(pushConstants),
-    _dynamicStates(dynamicStates){
+    _dynamicStates(dynamicStates),
+    _sampleCount(sampleCount),
+    _sampleShading(sampleShading),
+    _minSampleShading(minSampleShading){
         
     // Описание настроек вершинного шейдера
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -126,18 +132,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     rasterizer.cullMode = _cullingConfig.cullMode;    // Задняя часть
     rasterizer.frontFace = _cullingConfig.frontFace; // Обход по часовой стрелке для фронтальной стороны
     rasterizer.depthBiasEnable = VK_FALSE;          // Смещение по глубине отключено
-        
-    // Настройка антиаллиасинга с помощью мультисемплинга
-    VkPipelineMultisampleStateCreateInfo multisampling = {};
-    memset(&multisampling, 0, sizeof(VkPipelineMultisampleStateCreateInfo));
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;    // Кратность семплирования
-    multisampling.minSampleShading = 1.0f;      // Optional
-    multisampling.pSampleMask = nullptr;        // Optional
-    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-    multisampling.alphaToOneEnable = VK_FALSE;      // Optional
-        
+    
     // Настройки классического блендинга
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     memset(&colorBlendAttachment, 0, sizeof(VkPipelineColorBlendAttachmentState));
@@ -186,6 +181,17 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
         throw std::runtime_error("Failed to create pipeline layout!");
     }
     
+    // Настройка антиаллиасинга с помощью мультисемплинга
+    VkPipelineMultisampleStateCreateInfo multisampling = {};
+    memset(&multisampling, 0, sizeof(VkPipelineMultisampleStateCreateInfo));
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = _sampleCount;    // Кратность семплирования
+    multisampling.sampleShadingEnable = _sampleShading ? VK_TRUE : VK_FALSE;
+    multisampling.minSampleShading = _minSampleShading;
+    multisampling.pSampleMask = nullptr;        // Optional
+    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+    multisampling.alphaToOneEnable = VK_FALSE;      // Optional
+        
     // TODO: Наследование позволяет ускорить переключение пайплайнов с общим родителем
     
     // Непосредственно создание пайплайна

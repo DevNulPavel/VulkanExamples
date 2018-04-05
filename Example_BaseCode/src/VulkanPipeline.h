@@ -52,7 +52,10 @@ public:
                    VulkanDescriptorSetLayoutPtr descriptorSetLayout,
                    VulkanRenderPassPtr renderPass,
                    const std::vector<VkPushConstantRange>& pushConstants = std::vector<VkPushConstantRange>(),
-                   const std::vector<VkDynamicState>& dynamicStates = std::vector<VkDynamicState>());
+                   const std::vector<VkDynamicState>& dynamicStates = std::vector<VkDynamicState>(),
+                   VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT,
+                   bool sampleShading = false,
+                   float minSampleShading = 0.0f);
     ~VulkanPipeline();
     VkPipelineLayout getLayout() const;
     VkPipeline getPipeline() const;
@@ -74,6 +77,9 @@ private:
     VulkanRenderPassPtr _renderPass;
     std::vector<VkPushConstantRange> _pushConstants;
     std::vector<VkDynamicState> _dynamicStates;
+    VkSampleCountFlagBits _sampleCount;
+    bool _sampleShading;
+    float _minSampleShading;
     
     VkPipelineLayout _layout;
     VkPipeline _pipeline;
