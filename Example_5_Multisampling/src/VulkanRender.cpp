@@ -395,23 +395,23 @@ void VulkanRender::createMainRenderPass(){
     std::array<VkSubpassDependency, 2> dependencies;
     memset(dependencies.data(), 0, sizeof(VkSubpassDependency)*dependencies.size());
     
-    // Подпроход 1
-    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[0].dstSubpass = 0;
-    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    // Подпроход-зависимость 1
+    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;   // Должны выполниться все комманды до начала рендер прохода
+    dependencies[0].dstSubpass = 0; // Можно будет выводить на 0 подпроход
+    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;    // Все комманды до самого конца
+    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;   // Вывод будет разрешен на стадии вывода изображения в аттачмент
+    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;  // Все операции чтения должны быть завершены до???
+    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // После - можно читать и писать в аттачмент
+    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;  // Зависимость по регионам отрисовки
     
-    // Подпроход 2
-    dependencies[1].srcSubpass = 0;
-    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    // Подпроход-зависимость 2
+    dependencies[1].srcSubpass = 0; // Можно будет работать после вывода данных в 0 подпроход
+    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL; // После могут исполняться все комманды после окончания рендер прохода
+    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;   // До начала должны выполниться все выводы в изображение
+    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;    // Последняя стадия - после нее можно все
+    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // До начальной стадии долны выполниться все операции с аттачментом цвета
+    dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;  // После - можно работать с памятью на чтение
+    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;  // Зависимость по регионам отрисовки
     
     // Создание рендер прохода
     VkRenderPassCreateInfo renderPassInfo = {};
