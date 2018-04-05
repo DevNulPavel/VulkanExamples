@@ -985,6 +985,11 @@ void VulkanRender::drawFrame() {
 		LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
     }
 
+	// Ожидаем доступность закидывания задач на рендеринг, чтобы не удалялись буфферы комманд активные
+	TIME_BEGIN_OFF(WAIT_FENCE);
+	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
+
     // Model Draw buffer
     TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
     VulkanCommandBufferPtr modelBuffer = makeModelRenderCommandBuffer(vulkanImageIndex);
@@ -1026,16 +1031,12 @@ void VulkanRender::drawFrame() {
     postSubmitInfo.pCommandBuffers = &postDrawBuffer; // Указываем коммандный буффер отрисовки
     postSubmitInfo.signalSemaphoreCount = 1;
     postSubmitInfo.pSignalSemaphores = postSignalSemaphores;
-        
-    // Ожидаем доступность закидывания задач на рендеринг
-    TIME_BEGIN_OFF(WAIT_FENCE);
-    //vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-    TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
+    
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
     TIME_BEGIN_OFF(SUBMIT_TIME);
     VkSubmitInfo submits[] = {modelSubmitInfo, postSubmitInfo};
-    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 2, submits, /*vulkanRenderFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 2, submits, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }

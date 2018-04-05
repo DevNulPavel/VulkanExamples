@@ -93,7 +93,7 @@ int local_main(int argc, char** argv) {
             totalFrames = 0;
             char outText[128];
             sprintf(outText, "Possible FPS: %d, CPU draw duration %lldms, sleep duration: %lldms", 
-				static_cast<int>(1.0/lastFrameDuration), 
+				static_cast<int>(1.0/std::max(lastFrameDuration, 0.0001)), 
 				std::chrono::duration_cast<std::chrono::milliseconds>(drawCallDuration).count(),
 				std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count());
             glfwSetWindowTitle(window, outText);
