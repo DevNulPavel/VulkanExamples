@@ -23,6 +23,8 @@ public:
     ~VulkanPhysicalDevice();
     void updateSwapchainSupportDetails();   // Обновляем информацию о свопчейне после ресайза окна
     VkPhysicalDevice getDevice() const;
+    const VkPhysicalDeviceFeatures& getDeviceFeatures() const;
+    const VkPhysicalDeviceProperties& getDeviceProperties() const;
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
     VulkanSwapChainSupportDetails getSwapChainSupportDetails() const;
     VulkanInstancePtr getBaseInstance() const;
@@ -35,6 +37,8 @@ private:
 	std::vector<const char*> _vulkanLayers;
     VulkanSurfacePtr _vulkanSurface;
     VkPhysicalDevice _device;
+    VkPhysicalDeviceFeatures _deviceFeatures;
+    VkPhysicalDeviceProperties _deviceProperties;
     VulkanQueuesFamiliesIndexes _queuesFamiliesIndexes;
     VulkanSwapChainSupportDetails _swapchainSuppportDetails;
     

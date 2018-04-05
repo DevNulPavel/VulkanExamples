@@ -235,6 +235,19 @@ void VulkanRender::createWindowDepthResources() {
 
 // Создание изображения для мультисемплинга и вью для него
 void VulkanRender::createMultisampleImagesAndViews(){
+    VkSampleCountFlagBits samplingValue = VK_SAMPLE_COUNT_64_BIT;
+    VkSampleCountFlags counts = std::min(vulkanPhysicalDevice->getDeviceProperties().limits.framebufferColorSampleCounts,
+                                         vulkanPhysicalDevice->getDeviceProperties().limits.framebufferDepthSampleCounts);
+    if (counts & VK_SAMPLE_COUNT_64_BIT)      { samplingValue = VK_SAMPLE_COUNT_64_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_32_BIT) { samplingValue = VK_SAMPLE_COUNT_32_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_16_BIT) { samplingValue = VK_SAMPLE_COUNT_16_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_8_BIT)  { samplingValue = VK_SAMPLE_COUNT_8_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_4_BIT)  { samplingValue = VK_SAMPLE_COUNT_4_BIT; }
+    else if (counts & VK_SAMPLE_COUNT_2_BIT)  { samplingValue = VK_SAMPLE_COUNT_2_BIT; }
+    else { samplingValue = VK_SAMPLE_COUNT_1_BIT; }
+    
+    LOG("Selected multisampling value: X%d\n", static_cast<int>(samplingValue));
+    
     // Изображение для мультисемплинга цвета
     multisampleColorImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
                                                           vulkanSwapchain->getSwapChainExtent(),
@@ -244,7 +257,7 @@ void VulkanRender::createMultisampleImagesAndViews(){
                                                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                                           1,
-                                                          VK_SAMPLE_COUNT_8_BIT);
+                                                          samplingValue);
     
     //  Вью изображения для мультисемплинга цвета
     multisampleColorImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
@@ -260,7 +273,7 @@ void VulkanRender::createMultisampleImagesAndViews(){
                                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
                                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                                           1,
-                                                          VK_SAMPLE_COUNT_8_BIT);
+                                                          samplingValue);
     // Вью изображения мультисемплинга глубины
     multisampleDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                   multisampleDepthImage,

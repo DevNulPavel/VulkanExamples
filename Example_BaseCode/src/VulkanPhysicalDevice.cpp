@@ -75,6 +75,12 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanInstancePtr instance,
         _device = std::get<0>(candidates.begin()->second);
         _queuesFamiliesIndexes = std::get<1>(candidates.begin()->second);
         _swapchainSuppportDetails = std::get<2>(candidates.begin()->second);
+        
+        // Свойства устройства
+        vkGetPhysicalDeviceProperties(_device, &_deviceProperties);
+        
+        // Фичи физического устройства
+        vkGetPhysicalDeviceFeatures(_device, &_deviceFeatures);
     } else {
         LOG("Failed to find a suitable GPU!");
         throw std::runtime_error("Failed to find a suitable GPU!");
@@ -86,6 +92,14 @@ VulkanPhysicalDevice::~VulkanPhysicalDevice(){
 
 VkPhysicalDevice VulkanPhysicalDevice::getDevice() const{
     return _device;
+}
+
+const VkPhysicalDeviceFeatures& VulkanPhysicalDevice::getDeviceFeatures() const{
+    return _deviceFeatures;
+}
+
+const VkPhysicalDeviceProperties& VulkanPhysicalDevice::getDeviceProperties() const{
+    return _deviceProperties;
 }
 
 VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::getQueuesFamiliesIndexes() const{
@@ -165,10 +179,6 @@ int VulkanPhysicalDevice::rateDeviceScore(VkPhysicalDevice device) {
     // Свойства физического устройства
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
-    
-    // Фичи физического устройства
-    VkPhysicalDeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
     
     LOG("Test GPU with name: %s, API version: %d.%d.%d,\n",
            deviceProperties.deviceName,
