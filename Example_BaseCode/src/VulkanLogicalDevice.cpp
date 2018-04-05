@@ -95,8 +95,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         }
         
         // Нужные фичи устройства (ничего не указываем)
-        VkPhysicalDeviceFeatures deviceFeatures = {};
-        memset(&deviceFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
+        VkPhysicalDeviceFeatures deviceFeatures = _physicalDevice->getDeviceFeatures();
         
         // Конфиг создания девайса
         VkDeviceCreateInfo createInfo = {};

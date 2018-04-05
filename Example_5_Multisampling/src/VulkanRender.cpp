@@ -160,6 +160,9 @@ void VulkanRender::rebuildRendering(){
     
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
+
+	// Создание изображения для мультисемплинга и вью для него
+	createMultisampleImagesAndViews();
     
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
@@ -196,7 +199,7 @@ void VulkanRender::createWindowDepthResources() {
     uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
     uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
     vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                           VkExtent2D({width, height}),               // Размеры
+                                                           VkExtent2D{width, height},               // Размеры
                                                            vulkanDepthFormat,           // Формат текстуры
                                                            VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
                                                            VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -275,9 +278,13 @@ void VulkanRender::createMultisampleImagesAndViews(){
                                                           1,
                                                           samplingValue);
     // Вью изображения мультисемплинга глубины
+	VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if (hasStencilComponent(vulkanWindowDepthImage->getBaseFormat())) {
+		aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
     multisampleDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                   multisampleDepthImage,
-                                                                  VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+																  aspectMask);
 }
 
 // Создание рендер прохода
@@ -379,6 +386,8 @@ void VulkanRender::createMainRenderPass(){
     
     // Создание рендер прохода
     VkRenderPassCreateInfo renderPassInfo = {};
+	memset(&renderPassInfo, 0, sizeof(VkRenderPassCreateInfo));
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = attachments.size();
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
@@ -838,7 +847,6 @@ void VulkanRender::drawFrame() {
     TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
 
     // Настраиваем отправление в очередь комманд отрисовки
-    // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
     VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore()}; // Семафор ожидания картинки для вывода туда графики
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем c помощью семафора возможности вывода в буфер цвета
     VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore->getSemafore()}; // Семафор оповещения о завершении рендеринга

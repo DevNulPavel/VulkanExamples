@@ -248,7 +248,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
     // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
     VulkanImagePtr staggingImage = std::make_shared<VulkanImage>(device,
-                                                                 VkExtent2D({static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)}),
+                                                                 VkExtent2D{static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)},
                                                                  VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
                                                                  VK_IMAGE_TILING_LINEAR,             // Тайлинг
                                                                  VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -267,7 +267,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     
     // Создаем рабочее изображение для последующего использования
     VulkanImagePtr resultImage = std::make_shared<VulkanImage>(device,
-                                                               VkExtent2D({static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)}),
+                                                               VkExtent2D{static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)},
                                                                VK_FORMAT_R8G8B8A8_UNORM,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
                                                                VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -275,7 +275,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                                                                mipmapLevels);
     
-    // TODO: Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
+    // Надо ли для группы операций с текстурами каждый раз создавать коммандный буффер?? Может быть можно все делать в одном?
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
     
     // Конвертирование исходной буфферной текстуры с данными в формат копирования на GPU
@@ -318,29 +318,27 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     }
     
     // Генерируем мипмапы для текстуры
-    {
+    if (mipmapLevels > 1){
         //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         generateMipmapsForImage(commandBuffer, resultImage);
         //endAndQueueSingleTimeCommands(commandBuffer, queue);
-    }
-    
-    // Конвертируем использование текстуры в оптимальное для рендеринга
-    // Генерация мипмапов делает это самостоятельно
-    /*{
-        VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-        transitionImageLayout(commandBuffer,
-                              resultImage,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, // Без мипмапов - VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, C - VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                              0, resultImage->getBaseMipmapsCount(),
-                              VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_ACCESS_TRANSFER_WRITE_BIT,
-                              VK_ACCESS_SHADER_READ_BIT);
-         endAndQueueSingleTimeCommands(commandBuffer, queue);
-     }*/
-    
+	} else {
+		// Конвертируем использование текстуры в оптимальное для рендеринга
+		// Генерация мипмапов делает это самостоятельно
+		//VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+		transitionImageLayout(commandBuffer,
+			resultImage,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, resultImage->getBaseMipmapsCount(),
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT);
+		//endAndQueueSingleTimeCommands(commandBuffer, queue);
+	}
+
     endAndQueueWaitSingleTimeCommands(commandBuffer, queue);
     
     // Удаляем временные объекты
