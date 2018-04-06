@@ -6,6 +6,10 @@
 
 #ifdef _MSC_BUILD
 	#include <Windows.h>
+#else
+    //#include <thread>
+    #include <errno.h>
+    #include <time.h>
 #endif 
 
 // Читаем побайтово файлик
@@ -74,15 +78,37 @@ int __cdecl LOG(const char *format, ...) {
 	}
 #else
 	void sleepShort(float milliseconds){
-		long usec = (long)(milliseconds * 1000) * 1000;
-
-		struct timeval tv;
-		fd_set dummy;
-		SOCKET s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-		FD_ZERO(&dummy);
-		FD_SET(s, &dummy);
-		tv.tv_sec = usec / 1000000L;
-		tv.tv_usec = usec % 1000000L;
-		select(0, 0, 0, &dummy, &tv);
+//        long usec = (long)(milliseconds * 1000) * 1000;
+//
+//        struct timeval tv;
+//        fd_set dummy;
+//        int s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+//        FD_ZERO(&dummy);
+//        FD_SET(s, &dummy);
+//        tv.tv_sec = usec / 1000000L;
+//        tv.tv_usec = usec % 1000000L;
+//        select(0, 0, 0, &dummy, &tv);
+        //std::this_thread::sleep_for(std::chrono::microseconds(static_cast<int>(milliseconds * 1000.0f)));
+        
+        struct timespec tv;
+        /* Construct the timespec from the number of whole seconds... */
+        tv.tv_sec = (time_t)(milliseconds/1000.0);
+        /* ... and the remainder in nanoseconds. */
+        tv.tv_nsec = (long) ((milliseconds/1000.0 - tv.tv_sec) * 1e+9);
+        
+        while (1){
+            /* Sleep for the time specified in tv. If interrupted by a
+             signal, place the remaining time left to sleep back into tv. */
+            int rval = nanosleep (&tv, &tv);
+            if (rval == 0)
+            /* Completed the entire sleep time; all done. */
+                return;
+            else if (errno == EINTR)
+            /* Interrupted by a signal. Try again. */
+                continue;
+            else
+            /* Some other error; bail out. */
+                return;
+        }
 	}
 #endif
