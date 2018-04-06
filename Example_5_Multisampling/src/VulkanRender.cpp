@@ -847,7 +847,7 @@ void VulkanRender::drawFrame() {
                                             vulkanSwapchain->getSwapchain(),
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
-                                            vulkanPresentFences[vulkanImageIndex]->getFence() /*VK_NULL_HANDLE*/,
+                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/ VK_NULL_HANDLE,
                                             &swapchainImageIndex);
     TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
     
@@ -899,9 +899,9 @@ void VulkanRender::drawFrame() {
 	TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
     
 	// Ждем доступности отображения
-	TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
-	vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
+	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
+	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
 
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};

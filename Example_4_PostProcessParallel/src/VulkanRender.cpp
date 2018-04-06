@@ -1043,9 +1043,9 @@ void VulkanRender::drawFrame() {
     TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
     
 	// Ждем доступности отображения
-	TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
+	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
 	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
+	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
 
     // Настраиваем задачу отображения полученного изображения
     VkSemaphore presentWaitSemaphores[] = {vulkanPostRenderFinishedSemaphore->getSemafore()};

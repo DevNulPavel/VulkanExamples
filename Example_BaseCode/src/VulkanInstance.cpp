@@ -173,6 +173,7 @@ std::vector<const char*> VulkanInstance::getRequiredInstanceExtentionNames(){
     
 #ifdef VALIDATION_LAYERS_ENABLED
     result.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	//result.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	LOG("Extention - Required debug extention name: %s\n", VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
     return result;
