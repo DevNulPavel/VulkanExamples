@@ -191,28 +191,28 @@ void VulkanRender::printGPUStats(){
             std::string text;
             switch (info.first) {
                 case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT";
+                    text = "Vertex count";
                     break;
                 case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT";
+                    text = "Primitives count";
                     break;
                 case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT";
+                    text = "Vertex shader call count";
                     break;
                 case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT";
+                    text = "Clipping invocations";
                     break;
                 case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT";
+                    text = "Clipping primitives";
                     break;
                 case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT:
-                    text = "VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT";
+                    text = "Fragment shader call count";
                     break;
                 default:
                     text = "NOTHING";
                     break;
             }
-            LOG("Info %s: %lld", text.c_str(), info.second);
+            LOG("Info %s: %lld\n", text.c_str(), info.second);
         }
         LOG("\n");
     }
@@ -231,7 +231,7 @@ void VulkanRender::createWindowDepthResources() {
     uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
     uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
     vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                           VkExtent2D({width, height}),               // Размеры
+                                                           VkExtent2D{width, height},               // Размеры
                                                            vulkanDepthFormat,           // Формат текстуры
                                                            VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
                                                            VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -638,7 +638,7 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     
     // Завершаем запрос пула
     if (vulkanQueryPool) {
-        vulkanQueryPool->beginPool(buffer);
+        vulkanQueryPool->endPool(buffer);
     }
     
     // Заканчиваем рендер проход
@@ -765,7 +765,7 @@ void VulkanRender::drawFrame() {
     }
 
     TIME_END_MICROSEC_OFF(DRAW_TIME, "Total Draw method time");
-	LOG("\n\n");
+	//LOG("\n\n");
 }
 
 VulkanRender::~VulkanRender(){    
