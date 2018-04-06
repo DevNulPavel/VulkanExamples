@@ -19,6 +19,8 @@ void timestampEndMicroSec(const std::chrono::high_resolution_clock::time_point& 
 #define TIME_BEGIN_OFF(NAME) {}
 #define TIME_END_MICROSEC_OFF(NAME, INFO) {}
 
+void sleepShort(float milliseconds);
+
 #ifdef _MSC_BUILD
 	int __cdecl LOG(const char *format, ...);
 #else

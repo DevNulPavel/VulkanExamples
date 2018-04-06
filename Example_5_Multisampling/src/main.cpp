@@ -17,6 +17,7 @@
 #include <chrono>
 #include <algorithm>
 #include <limits>
+#include <Helpers.h>
 
 #include "VulkanRender.h"
 #include "CommonDefines.h"
@@ -72,34 +73,40 @@ int local_main(int argc, char** argv) {
     double lastFrameDuration = 1.0/60.0;
     int totalFrames = 0;
     while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
+
 		std::chrono::high_resolution_clock::time_point drawBegin = std::chrono::high_resolution_clock::now();
-        glfwPollEvents();
         
         // Обновляем юниформы
         VulkanRender::getInstance()->updateRender(lastFrameDuration);
         
         // Непосредственно отрисовка кадра
         VulkanRender::getInstance()->drawFrame();
-        
+
         // Стабилизация времени кадра
         std::chrono::high_resolution_clock::duration drawCallDuration = std::chrono::high_resolution_clock::now() - drawBegin;
         std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - drawCallDuration;
+
+		//TIME_BEGIN(SLEEP_TEST);
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
-            std::this_thread::sleep_for(sleepDuration);
+			// Низкая точность на винде
+			sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
         }
-        // Расчет времени кадра
-        lastFrameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0;
-        lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
+		//TIME_END_MICROSEC(SLEEP_TEST, "Sleep time");
         
+		// Расчет времени кадра
+		lastFrameDuration = (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0 / 1000.0;
+		lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
+
         // FPS
         totalFrames++;
         if (totalFrames >= 30) {
             totalFrames = 0;
             char outText[128];
-            sprintf(outText, "Possible FPS: %d, CPU draw duration %lldms, sleep duration: %lldms", 
-				static_cast<int>(1.0/lastFrameDuration), 
-				std::chrono::duration_cast<std::chrono::milliseconds>(drawCallDuration).count(),
-				std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count());
+            sprintf(outText, "Possible FPS: %d (%.1fms), CPU draw duration %.1fms, sleep duration: %.1fms", 
+				static_cast<int>(1.0/lastFrameDuration), lastFrameDuration*1000.0,
+				(double)std::chrono::duration_cast<std::chrono::microseconds>(drawCallDuration).count() / 1000.0,
+				(double)std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0 );
             glfwSetWindowTitle(window, outText);
         }
    }

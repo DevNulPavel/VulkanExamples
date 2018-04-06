@@ -143,8 +143,6 @@ set(ALL_SOURCES
     src/VulkanRender.cpp
     src/CommonDefines.h
     src/CommonConstants.h
-    src/Helpers.h
-    src/Helpers.cpp
     src/Vertex2D.h
     src/Vertex2D.cpp
     src/Vertex3D.h
