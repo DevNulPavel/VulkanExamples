@@ -109,7 +109,7 @@ void VulkanRender::init(GLFWwindow* window){
     createModelGraphicsPipeline();
     
     // Грузим текстуру
-    modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "res/textures/chalet.jpg");
+    modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanRenderCommandPool, "static_res/textures/chalet.jpg");
     
     // Вью для текстуры
     modelTextureImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice, modelTextureImage, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -603,7 +603,7 @@ void VulkanRender::loadModelSrcData(){
     std::vector<tinyobj::material_t> materials;
     std::string err;
     
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "res/models/chalet.obj")) {
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "static_res/models/chalet.obj")) {
         throw std::runtime_error(err);
     }
     

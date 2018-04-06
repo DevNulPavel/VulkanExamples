@@ -187,7 +187,17 @@ target_link_libraries(${EXECUTABLE_NAME} ${LIBS_LINK_NAMES})
 if (WIN32)
     string(REGEX REPLACE "/" "\\\\" SOURCE_RES_PATH "${CMAKE_SOURCE_DIR}/res")
     string(REGEX REPLACE "/" "\\\\" RESULT_RES_PATH "${CMAKE_BINARY_DIR}/res")
-	message("Copy command: xcopy \"${SOURCE_RES_PATH}\" \"${RESULT_RES_PATH}\\\" /H /Y /C /R /S")
+	# message("Copy command: xcopy \"${SOURCE_RES_PATH}\" \"${RESULT_RES_PATH}\\\" /H /Y /C /R /S")
+    #message("COPY RES COMMAND = copy ${SOURCE_RES_PATH} ${RESULT_RES_PATH} /y")
+    add_custom_command (
+        TARGET ${EXECUTABLE_NAME}
+        POST_BUILD
+        COMMAND xcopy "${SOURCE_RES_PATH}" "${RESULT_RES_PATH}\\" /H /Y /C /R /S
+    )
+
+    string(REGEX REPLACE "/" "\\\\" SOURCE_RES_PATH "${CMAKE_SOURCE_DIR}/../Example_SharedResources")
+    string(REGEX REPLACE "/" "\\\\" RESULT_RES_PATH "${CMAKE_BINARY_DIR}/static_res")
+    # message("Copy command: xcopy \"${SOURCE_RES_PATH}\" \"${RESULT_RES_PATH}\\\" /H /Y /C /R /S")
     #message("COPY RES COMMAND = copy ${SOURCE_RES_PATH} ${RESULT_RES_PATH} /y")
     add_custom_command (
         TARGET ${EXECUTABLE_NAME}
@@ -200,5 +210,11 @@ else()
         POST_BUILD
         COMMAND rm -f ${CMAKE_BINARY_DIR}/res
         COMMAND ln -s ../res ${CMAKE_BINARY_DIR}/res
+    )
+    add_custom_command (
+        TARGET ${EXECUTABLE_NAME}
+        POST_BUILD
+        COMMAND rm -f ${CMAKE_BINARY_DIR}/static_res
+        COMMAND ln -s ../../Example_SharedResources ${CMAKE_BINARY_DIR}/static_res
     )
 endif()

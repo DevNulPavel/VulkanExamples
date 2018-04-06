@@ -65,6 +65,7 @@ public:
     VulkanSemaforePtr vulkanRenderFinishedSemaphore;
     std::vector<VulkanFencePtr> vulkanPresentFences;
     std::vector<VulkanFencePtr> vulkanRenderFences;
+    VulkanCommandPoolPtr vulkanRenderCommandPool;
     VulkanSwapchainPtr vulkanSwapchain;
     VulkanImagePtr vulkanWindowDepthImage;
     VulkanImageViewPtr vulkanWindowDepthImageView;
@@ -74,7 +75,6 @@ public:
     VulkanShaderModulePtr vulkanVertexModule;
     VulkanShaderModulePtr vulkanFragmentModule;
     VulkanPipelinePtr vulkanPipeline;
-    VulkanCommandPoolPtr vulkanRenderCommandPool;
     
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;

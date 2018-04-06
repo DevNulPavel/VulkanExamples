@@ -251,6 +251,8 @@ set(ALL_SOURCES
     src/VulkanDescriptorPool.cpp
     src/VulkanDescriptorSet.h
     src/VulkanDescriptorSet.cpp
+    src/VulkanQueryPool.h
+    src/VulkanQueryPool.cpp
     src/Helpers.h
     src/Helpers.cpp
 	src/TestDefines.h)
