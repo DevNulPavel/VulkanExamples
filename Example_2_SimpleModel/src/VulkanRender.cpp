@@ -199,7 +199,7 @@ void VulkanRender::createWindowDepthResources() {
     uint32_t width = vulkanSwapchain->getSwapChainExtent().width;
     uint32_t height = vulkanSwapchain->getSwapChainExtent().height;
     vulkanWindowDepthImage = std::make_shared<VulkanImage>(vulkanLogicalDevice,
-                                                           VkExtent2D({width, height}),               // Размеры
+                                                           VkExtent2D{width, height},               // Размеры
                                                            vulkanDepthFormat,           // Формат текстуры
                                                            VK_IMAGE_TILING_OPTIMAL,     // Оптимальный тайлинг
                                                            VK_IMAGE_LAYOUT_UNDEFINED,   // Лаяут начальной текстуры (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
@@ -679,7 +679,7 @@ void VulkanRender::drawFrame() {
                                             vulkanSwapchain->getSwapchain(),
                                             std::numeric_limits<uint64_t>::max(),
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
-                                            vulkanPresentFences[vulkanImageIndex]->getFence() /*VK_NULL_HANDLE*/,
+                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/ VK_NULL_HANDLE,
                                             &swapchainImageIndex);
     TIME_END_MICROSEC(NEXT_IMAGE_TIME, "Next image index wait time");
     
@@ -733,7 +733,7 @@ void VulkanRender::drawFrame() {
     
 	// Ждем доступности отображения
 	TIME_BEGIN(WAIT_FENCE_PRESENT);
-	vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
 	TIME_END_MICROSEC(WAIT_FENCE_PRESENT, "Present fence wait time");
 
     // Настраиваем задачу отображения полученного изображения

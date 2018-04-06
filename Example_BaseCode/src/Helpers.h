@@ -19,7 +19,7 @@ void timestampEndMicroSec(const std::chrono::high_resolution_clock::time_point& 
 #define TIME_BEGIN_OFF(NAME) {}
 #define TIME_END_MICROSEC_OFF(NAME, INFO) {}
 
-#ifdef _MSVC_LANG
+#ifdef _MSC_BUILD
 	int __cdecl LOG(const char *format, ...);
 #else
     #define LOG(...) {printf(__VA_ARGS__); fflush(stdout);}

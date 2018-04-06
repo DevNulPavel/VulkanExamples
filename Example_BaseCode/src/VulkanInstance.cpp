@@ -44,7 +44,7 @@ std::vector<VkLayerProperties> VulkanInstance::getAllValidationLayers(){
     // Получаем доступные слои валидации
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-    
+
     return availableLayers;
 }
 
@@ -82,16 +82,22 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
     std::vector<const char*> result;
     result.push_back("VK_LAYER_LUNARG_standard_validation");
 #if defined(__WINNT__) || defined(_MSC_BUILD)
-//    result.push_back("VK_LAYER_LUNARG_api_dump");
-//    result.push_back("VK_LAYER_LUNARG_device_simulation");
-//    result.push_back("VK_LAYER_LUNARG_screenshot");
-//    result.push_back("VK_LAYER_LUNARG_vktrace");
     result.push_back("VK_LAYER_LUNARG_assistant_layer");
     result.push_back("VK_LAYER_LUNARG_core_validation");
     result.push_back("VK_LAYER_LUNARG_object_tracker");
     result.push_back("VK_LAYER_LUNARG_parameter_validation");
     result.push_back("VK_LAYER_GOOGLE_threading");
     result.push_back("VK_LAYER_GOOGLE_unique_objects");
+
+	//result.push_back("VK_LAYER_LUNARG_api_dump");
+	//result.push_back("VK_LAYER_LUNARG_device_simulation");
+	//result.push_back("VK_LAYER_LUNARG_screenshot");
+	//result.push_back("VK_LAYER_LUNARG_vktrace");
+
+	result.push_back("VK_LAYER_NV_nsight");
+	result.push_back("VK_LAYER_NV_optimus");
+	//result.push_back("VK_LAYER_NV_nomad");
+	
 #endif
     if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
         result.clear();
