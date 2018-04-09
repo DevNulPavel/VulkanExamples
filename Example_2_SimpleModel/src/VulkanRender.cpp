@@ -96,9 +96,6 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
     
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
-    
     // Создаем рендер проход
     createMainRenderPass();
 
@@ -170,9 +167,6 @@ void VulkanRender::rebuildRendering(){
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
     
-    // Обновляем лаяут текстуры глубины на правильный
-    updateWindowDepthTextureLayout();
-    
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
     
@@ -220,10 +214,8 @@ void VulkanRender::createWindowDepthResources() {
     vulkanWindowDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                    vulkanWindowDepthImage,
                                                                    VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
-}
-
-// Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updateWindowDepthTextureLayout(){
+    
+    // Обновляем лаяут текстуры глубины на правильный
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
     
     VkImageAspectFlags aspectMask;
@@ -237,7 +229,7 @@ void VulkanRender::updateWindowDepthTextureLayout(){
                           vulkanWindowDepthImage,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                          0, 1,
+                          0, VK_REMAINING_MIP_LEVELS,   // Оставшиеся
                           aspectMask,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
@@ -288,8 +280,8 @@ void VulkanRender::createWindowFrameBuffers(){
 // Создаем структуру дескрипторов для отрисовки (юниформ буффер, семплер и тд)
 void VulkanRender::createDescriptorsSetLayout(){
     VulkanDescriptorSetConfig uniformBuffer;
-    uniformBuffer.binding = 0; // Юниформ буффер биндим на 0 индекс
-    uniformBuffer.desriptorsCount = 1; // 1н дескриптор
+    uniformBuffer.binding = 0;          // Юниформ буффер биндим на 0 индекс
+    uniformBuffer.desriptorsCount = 1;  // 1н дескриптор
     uniformBuffer.desriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
     uniformBuffer.descriptorStageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Используется в вершинном шейдере
     

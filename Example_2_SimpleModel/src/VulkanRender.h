@@ -114,8 +114,6 @@ private:
     void loadShaders();
     // Создание пайплайна отрисовки
     void createGraphicsPipeline();
-    // Обновляем лаяут текстуры глубины на правильный
-    void updateWindowDepthTextureLayout();
     
     // Грузим данные для модели
     void loadModelSrcData();
