@@ -60,8 +60,17 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем логическое устройство
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
-    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
+    std::vector<float> renderPriorities = {0.5f};
+    VkPhysicalDeviceFeatures logicalDeviceFeatures = {};
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice,
+                                                                vulkanQueuesFamiliesIndexes,
+                                                                0.5f,
+                                                                1,
+                                                                renderPriorities,
+                                                                vulkanInstanceValidationLayers,
+                                                                vulkanDeviceExtensions,
+                                                                logicalDeviceFeatures);
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueues()[0];      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
     
     // Создаем семафоры для отображения и ренедринга

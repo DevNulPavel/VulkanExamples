@@ -94,7 +94,7 @@ VkPhysicalDevice VulkanPhysicalDevice::getDevice() const{
     return _device;
 }
 
-const VkPhysicalDeviceFeatures& VulkanPhysicalDevice::getDeviceFeatures() const{
+const VkPhysicalDeviceFeatures& VulkanPhysicalDevice::getPossibleDeviceFeatures() const{
     return _deviceFeatures;
 }
 

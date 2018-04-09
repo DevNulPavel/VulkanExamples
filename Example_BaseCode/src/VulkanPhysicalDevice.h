@@ -23,7 +23,7 @@ public:
     ~VulkanPhysicalDevice();
     void updateSwapchainSupportDetails();   // Обновляем информацию о свопчейне после ресайза окна
     VkPhysicalDevice getDevice() const;
-    const VkPhysicalDeviceFeatures& getDeviceFeatures() const;
+    const VkPhysicalDeviceFeatures& getPossibleDeviceFeatures() const;
     const VkPhysicalDeviceProperties& getDeviceProperties() const;
     VulkanQueuesFamiliesIndexes getQueuesFamiliesIndexes() const;
     VulkanSwapChainSupportDetails getSwapChainSupportDetails() const;

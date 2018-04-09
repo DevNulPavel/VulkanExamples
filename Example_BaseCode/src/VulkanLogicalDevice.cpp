@@ -3,20 +3,29 @@
 #include <cstring>
 #include <stdexcept>
 #include <set>
+#include "Helpers.h"
 #include "VulkanQueue.h"
 
 
 VulkanLogicalDevice::VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice,
                                          VulkanQueuesFamiliesIndexes queuesFamiliesIndexes,
+                                         float presetQueuePriority,
+                                         uint8_t renderQueuesCount,
+                                         const std::vector<float>& renderQueuesPriorities,
                                          std::vector<const char*> validationLayers,
-                                         std::vector<const char*> extensions):
+                                         std::vector<const char*> extensions,
+                                         VkPhysicalDeviceFeatures deviceFeatures):
     _physicalDevice(physicalDevice),
     _queuesFamiliesIndexes(queuesFamiliesIndexes),
+    _presetQueuePriority(presetQueuePriority),
+    _renderQueuesCount(renderQueuesCount),
+    _renderQueuesPriorities(renderQueuesPriorities),
     _validationLayers(validationLayers),
     _extensions(extensions),
+    _deviceFeatures(deviceFeatures),
     _device(VK_NULL_HANDLE){
-        
-    // Отложенная инициализация в геттерах
+    
+    // Отложенное создание в геттерах из-за shared_ptr
 }
 
 VulkanLogicalDevice::~VulkanLogicalDevice(){
@@ -42,18 +51,22 @@ std::vector<const char*> VulkanLogicalDevice::getBaseExtensions() const{
     return _extensions;
 }
 
-VkDevice VulkanLogicalDevice::getDevice(){
+VkPhysicalDeviceFeatures VulkanLogicalDevice::getBaseFeatures() const{
+    return _deviceFeatures;
+}
+
+VkDevice VulkanLogicalDevice::getDevice() {
     createLogicalDeviceAndQueue();
     return _device;
 }
 
-std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getRenderQueue(){
+std::vector<VulkanQueuePtr> VulkanLogicalDevice::getRenderQueues() {
     createLogicalDeviceAndQueue();
-    return _renderQueue;
+    return _renderQueues;
 }
 
-std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getPresentQueue(){
-    createLogicalDeviceAndQueue();
+std::shared_ptr<VulkanQueue> VulkanLogicalDevice::getPresentQueue() {
+    
     return _presentQueue;
 }
 
@@ -62,78 +75,193 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
     if (_device == VK_NULL_HANDLE) {
         // Только уникальные индексы очередей
         uint32_t vulkanRenderQueueFamilyIndex = _queuesFamiliesIndexes.renderQueuesFamilyIndex;
-        uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueuesFamilyQueuesCount;
         uint32_t vulkanPresentQueueFamilyIndex = _queuesFamiliesIndexes.presentQueuesFamilyIndex;
-        //uint32_t vulkanPresentQueueFamilyQueuesCount = _queuesFamiliesIndexes.presentQueuesFamilyQueuesCount;
-        
-        std::set<uint32_t> uniqueQueueFamilies = {vulkanRenderQueueFamilyIndex, vulkanPresentQueueFamilyIndex};
         
         // Определяем количество создаваемых очередей
-        uint32_t createQueuesCount = 1;
         if (vulkanRenderQueueFamilyIndex == vulkanPresentQueueFamilyIndex) {
-            // Если в одном семействе больше одной очереди - берем разные, иначе одну
-            if (vulkanRenderQueueFamilyQueuesCount > 1) {
-                createQueuesCount = 2;
-            }else{
-                createQueuesCount = 1;
+            LOG("One queue family for render and present");
+            
+            uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueuesFamilyQueuesCount;
+
+            uint32_t createCount = 0;
+            std::vector<uint32_t> queuesIndexes;
+            std::vector<float> priorities;
+            // Всего одна очередь на все
+            if (vulkanRenderQueueFamilyQueuesCount == 1) {
+                LOG("Only one queue for all VulkanQueue objects");
+                
+                createCount = 1;
+                for (int i = 0; i < (1 + _renderQueuesCount); i++) {
+                    queuesIndexes.push_back(0);
+                    priorities.push_back(0.5f);
+                }
             }
-        }else{
-            createQueuesCount = 1;
-        }
-        
-        // Создаем экземпляры настроек создания очереди
-        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        float queuePriority[2] = {0.7f, 0.5f};
-        for (int queueFamily : uniqueQueueFamilies) {
+            // На каждый объект очереди - получим свою логическую очередь если нам хватает очередей настоящих
+            else if ((vulkanRenderQueueFamilyQueuesCount >= 2) && (vulkanRenderQueueFamilyQueuesCount >= ((uint32_t)_renderQueuesCount + 1))) {
+                LOG("Queue for each VulkanQueue object");
+                
+                createCount = (uint32_t)_renderQueuesCount + 1;
+                for (int i = 0; i < createCount; i++) {
+                    queuesIndexes.push_back(i);
+                    if (i == 0) {
+                        priorities.push_back(_presetQueuePriority);
+                    }else{
+                        priorities.push_back(_renderQueuesPriorities[i - 1]);
+                    }
+                }
+            }
+            // Если нехватает настоящих очередей под запрошеные нужды
+            else if ((vulkanRenderQueueFamilyQueuesCount >= 2) && (vulkanRenderQueueFamilyQueuesCount < ((uint32_t)_renderQueuesCount + 1))) {
+                LOG("Less queues than needed for VulkanQueue objects");
+                
+                createCount = (uint32_t)vulkanRenderQueueFamilyQueuesCount;
+                for (int i = 0; i < (uint32_t)_renderQueuesCount + 1; i++) {
+                    if (i < vulkanRenderQueueFamilyQueuesCount) {
+                        queuesIndexes.push_back(i);
+                        if (i == 0) {
+                            priorities.push_back(_presetQueuePriority);
+                        }else{
+                            priorities.push_back(_renderQueuesPriorities[i - 1]);
+                        }
+                    }else{
+                        queuesIndexes.push_back(vulkanRenderQueueFamilyQueuesCount-1);
+                        priorities[vulkanRenderQueueFamilyQueuesCount-1] = 0.5f;
+                    }
+                }
+            }else{
+                LOG("Queues allocating error");
+                throw std::runtime_error("Queues allocating error");
+            }
+
             VkDeviceQueueCreateInfo queueCreateInfo = {};
             memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
             queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueCreateInfo.queueFamilyIndex = queueFamily;
-            queueCreateInfo.queueCount = createQueuesCount;
-            queueCreateInfo.pQueuePriorities = queuePriority;
-            queueCreateInfos.push_back(queueCreateInfo);
-        }
-        
-        // Нужные фичи устройства (ничего не указываем)
-        VkPhysicalDeviceFeatures deviceFeatures = _physicalDevice->getDeviceFeatures();
-        
-        // Конфиг создания девайса
-        VkDeviceCreateInfo createInfo = {};
-        memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
-        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
-        createInfo.pQueueCreateInfos = queueCreateInfos.data(); // Информация о создаваемых на девайсе очередях
-        createInfo.pEnabledFeatures = &deviceFeatures;          // Информация о фичах устройства
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(_extensions.size());
-        createInfo.ppEnabledExtensionNames = _extensions.data();     // Список требуемых расширений устройства
-        createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());    // Слои валидации что и при создании инстанса
-        createInfo.ppEnabledLayerNames = _validationLayers.data();
-        
-        // Пробуем создать логический девайс на конкретном физическом
-        VkPhysicalDevice physDevice = _physicalDevice->getDevice();
-        VkResult createStatus = vkCreateDevice(physDevice, &createInfo, nullptr, &_device);
-        if (createStatus != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create logical device!");
-        }
-        
-        // Если в одном семействе больше одной очереди - берем разные, иначе одну из разных семейств или одного семейства
-        uint32_t queuesIndexes[2] = {0 , 0};
-        if (createQueuesCount >= 2) {
-            queuesIndexes[0] = 0;
-            queuesIndexes[1] = 1;
+            queueCreateInfo.queueFamilyIndex = _queuesFamiliesIndexes.renderQueuesFamilyIndex;
+            queueCreateInfo.queueCount = createCount;
+            queueCreateInfo.pQueuePriorities = priorities.data();
+            
+            // Конфиг создания девайса
+            VkDeviceCreateInfo createInfo = {};
+            memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
+            createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            createInfo.queueCreateInfoCount = 1;
+            createInfo.pQueueCreateInfos = &queueCreateInfo; // Информация о создаваемых на девайсе очередях
+            createInfo.pEnabledFeatures = &_deviceFeatures;          // Информация о фичах устройства
+            createInfo.enabledExtensionCount = static_cast<uint32_t>(_extensions.size());
+            createInfo.ppEnabledExtensionNames = _extensions.data();     // Список требуемых расширений устройства
+            createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());    // Слои валидации что и при создании инстанса
+            createInfo.ppEnabledLayerNames = _validationLayers.data();
+            
+            // Пробуем создать логический девайс на конкретном физическом
+            VkResult createStatus = vkCreateDevice(_physicalDevice->getDevice(), &createInfo, nullptr, &_device);
+            if (createStatus != VK_SUCCESS) {
+                LOG("Failed to create logical device!");
+                throw std::runtime_error("Failed to create logical device!");
+            }
+
+            // Очередь отображения
+            VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
+            vkGetDeviceQueue(_device, vulkanPresentQueueFamilyIndex, queuesIndexes[0], &vulkanPresentQueue);
+            _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[0], vulkanPresentQueue));
+            
+            // Очереди рендеринга
+            for (int i = 1; i < queuesIndexes.size(); i++) {
+                VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
+                vkGetDeviceQueue(_device, vulkanRenderQueueFamilyIndex, queuesIndexes[i], &vulkanGraphicsQueue);
+                VulkanQueuePtr renderQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[i], vulkanGraphicsQueue));
+                _renderQueues.push_back(renderQueue);
+            }
         }else{
-            queuesIndexes[0] = 0;
-            queuesIndexes[1] = 0;
+            LOG("Different queue families for render and present");
+            
+            // Present
+            VkDeviceQueueCreateInfo presentQueueCreateInfo = {};
+            memset(&presentQueueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
+            presentQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            presentQueueCreateInfo.queueFamilyIndex = _queuesFamiliesIndexes.presentQueuesFamilyIndex;
+            presentQueueCreateInfo.queueCount = 1;
+            presentQueueCreateInfo.pQueuePriorities = &_presetQueuePriority;
+            
+            // Render
+            uint32_t renderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueuesFamilyQueuesCount;
+            uint32_t renderQueuesCreateCount = 0;
+            std::vector<uint32_t> queuesIndexes;
+            std::vector<float> priorities;
+            // Всего одна очередь на все
+            if (renderQueueFamilyQueuesCount == 1) {
+                LOG("Only one queue for all VulkanQueue objects");
+                renderQueuesCreateCount = 1;
+                for (int i = 0; i < _renderQueuesCount; i++) {
+                    queuesIndexes.push_back(0);
+                    priorities.push_back(0.5f);
+                }
+            }
+            // На каждый объект очереди - получим свою логическую очередь если нам хватает очередей настоящих
+            else if ((renderQueueFamilyQueuesCount >= 2) && (renderQueueFamilyQueuesCount >= (uint32_t)_renderQueuesCount)) {
+                LOG("Queue for each VulkanQueue object");
+                renderQueuesCreateCount = (uint32_t)_renderQueuesCount;
+                for (int i = 0; i < renderQueuesCreateCount; i++) {
+                    queuesIndexes.push_back(i);
+                    priorities.push_back(_renderQueuesPriorities[i]);
+                }
+            }
+            // Если нехватает настоящих очередей под запрошеные нужды
+            else if ((renderQueueFamilyQueuesCount >= 2) && (renderQueueFamilyQueuesCount < ((uint32_t)_renderQueuesCount))) {
+                LOG("Less queues than needed for VulkanQueue objects");
+                renderQueuesCreateCount = (uint32_t)renderQueueFamilyQueuesCount;
+                for (int i = 0; i < (uint32_t)_renderQueuesCount; i++) {
+                    if (i < renderQueueFamilyQueuesCount) {
+                        queuesIndexes.push_back(i);
+                        priorities.push_back(_renderQueuesPriorities[i]);
+                    }else{
+                        queuesIndexes.push_back(renderQueueFamilyQueuesCount);
+                        priorities[renderQueueFamilyQueuesCount] = 0.5f;
+                    }
+                }
+            }else{
+                LOG("Queues allocating error");
+                throw std::runtime_error("Queues allocating error");
+            }
+            VkDeviceQueueCreateInfo renderQueueCreateInfo = {};
+            memset(&renderQueueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
+            renderQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            renderQueueCreateInfo.queueFamilyIndex = _queuesFamiliesIndexes.renderQueuesFamilyIndex;
+            renderQueueCreateInfo.queueCount = renderQueuesCreateCount;
+            renderQueueCreateInfo.pQueuePriorities = priorities.data();
+            
+            // Конфиг создания девайса
+            VkDeviceQueueCreateInfo createQueueInfo[2] = {presentQueueCreateInfo, renderQueueCreateInfo};
+            VkDeviceCreateInfo createInfo = {};
+            memset(&createInfo, 0, sizeof(VkDeviceCreateInfo));
+            createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            createInfo.queueCreateInfoCount = 2;
+            createInfo.pQueueCreateInfos = createQueueInfo; // Информация о создаваемых на девайсе очередях
+            createInfo.pEnabledFeatures = &_deviceFeatures;          // Информация о фичах устройства
+            createInfo.enabledExtensionCount = static_cast<uint32_t>(_extensions.size());
+            createInfo.ppEnabledExtensionNames = _extensions.data();     // Список требуемых расширений устройства
+            createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());    // Слои валидации что и при создании инстанса
+            createInfo.ppEnabledLayerNames = _validationLayers.data();
+            
+            // Пробуем создать логический девайс на конкретном физическом
+            VkResult createStatus = vkCreateDevice(_physicalDevice->getDevice(), &createInfo, nullptr, &_device);
+            if (createStatus != VK_SUCCESS) {
+                LOG("Failed to create logical device!");
+                throw std::runtime_error("Failed to create logical device!");
+            }
+            
+            // Очередь отображения
+            VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
+            vkGetDeviceQueue(_device, _queuesFamiliesIndexes.presentQueuesFamilyIndex, 0, &vulkanPresentQueue);
+            _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), _queuesFamiliesIndexes.presentQueuesFamilyIndex, 0, vulkanPresentQueue));
+            
+            // Очереди рендеринга
+            for (int i = 0; i < queuesIndexes.size(); i++) {
+                VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
+                vkGetDeviceQueue(_device, _queuesFamiliesIndexes.renderQueuesFamilyIndex, queuesIndexes[i], &vulkanGraphicsQueue);
+                VulkanQueuePtr renderQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), _queuesFamiliesIndexes.renderQueuesFamilyIndex, queuesIndexes[i], vulkanGraphicsQueue));
+                _renderQueues.push_back(renderQueue);
+            }
         }
-        
-        // Очередь рендеринга
-        VkQueue vulkanGraphicsQueue = VK_NULL_HANDLE;
-        vkGetDeviceQueue(_device, vulkanRenderQueueFamilyIndex, queuesIndexes[0], &vulkanGraphicsQueue);
-        _renderQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[0], vulkanGraphicsQueue));
-        // Очередь отображения
-        VkQueue vulkanPresentQueue = VK_NULL_HANDLE;
-        vkGetDeviceQueue(_device, vulkanPresentQueueFamilyIndex, queuesIndexes[1], &vulkanPresentQueue);
-        _presentQueue = VulkanQueuePtr(new VulkanQueue(shared_from_this(), vulkanRenderQueueFamilyIndex, queuesIndexes[1], vulkanPresentQueue));
     }
 }
 

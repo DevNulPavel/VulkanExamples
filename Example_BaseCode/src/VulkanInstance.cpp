@@ -94,8 +94,8 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
 	//result.push_back("VK_LAYER_LUNARG_screenshot");
 	//result.push_back("VK_LAYER_LUNARG_vktrace");
 
-	result.push_back("VK_LAYER_NV_nsight");
-	result.push_back("VK_LAYER_NV_optimus");
+	//result.push_back("VK_LAYER_NV_nsight");
+	//result.push_back("VK_LAYER_NV_optimus");
 	//result.push_back("VK_LAYER_NV_nomad");
 	
 #endif
@@ -125,15 +125,24 @@ std::vector<const char *> VulkanInstance::getPossibleDebugValidationLayers(){
 std::map<std::string, std::vector<VkExtensionProperties>> VulkanInstance::getAllExtentionsNames(const std::vector<const char *>& layersNames){
     std::map<std::string, std::vector<VkExtensionProperties>> result;
     
+    // Количество расширений доступных у слоя
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    
+    // Получаем расширения у слоя
+    std::vector<VkExtensionProperties> allInstanceExtentions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, allInstanceExtentions.data());
+    
+    std::vector<VkExtensionProperties>& propsArray = result["INSTANCE"];
+    propsArray.insert(propsArray.end(), allInstanceExtentions.begin(), allInstanceExtentions.end());
+    
     for (const char* layerName: layersNames) {
-        std::vector<VkExtensionProperties> layerExtentions;
-        
-        // Количество расширений доступных
-        uint32_t extensionCount = 0;
+        // Количество расширений доступных у слоя
+        extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(layerName, &extensionCount, nullptr);
         
-        // Получаем расширения
-        layerExtentions.resize(extensionCount);
+        // Получаем расширения у слоя
+        std::vector<VkExtensionProperties> layerExtentions(extensionCount);
         vkEnumerateInstanceExtensionProperties(layerName, &extensionCount, layerExtentions.data());
         
         std::vector<VkExtensionProperties>& propsArray = result[layerName];
@@ -167,8 +176,8 @@ std::vector<const char*> VulkanInstance::getRequiredInstanceExtentionNames(){
     }
 #ifdef __APPLE__
     // Optional
-    result.push_back("VK_MVK_moltenvk");
-	LOG("Extention - Required MoltenVK extention name: %s\n", "VK_MVK_moltenvk");
+    //result.push_back("VK_MVK_moltenvk");
+	//LOG("Extention - Required MoltenVK extention name: %s\n", "VK_MVK_moltenvk");
 #endif
     
 #ifdef VALIDATION_LAYERS_ENABLED
@@ -283,7 +292,8 @@ void VulkanInstance::setupDebugCallback() {
     createInfo.pfnCallback = debugCallbackFunction;
     
     if (createDebugReportCallbackEXT(&createInfo, nullptr, &_debugCallback) != VK_SUCCESS) {
-        throw std::runtime_error("failed to set up debug callback!");
+        LOG("Failed to set up debug callback!");
+        throw std::runtime_error("Failed to set up debug callback!");
     }
 #endif
 }
