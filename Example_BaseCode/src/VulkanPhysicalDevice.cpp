@@ -246,7 +246,7 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
     for (const VkQueueFamilyProperties& queueFamily: queueFamilies) {
         
         // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
-        if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+        if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
             result.renderQueuesFamilyIndex = i;
             result.renderQueuesFamilyQueuesCount = queueFamily.queueCount;
         }
