@@ -128,7 +128,7 @@ private:
     // Создаем коммандные буфферы
     void createRenderModelCommandBuffers();
     
-    VulkanCommandBufferPtr makeModelCommandBuffer(uint32_t frameIndex);
+    VulkanCommandBufferPtr updateModelCommandBuffer(uint32_t frameIndex);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

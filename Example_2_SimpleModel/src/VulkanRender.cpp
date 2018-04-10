@@ -512,22 +512,17 @@ void VulkanRender::createModelDescriptorSet() {
     modelDescriptorSet->updateDescriptorSet(configs);
 }
 
-VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex){
-    VulkanCommandBufferPtr buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameIndex){
+    // Создаем новый буффер или сбрасываем старый
+    VulkanCommandBufferPtr& buffer = modelDrawCommandBuffers[vulkanImageIndex];
+    if (buffer == nullptr) {
+        buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+    }else{
+        buffer->reset(0);   // Можно отправить флаг сброса
+    }
     
-    // Настройка наследования
-    /*VkCommandBufferInheritanceInfo inheritanceInfo = {};
-     memset(&inheritanceInfo, 0, sizeof(VkCommandBufferInheritanceInfo));
-     inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-     inheritanceInfo.pNext = nullptr;
-     inheritanceInfo.renderPass = vulkanRenderPass->getPass();
-     inheritanceInfo.subpass = 0;
-     inheritanceInfo.framebuffer = vulkanWindowFrameBuffers[i]->getBuffer();
-     inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-     inheritanceInfo.queryFlags = 0;
-     inheritanceInfo.pipelineStatistics = 0;*/
-    
-    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT); // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+    // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+    buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
     // Информация о запуске рендер-прохода
     std::array<VkClearValue, 2> clearValues = {};
@@ -596,54 +591,8 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
     vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
     
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    /*// Начинаем вводить комманды для следующего подпрохода рендеринга
-     vkCmdNextSubpass(vulkanCommandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
-     
-     // Устанавливаем пайплайн у коммандного буффера
-     vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline);
-     
-     // Привязываем вершинный буффер к пайлпайну
-     vkCmdBindVertexBuffers(vulkanCommandBuffers[i], 0, 1, vertexBuffers, offsets);
-     
-     // Привязываем индексный буффер к пайплайну
-     vkCmdBindIndexBuffer(vulkanCommandBuffers[i], vulkanIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-     
-     // Подключаем дескрипторы ресурсов для юниформ буффера
-     vkCmdBindDescriptorSets(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipelineLayout, 0, 1, &vulkanDescriptorSet, 0, nullptr);
-     
-     // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-     // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
-     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-     vkCmdDrawIndexed(vulkanCommandBuffers[i], vulkanTotalIndexesCount/2, 1, 0, 0, 0);*/
-    
-    //////////////////////////////////////////////////////////////////////////////////////////////////
-    
     // Заканчиваем рендер проход
     vkCmdEndRenderPass(buffer->getBuffer());
-    
-    /*VkImageMemoryBarrier imageMemoryBarrier = {};
-     memset(&imageMemoryBarrier, 0, sizeof(VkImageMemoryBarrier));
-     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-     imageMemoryBarrier.pNext = nullptr;
-     imageMemoryBarrier.srcAccessMask = 0;
-     imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_MEMORY_READ_BIT;
-     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-     imageMemoryBarrier.srcQueueFamilyIndex = 0;
-     imageMemoryBarrier.dstQueueFamilyIndex = 0;
-     imageMemoryBarrier.image = vulkanSwapChainImages[i];
-     imageMemoryBarrier.subresourceRange = {VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-     
-     vkCmdPipelineBarrier(vulkanCommandBuffers[i],
-     VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-     0,
-     0, nullptr,
-     0, nullptr,
-     1, &imageMemoryBarrier
-     );*/
     
     // Заканчиваем подготовку коммандного буффера
 	buffer->end();
@@ -680,13 +629,11 @@ void VulkanRender::drawFrame() {
 
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
     TIME_BEGIN(MAKE_MODEL_DRAW_BUFFER);
-    VulkanCommandBufferPtr buffer = makeModelCommandBuffer(vulkanImageIndex);
-    modelDrawCommandBuffers[vulkanImageIndex] = buffer;
+    VulkanCommandBufferPtr buffer = updateModelCommandBuffer(vulkanImageIndex);
     VkCommandBuffer drawBuffer = buffer->getBuffer();
     TIME_END_MICROSEC(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
 
     // Настраиваем отправление в очередь комманд отрисовки
-    // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
     VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore()}; // Семафор ожидания картинки для вывода туда графики
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем c помощью семафора возможности вывода в буфер цвета
     VkSemaphore signalSemaphores[] = {vulkanRenderFinishedSemaphore->getSemafore()}; // Семафор оповещения о завершении рендеринга
