@@ -102,7 +102,7 @@ VkPresentModeKHR VulkanSwapchain::chooseSwapPresentMode(const std::vector<VkPres
     }
     
     // Если нет - непосредственный вывод графики
-    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+    return availablePresentModes[0];
 }
 
 // Выбираем размер кадра-свопа

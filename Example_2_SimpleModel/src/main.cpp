@@ -86,12 +86,12 @@ int local_main(int argc, char** argv) {
         std::chrono::high_resolution_clock::duration drawCallDuration = std::chrono::high_resolution_clock::now() - drawBegin;
         std::chrono::high_resolution_clock::duration sleepDuration = std::chrono::milliseconds(static_cast<int>(1.0/60.0 * 1000.0)) - drawCallDuration;
         
-        //TIME_BEGIN(SLEEP_TEST);
+        TIME_BEGIN_OFF(SLEEP_TEST);
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
             // Низкая точность на винде
             sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
         }
-        //TIME_END_MICROSEC(SLEEP_TEST, "Sleep time");
+        TIME_END_MICROSEC_OFF(SLEEP_TEST, "Sleep time");
         
         // Расчет времени кадра
         lastFrameDuration = (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0 / 1000.0;

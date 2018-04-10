@@ -1006,6 +1006,29 @@ void VulkanRender::drawFrame() {
     
     TIME_BEGIN_OFF(DRAW_TIME);
     
+	// Ставим в очередь запрос изображения для отображения из swapchain, время ожидания делаем максимальным
+    TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
+    uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
+    VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
+                                            vulkanSwapchain->getSwapchain(),
+                                            std::numeric_limits<uint64_t>::max(),
+                                            vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
+                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE,
+                                            &swapchainImageIndex);
+    TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
+    
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        rebuildRendering();
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("Failed to acquire swap chain image!");
+    }
+    
+    // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
+    if (vulkanImageIndex != swapchainImageIndex) {
+        LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
+    }
+
 	// Ожидаем доступность закидывания задач на рендеринг, чтобы не удалялись буфферы комманд активные
 	TIME_BEGIN_OFF(WAIT_FENCE);
 	vulkanRenderFences1[vulkanImageIndex]->waitAndReset();
@@ -1081,29 +1104,6 @@ void VulkanRender::drawFrame() {
 	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
 	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
 	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
-    
-    // Ставим в очередь запрос изображения для отображения из swapchain, время ожидания делаем максимальным
-    TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
-    uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
-    VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
-                                            vulkanSwapchain->getSwapchain(),
-                                            std::numeric_limits<uint64_t>::max(),
-                                            vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
-                                            /*vulkanPresentFences[vulkanImageIndex]->getFence()*/VK_NULL_HANDLE,
-                                            &swapchainImageIndex);
-    TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
-    
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        rebuildRendering();
-        return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        throw std::runtime_error("Failed to acquire swap chain image!");
-    }
-    
-    // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
-    if (vulkanImageIndex != swapchainImageIndex) {
-        LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
-    }
     
     // Настраиваем задачу отображения полученного изображения
     VkSemaphore presentWaitSemaphores[] = {vulkanPostRenderFinishedSemaphoreSwapchain->getSemafore()};
