@@ -64,7 +64,8 @@ public:
     VulkanQueuePtr vulkanPresentQueue;
     VulkanSemaforePtr vulkanImageAvailableSemaphore;
     VulkanSemaforePtr vulkanModelRenderFinishedSemaphore;
-    VulkanSemaforePtr vulkanPostRenderFinishedSemaphore;
+    VulkanSemaforePtr vulkanPostRenderFinishedSemaphoreSwapchain;
+    VulkanSemaforePtr vulkanPostRenderFinishedSemaphoreModel;
     std::vector<VulkanFencePtr> vulkanPresentFences;
     std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanSwapchainPtr vulkanSwapchain;
@@ -124,8 +125,6 @@ private:
     void createSharedVulkanObjects(GLFWwindow* window);
     // Создаем буфферы для глубины
     void createPostDepthResources();
-    // Обновляем лаяут текстуры глубины на правильный
-    void updatePostDepthTextureLayout();
     // Создание рендер прохода
     void createRenderToWindowsRenderPass();
     
@@ -171,8 +170,8 @@ private:
     void resetCommandBuffers();
     
     // Коммандный буффер рендеринга
-    VulkanCommandBufferPtr makeModelRenderCommandBuffer(uint32_t frameIndex);
-    VulkanCommandBufferPtr makePostRenderCommandBuffer(uint32_t frameIndex);
+    VulkanCommandBufferPtr updateModelRenderCommandBuffer(uint32_t frameIndex);
+    VulkanCommandBufferPtr updatePostRenderCommandBuffer(uint32_t frameIndex);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;

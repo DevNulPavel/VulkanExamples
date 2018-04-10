@@ -64,9 +64,6 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем текстуры для буффера глубины
     createPostDepthResources();
     
-    // Обновляем лаяут текстуры глубины на правильный
-    updatePostDepthTextureLayout();
-    
     // Создаем рендер проход
     createRenderToPostRenderPass();
     
@@ -169,9 +166,6 @@ void VulkanRender::rebuildRendering(){
     // Создаем текстуры для буффера глубины
     createPostDepthResources();
     
-    // Обновляем лаяут текстуры глубины на правильный
-    updatePostDepthTextureLayout();
-    
     // Создаем фреймбуфферы для вьюшек изображений окна
     createWindowFrameBuffers();
     
@@ -208,14 +202,24 @@ void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
     // Создаем логическое устройство
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
-    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
+    std::vector<float> renderPriorities = {0.5f};
+    VkPhysicalDeviceFeatures logicalDeviceFeatures = {};
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice,
+                                                                vulkanQueuesFamiliesIndexes,
+                                                                0.5f,
+                                                                1,
+                                                                renderPriorities,
+                                                                vulkanInstanceValidationLayers,
+                                                                vulkanDeviceExtensions,
+                                                                logicalDeviceFeatures);
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueues()[0];      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
     
     // Создаем семафоры для отображения и ренедринга
     vulkanImageAvailableSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     vulkanModelRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
-    vulkanPostRenderFinishedSemaphore = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    vulkanPostRenderFinishedSemaphoreSwapchain = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
+    vulkanPostRenderFinishedSemaphoreModel = std::make_shared<VulkanSemafore>(vulkanLogicalDevice);
     
     // Создаем свопчейн + получаем изображения свопчейна
     vulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, nullptr);
@@ -293,11 +297,8 @@ void VulkanRender::createPostDepthResources() {
     postDepthImageView = std::make_shared<VulkanImageView>(vulkanLogicalDevice,
                                                                  postDepthImage,
                                                                  VK_IMAGE_ASPECT_DEPTH_BIT);  // Используем как глубину
-}
-
-
-// Обновляем лаяут текстуры глубины на правильный
-void VulkanRender::updatePostDepthTextureLayout(){
+    
+    // Обновляем лаяут текстуры глубины на правильный
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
     
     VkImageAspectFlags aspectMask;
@@ -762,8 +763,14 @@ void VulkanRender::createWindowFrameBuffers(){
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VulkanCommandBufferPtr VulkanRender::makeModelRenderCommandBuffer(uint32_t frameIndex){
-    VulkanCommandBufferPtr buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+VulkanCommandBufferPtr VulkanRender::updateModelRenderCommandBuffer(uint32_t frameIndex){
+    // Создаем новый буффер или сбрасываем старый
+    VulkanCommandBufferPtr& buffer = vulkanModelDrawCommandBuffers[vulkanImageIndex];
+    if (buffer == nullptr) {
+        buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+    }else{
+        buffer->reset(0);   // Можно отправить флаг сброса
+    }
     
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -830,18 +837,36 @@ VulkanCommandBufferPtr VulkanRender::makeModelRenderCommandBuffer(uint32_t frame
         vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, modelPipeline->getLayout(), 0, 1, &set, 0, nullptr);
         
         // Push константы для динамической отрисовки
-        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-        vkCmdPushConstants(buffer->getBuffer(),
-                           modelPipeline->getLayout(),
-                           VK_SHADER_STAGE_VERTEX_BIT,
-                           0,
-                           sizeof(model),
-                           (unsigned char*)&model);
-        
-        // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-        // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
-        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-        vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+        float angles[6] = {
+            rotateAngle,
+            rotateAngle,
+            rotateAngle,
+            -rotateAngle,
+            -rotateAngle,
+            -rotateAngle,
+        };
+        glm::vec3 axis[6] = {
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f),
+        };
+        for (size_t i = 0; i < 40; i++) {
+            glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(angles[i%6] + i*5), axis[i%6]);
+            vkCmdPushConstants(buffer->getBuffer(),
+                               modelPipeline->getLayout(),
+                               VK_SHADER_STAGE_VERTEX_BIT,
+                               0,
+                               sizeof(model),
+                               (unsigned char*)&model);
+            
+            // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
+            // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+            // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+            vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+        }
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(buffer->getBuffer());
@@ -854,8 +879,14 @@ VulkanCommandBufferPtr VulkanRender::makeModelRenderCommandBuffer(uint32_t frame
     return buffer;
 }
 
-VulkanCommandBufferPtr VulkanRender::makePostRenderCommandBuffer(uint32_t frameIndex){
-    VulkanCommandBufferPtr buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+VulkanCommandBufferPtr VulkanRender::updatePostRenderCommandBuffer(uint32_t frameIndex){
+    // Создаем новый буффер или сбрасываем старый
+    VulkanCommandBufferPtr& buffer = vulkanPostDrawCommandBuffers[vulkanImageIndex];
+    if (buffer == nullptr) {
+        buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
+    }else{
+        buffer->reset(0);   // Можно отправить флаг сброса
+    }
     
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -924,16 +955,18 @@ VulkanCommandBufferPtr VulkanRender::makePostRenderCommandBuffer(uint32_t frameI
         vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, postPipeline->getLayout(), 0, 1, &set, 0, nullptr);
         
         // Push константы для динамической отрисовки
-        float effectCoeff = std::abs(std::sin(totalTime * 3.1415926535 / 10.0f));
-        vkCmdPushConstants(buffer->getBuffer(),
-                           postPipeline->getLayout(),
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(float),
-                           (unsigned char*)&effectCoeff);
-        
-        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-        vkCmdDrawIndexed(buffer->getBuffer(), QUAD_INDICES.size(), 1, 0, 0, 0);
+        for(int i = 0; i < 600; i++){
+            float effectCoeff = std::abs(std::sin(totalTime * 3.1415926535 / 10.0f));
+            vkCmdPushConstants(buffer->getBuffer(),
+                               postPipeline->getLayout(),
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(float),
+                               (unsigned char*)&effectCoeff);
+            
+            // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+            vkCmdDrawIndexed(buffer->getBuffer(), QUAD_INDICES.size(), 1, 0, 0, 0);
+        }
         
         // Заканчиваем рендер проход
         vkCmdEndRenderPass(buffer->getBuffer());
@@ -952,15 +985,82 @@ void VulkanRender::updateRender(float delta){
     rotateAngle += delta * 30.0f;
 }
 
+bool firstRender = true;
+
 // Непосредственно отрисовка кадра
 void VulkanRender::drawFrame() {
 #ifdef __APPLE__
     // TODO: Помогает против подвисания на ресайзах и тд
-	vulkanRenderQueue->wait();
-	vulkanPresentQueue->wait();
+	//vulkanRenderQueue->wait();
+	//vulkanPresentQueue->wait();
 #endif // 
     
     TIME_BEGIN_OFF(DRAW_TIME);
+    
+	// Ожидаем доступность закидывания задач на рендеринг, чтобы не удалялись буфферы комманд активные
+	TIME_BEGIN_OFF(WAIT_FENCE);
+	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
+
+    // Model Draw buffer
+    TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
+    VulkanCommandBufferPtr modelBuffer = updateModelRenderCommandBuffer(vulkanImageIndex);
+    vulkanModelDrawCommandBuffers[vulkanImageIndex] = modelBuffer;
+    VkCommandBuffer modelDrawBuffer = modelBuffer->getBuffer();
+    TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
+    
+    // Настраиваем отправление в очередь комманд отрисовки
+    VkSemaphore modelWaitSemaphores[] = {vulkanPostRenderFinishedSemaphoreModel->getSemafore()};
+    VkPipelineStageFlags modelWaitStages[] = {VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
+    VkSemaphore modelSignalSemaphores[] = {vulkanModelRenderFinishedSemaphore->getSemafore()};
+    VkSubmitInfo modelSubmitInfo = {};
+    memset(&modelSubmitInfo, 0, sizeof(VkSubmitInfo));
+    modelSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    modelSubmitInfo.waitSemaphoreCount = firstRender ? 0 : 1;
+    modelSubmitInfo.pWaitSemaphores = firstRender ? nullptr : modelWaitSemaphores;
+    modelSubmitInfo.pWaitDstStageMask = firstRender ? nullptr : modelWaitStages;
+    modelSubmitInfo.commandBufferCount = 1;
+    modelSubmitInfo.pCommandBuffers = &modelDrawBuffer; // Указываем коммандный буффер отрисовки
+    modelSubmitInfo.signalSemaphoreCount = 1;
+    modelSubmitInfo.pSignalSemaphores = modelSignalSemaphores;
+    
+    firstRender = false;
+    
+    // Post Draw buffer
+    TIME_BEGIN_OFF(MAKE_POST_DRAW_BUFFER);
+    VulkanCommandBufferPtr postBuffer = updatePostRenderCommandBuffer(vulkanImageIndex);
+    VkCommandBuffer postDrawBuffer = postBuffer->getBuffer();
+    TIME_END_MICROSEC_OFF(MAKE_POST_DRAW_BUFFER, "Make post draw buffer wait time");
+    
+    // Настраиваем отправление в очередь комманд отрисовки
+    VkSemaphore postWaitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore(), vulkanModelRenderFinishedSemaphore->getSemafore()};
+    VkPipelineStageFlags postWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
+    VkSemaphore postSignalSemaphores[] = {vulkanPostRenderFinishedSemaphoreSwapchain->getSemafore(), vulkanPostRenderFinishedSemaphoreModel->getSemafore()};
+    VkSubmitInfo postSubmitInfo = {};
+    memset(&postSubmitInfo, 0, sizeof(VkSubmitInfo));
+    postSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    postSubmitInfo.waitSemaphoreCount = 2;
+    postSubmitInfo.pWaitSemaphores = postWaitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
+    postSubmitInfo.pWaitDstStageMask = postWaitStages;      // Ждать будем возможности вывода в буфер цвета
+    postSubmitInfo.commandBufferCount = 1;
+    postSubmitInfo.pCommandBuffers = &postDrawBuffer; // Указываем коммандный буффер отрисовки
+    postSubmitInfo.signalSemaphoreCount = 2;
+    postSubmitInfo.pSignalSemaphores = postSignalSemaphores;
+    
+    
+    // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
+    TIME_BEGIN_OFF(SUBMIT_TIME);
+    VkSubmitInfo submits[] = {modelSubmitInfo, postSubmitInfo};
+    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 2, submits, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
+        LOG("Failed to submit draw command buffer!\n");
+        throw std::runtime_error("Failed to submit draw command buffer!");
+    }
+    TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
+    
+	// Ждем доступности отображения
+	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
+	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
     
     // Ставим в очередь запрос изображения для отображения из swapchain, время ожидания делаем максимальным
     TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
@@ -982,73 +1082,11 @@ void VulkanRender::drawFrame() {
     
     // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
     if (vulkanImageIndex != swapchainImageIndex) {
-		LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
+        LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
     }
-
-	// Ожидаем доступность закидывания задач на рендеринг, чтобы не удалялись буфферы комманд активные
-	TIME_BEGIN_OFF(WAIT_FENCE);
-	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
-
-    // Model Draw buffer
-    TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
-    VulkanCommandBufferPtr modelBuffer = makeModelRenderCommandBuffer(vulkanImageIndex);
-    vulkanModelDrawCommandBuffers[vulkanImageIndex] = modelBuffer;
-    VkCommandBuffer modelDrawBuffer = modelBuffer->getBuffer();
-    TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
     
-    // Настраиваем отправление в очередь комманд отрисовки
-    VkSemaphore modelSignalSemaphores[] = {vulkanModelRenderFinishedSemaphore->getSemafore()};
-    VkSubmitInfo modelSubmitInfo = {};
-    memset(&modelSubmitInfo, 0, sizeof(VkSubmitInfo));
-    modelSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    modelSubmitInfo.waitSemaphoreCount = 0;
-    modelSubmitInfo.pWaitSemaphores = nullptr;
-    modelSubmitInfo.pWaitDstStageMask = nullptr;
-    modelSubmitInfo.commandBufferCount = 1;
-    modelSubmitInfo.pCommandBuffers = &modelDrawBuffer; // Указываем коммандный буффер отрисовки
-    modelSubmitInfo.signalSemaphoreCount = 1;
-    modelSubmitInfo.pSignalSemaphores = modelSignalSemaphores;
-    
-    // Post Draw buffer
-    TIME_BEGIN_OFF(MAKE_POST_DRAW_BUFFER);
-    VulkanCommandBufferPtr postBuffer = makePostRenderCommandBuffer(vulkanImageIndex);
-    vulkanPostDrawCommandBuffers[vulkanImageIndex] = postBuffer;
-    VkCommandBuffer postDrawBuffer = postBuffer->getBuffer();
-    TIME_END_MICROSEC_OFF(MAKE_POST_DRAW_BUFFER, "Make post draw buffer wait time");
-    
-    // Настраиваем отправление в очередь комманд отрисовки
-    VkSemaphore postWaitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore(), vulkanModelRenderFinishedSemaphore->getSemafore()};
-    VkPipelineStageFlags postWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
-    VkSemaphore postSignalSemaphores[] = {vulkanPostRenderFinishedSemaphore->getSemafore()};
-    VkSubmitInfo postSubmitInfo = {};
-    memset(&postSubmitInfo, 0, sizeof(VkSubmitInfo));
-    postSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    postSubmitInfo.waitSemaphoreCount = 2;
-    postSubmitInfo.pWaitSemaphores = postWaitSemaphores;    // Ожидаем доступное изображение, в которое можно было бы записывать пиксели
-    postSubmitInfo.pWaitDstStageMask = postWaitStages;      // Ждать будем возможности вывода в буфер цвета
-    postSubmitInfo.commandBufferCount = 1;
-    postSubmitInfo.pCommandBuffers = &postDrawBuffer; // Указываем коммандный буффер отрисовки
-    postSubmitInfo.signalSemaphoreCount = 1;
-    postSubmitInfo.pSignalSemaphores = postSignalSemaphores;
-    
-    
-    // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-    TIME_BEGIN_OFF(SUBMIT_TIME);
-    VkSubmitInfo submits[] = {modelSubmitInfo, postSubmitInfo};
-    if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 2, submits, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
-        LOG("Failed to submit draw command buffer!\n");
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
-    TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
-    
-	// Ждем доступности отображения
-	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
-	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
-
     // Настраиваем задачу отображения полученного изображения
-    VkSemaphore presentWaitSemaphores[] = {vulkanPostRenderFinishedSemaphore->getSemafore()};
+    VkSemaphore presentWaitSemaphores[] = {vulkanPostRenderFinishedSemaphoreSwapchain->getSemafore()};
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
     VkPresentInfoKHR presentInfo = {};
     memset(&presentInfo, 0, sizeof(VkPresentInfoKHR));
@@ -1109,7 +1147,8 @@ VulkanRender::~VulkanRender(){
     vulkanPresentFences.clear();
     vulkanRenderFences.clear();
     vulkanImageAvailableSemaphore = nullptr;
-    vulkanPostRenderFinishedSemaphore = nullptr;
+    vulkanPostRenderFinishedSemaphoreSwapchain = nullptr;
+    vulkanPostRenderFinishedSemaphoreModel = nullptr;
     vulkanRenderQueue = nullptr;
     vulkanPresentQueue = nullptr;
     vulkanLogicalDevice = nullptr;

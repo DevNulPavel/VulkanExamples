@@ -79,7 +79,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
         
         // Определяем количество создаваемых очередей
         if (vulkanRenderQueueFamilyIndex == vulkanPresentQueueFamilyIndex) {
-            LOG("One queue family for render and present");
+            LOG("One queue family for render and present\n");
             
             uint32_t vulkanRenderQueueFamilyQueuesCount = _queuesFamiliesIndexes.renderQueuesFamilyQueuesCount;
 
@@ -88,7 +88,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             std::vector<float> priorities;
             // Всего одна очередь на все
             if (vulkanRenderQueueFamilyQueuesCount == 1) {
-                LOG("Only one queue for all VulkanQueue objects");
+                LOG("Only one queue for all VulkanQueue objects\n");
                 
                 createCount = 1;
                 for (int i = 0; i < (1 + _renderQueuesCount); i++) {
@@ -98,7 +98,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             }
             // На каждый объект очереди - получим свою логическую очередь если нам хватает очередей настоящих
             else if ((vulkanRenderQueueFamilyQueuesCount >= 2) && (vulkanRenderQueueFamilyQueuesCount >= ((uint32_t)_renderQueuesCount + 1))) {
-                LOG("Queue for each VulkanQueue object");
+                LOG("Queue for each VulkanQueue object\n");
                 
                 createCount = (uint32_t)_renderQueuesCount + 1;
                 for (int i = 0; i < createCount; i++) {
@@ -112,7 +112,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             }
             // Если нехватает настоящих очередей под запрошеные нужды
             else if ((vulkanRenderQueueFamilyQueuesCount >= 2) && (vulkanRenderQueueFamilyQueuesCount < ((uint32_t)_renderQueuesCount + 1))) {
-                LOG("Less queues than needed for VulkanQueue objects");
+                LOG("Less queues than needed for VulkanQueue objects\n");
                 
                 createCount = (uint32_t)vulkanRenderQueueFamilyQueuesCount;
                 for (int i = 0; i < (uint32_t)_renderQueuesCount + 1; i++) {
@@ -129,7 +129,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
                     }
                 }
             }else{
-                LOG("Queues allocating error");
+                LOG("Queues allocating error\n");
                 throw std::runtime_error("Queues allocating error");
             }
 
@@ -155,7 +155,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             // Пробуем создать логический девайс на конкретном физическом
             VkResult createStatus = vkCreateDevice(_physicalDevice->getDevice(), &createInfo, nullptr, &_device);
             if (createStatus != VK_SUCCESS) {
-                LOG("Failed to create logical device!");
+                LOG("Failed to create logical device!\n");
                 throw std::runtime_error("Failed to create logical device!");
             }
 
@@ -172,7 +172,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
                 _renderQueues.push_back(renderQueue);
             }
         }else{
-            LOG("Different queue families for render and present");
+            LOG("Different queue families for render and present\n");
             
             // Present
             VkDeviceQueueCreateInfo presentQueueCreateInfo = {};
@@ -189,7 +189,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             std::vector<float> priorities;
             // Всего одна очередь на все
             if (renderQueueFamilyQueuesCount == 1) {
-                LOG("Only one queue for all VulkanQueue objects");
+                LOG("Only one queue for all VulkanQueue objects\n");
                 renderQueuesCreateCount = 1;
                 for (int i = 0; i < _renderQueuesCount; i++) {
                     queuesIndexes.push_back(0);
@@ -198,7 +198,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             }
             // На каждый объект очереди - получим свою логическую очередь если нам хватает очередей настоящих
             else if ((renderQueueFamilyQueuesCount >= 2) && (renderQueueFamilyQueuesCount >= (uint32_t)_renderQueuesCount)) {
-                LOG("Queue for each VulkanQueue object");
+                LOG("Queue for each VulkanQueue object\n");
                 renderQueuesCreateCount = (uint32_t)_renderQueuesCount;
                 for (int i = 0; i < renderQueuesCreateCount; i++) {
                     queuesIndexes.push_back(i);
@@ -207,7 +207,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             }
             // Если нехватает настоящих очередей под запрошеные нужды
             else if ((renderQueueFamilyQueuesCount >= 2) && (renderQueueFamilyQueuesCount < ((uint32_t)_renderQueuesCount))) {
-                LOG("Less queues than needed for VulkanQueue objects");
+                LOG("Less queues than needed for VulkanQueue objects\n");
                 renderQueuesCreateCount = (uint32_t)renderQueueFamilyQueuesCount;
                 for (int i = 0; i < (uint32_t)_renderQueuesCount; i++) {
                     if (i < renderQueueFamilyQueuesCount) {
@@ -219,7 +219,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
                     }
                 }
             }else{
-                LOG("Queues allocating error");
+                LOG("Queues allocating error\n");
                 throw std::runtime_error("Queues allocating error");
             }
             VkDeviceQueueCreateInfo renderQueueCreateInfo = {};
@@ -245,7 +245,7 @@ void VulkanLogicalDevice::createLogicalDeviceAndQueue() {
             // Пробуем создать логический девайс на конкретном физическом
             VkResult createStatus = vkCreateDevice(_physicalDevice->getDevice(), &createInfo, nullptr, &_device);
             if (createStatus != VK_SUCCESS) {
-                LOG("Failed to create logical device!");
+                LOG("Failed to create logical device!\n");
                 throw std::runtime_error("Failed to create logical device!");
             }
             
