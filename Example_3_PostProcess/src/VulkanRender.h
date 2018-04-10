@@ -87,7 +87,6 @@ public:
     VulkanSamplerPtr postTextureSampler;
     VulkanDescriptorPoolPtr postDescriptorPool;
     VulkanDescriptorSetPtr postDescriptorSet;
-    std::vector<VulkanCommandBufferPtr> postDrawCommandBuffers;
     
     VulkanDescriptorSetLayoutPtr modelDescriptorSetLayout;
     VulkanShaderModulePtr modelVertexModule;
@@ -122,8 +121,6 @@ private:
     void createSharedVulkanObjects(GLFWwindow* window);
     // Создаем буфферы для глубины
     void createPostDepthResources();
-    // Обновляем лаяут текстуры глубины на правильный
-    void updatePostDepthTextureLayout();
     // Создание рендер прохода
     void createRenderToWindowsRenderPass();
     
@@ -169,7 +166,7 @@ private:
     void resetCommandBuffers();
     
     // Коммандный буффер рендеринга
-    VulkanCommandBufferPtr makeRenderCommandBuffer(uint32_t frameIndex);
+    VulkanCommandBufferPtr updateRenderCommandBuffer(uint32_t frameIndex);
 };
 
 typedef std::shared_ptr<VulkanRender> VulkanRenderPtr;
