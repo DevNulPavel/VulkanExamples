@@ -245,11 +245,13 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
         throw std::runtime_error("Failed to load texture image!");
     }
     
+    VkFormat imagesFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    
     // VK_IMAGE_TILING_LINEAR - специально, для исходного изображения
     // http://vulkanapi.ru/2016/12/17/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-45/
     VulkanImagePtr staggingImage = std::make_shared<VulkanImage>(device,
                                                                  VkExtent2D{static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)},
-                                                                 VK_FORMAT_R8G8B8A8_UNORM,           // Формат текстуры
+                                                                 imagesFormat,           // Формат текстуры
                                                                  VK_IMAGE_TILING_LINEAR,             // Тайлинг
                                                                  VK_IMAGE_LAYOUT_PREINITIALIZED,     // Чтобы данные не уничтожились при первом использовании - используем PREINITIALIZED (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
                                                                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,    // Используется для передачи в другую текстуру данных
@@ -263,12 +265,23 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     stbi_image_free(pixels);
     pixels = nullptr;
     
-    uint32_t mipmapLevels = floor(log2(std::max(texWidth, texHeight))) + 1;
+    // Получим информацию об формате будущей картинки
+    VkImageFormatProperties properties = {};
+    vkGetPhysicalDeviceImageFormatProperties(device->getBasePhysicalDevice()->getDevice(),
+                                             imagesFormat,
+                                             VK_IMAGE_TYPE_2D,
+                                             VK_IMAGE_TILING_OPTIMAL,
+                                             VK_IMAGE_USAGE_SAMPLED_BIT,
+                                             0,
+                                             &properties);
+    
+    // Определяем уровни мипмапов
+    uint32_t mipmapLevels = std::min((uint32_t)floor(log2(std::max(texWidth, texHeight))) + (uint32_t)1, properties.maxMipLevels);
     
     // Создаем рабочее изображение для последующего использования
     VulkanImagePtr resultImage = std::make_shared<VulkanImage>(device,
                                                                VkExtent2D{static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)},
-                                                               VK_FORMAT_R8G8B8A8_UNORM,      // Формат текстуры
+                                                               imagesFormat,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
                                                                VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
 															   VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки

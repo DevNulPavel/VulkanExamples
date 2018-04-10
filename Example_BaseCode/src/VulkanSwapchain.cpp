@@ -144,6 +144,8 @@ void VulkanSwapchain::createSwapChain() {
     createInfo.imageExtent = extent;    // Границы окна
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;    // Картинки используются в качестве буффера цвета
+    createInfo.presentMode = presentMode;
+    createInfo.clipped = VK_TRUE;
     
     // Если у нас разные очереди для рендеринга и отображения -
     int vulkanRenderQueueFamilyIndex = _queuesFamilies.renderQueuesFamilyIndex;
@@ -161,14 +163,20 @@ void VulkanSwapchain::createSwapChain() {
         createInfo.pQueueFamilyIndices = nullptr; // Optional
     }
     
-    createInfo.preTransform = _swapChainSupportDetails.capabilities.currentTransform;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
-#if defined(__WINNT__) || defined(_WINDOWS)
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
-#else
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
-#endif
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
+    // Трансформ
+    if (_swapChainSupportDetails.capabilities.currentTransform & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+        createInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;   // Предварительный трансформ перед отображением графики, VK_SURFACE_TRANSFORM_*
+    }else{
+        createInfo.preTransform = _swapChainSupportDetails.capabilities.currentTransform;
+    }
+    
+    // Настройки композитинга окон
+    if(_swapChainSupportDetails.capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR){
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
+    }
+    else if(_swapChainSupportDetails.capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR){
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;  // Должно ли изображение смешиваться с альфа каналом оконной системы?
+    }
     
     // Пересоздание свопчейна
     VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE;
@@ -188,7 +196,6 @@ void VulkanSwapchain::createSwapChain() {
 		// Удалится вместе со старой ссылкой
         //vkDestroySwapchainKHR(_device->getDevice(), oldSwapChain, nullptr);
         _oldSwapchain = nullptr;
-        //oldSwapChain = VK_NULL_HANDLE;
     }
     
     // Сохраняем формат и размеры изображения

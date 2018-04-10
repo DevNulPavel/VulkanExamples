@@ -394,6 +394,8 @@ void VulkanRender::loadModelSrcData(){
     }
     
     for (const auto& shape : shapes) {
+        modelVertices.reserve(shape.mesh.indices.size());
+        modelIndices.reserve(shape.mesh.indices.size());
         for (const auto& index : shape.mesh.indices) {
             Vertex vertex = {};
             vertex.pos = {
