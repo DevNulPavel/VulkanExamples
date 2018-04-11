@@ -18,6 +18,7 @@ VulkanDescriptorPool::VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice,
     poolInfo.poolSizeCount = static_cast<uint32_t>(_poolSize.size());
     poolInfo.pPoolSizes = _poolSize.data();
     poolInfo.maxSets = _maxSets;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     
     if (vkCreateDescriptorPool(_logicalDevice->getDevice(), &poolInfo, nullptr, &_pool) != VK_SUCCESS) {
         LOG("Failed to create descriptor pool!\n");

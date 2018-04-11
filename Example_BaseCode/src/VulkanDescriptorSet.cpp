@@ -33,6 +33,7 @@ VulkanDescriptorSet::VulkanDescriptorSet(VulkanLogicalDevicePtr logicalDevice, V
 }
 
 VulkanDescriptorSet::~VulkanDescriptorSet(){
+	vkFreeDescriptorSets(_logicalDevice->getDevice(), _pool->getPool(), 1, &_set);
 }
 
 VkDescriptorSet VulkanDescriptorSet::getSet() const{
