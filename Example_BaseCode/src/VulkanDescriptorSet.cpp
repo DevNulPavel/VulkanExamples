@@ -67,7 +67,11 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
         writeSet.dstArrayElement = 0;            // 0 элемент
         writeSet.descriptorType = config.type; // Тип - юниформ буффер
         writeSet.descriptorCount = 1;            // 1н дескриптор
-        if (config.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+		if (config.type == VK_DESCRIPTOR_TYPE_SAMPLER) {
+			writeSet.pImageInfo = &config.imageInfo;
+		}else if (config.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+			writeSet.pImageInfo = &config.imageInfo;
+		}else if (config.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) {
             writeSet.pImageInfo = &config.imageInfo;
         }else if(config.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER){
             writeSet.pBufferInfo = &config.bufferInfo;
