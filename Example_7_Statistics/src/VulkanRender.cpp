@@ -60,8 +60,20 @@ void VulkanRender::init(GLFWwindow* window){
     // Создаем логическое устройство
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice, vulkanQueuesFamiliesIndexes, vulkanInstanceValidationLayers, vulkanDeviceExtensions);
-    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueue();      // Получаем очередь рендеринга
+    std::vector<float> renderPriorities = {0.5f};
+    VkPhysicalDeviceFeatures logicalDeviceFeatures = {};
+	if (vulkanPhysicalDevice->getPossibleDeviceFeatures().pipelineStatisticsQuery == VK_TRUE){
+		logicalDeviceFeatures.pipelineStatisticsQuery = VK_TRUE;
+	}
+    vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice,
+                                                                vulkanQueuesFamiliesIndexes,
+                                                                0.5f,
+                                                                1,
+                                                                renderPriorities,
+                                                                vulkanInstanceValidationLayers,
+                                                                vulkanDeviceExtensions,
+                                                                logicalDeviceFeatures);
+    vulkanRenderQueue = vulkanLogicalDevice->getRenderQueues()[0];      // Получаем очередь рендеринга
     vulkanPresentQueue = vulkanLogicalDevice->getPresentQueue();    // Получаем очередь отрисовки
     
     // Создаем семафоры для отображения и ренедринга
@@ -410,7 +422,7 @@ void VulkanRender::createGraphicsPipeline() {
 
 // Создание пула запроса статистики
 void VulkanRender::createQueryPool(){
-    if(vulkanPhysicalDevice->getDeviceFeatures().pipelineStatisticsQuery){
+    if(vulkanLogicalDevice->getBaseFeatures().pipelineStatisticsQuery){
         VkQueryPipelineStatisticFlags flags = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
         VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
         VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
