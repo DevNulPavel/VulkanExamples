@@ -504,7 +504,7 @@ void VulkanRender::createModelDescriptorSet() {
     vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // Тип - юниформ буффер
     vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer->getBuffer();
     vertexBufferSet.bufferInfo.offset = 0;
-    vertexBufferSet.bufferInfo.range = modelUniformGPUBuffer->getBaseSize();
+    vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
     
     VulkanDescriptorSetUpdateConfig samplerSet;
     samplerSet.binding = 1; // Биндится на 1м значении в шейдере
