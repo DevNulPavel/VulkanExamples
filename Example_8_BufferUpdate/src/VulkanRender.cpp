@@ -511,12 +511,12 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
-//    // Обновляем данные в буффере юниформов.
-//    // Делается только вне рендер пасса!!! Для средств движка не очень подходит
-//    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-//    VkDeviceSize offset = offsetof(UniformBufferObject, model);
-//    VkDeviceSize size = sizeof(glm::mat4);
-//    vkCmdUpdateBuffer(buffer->getBuffer(), modelUniformGPUBuffer->getBuffer(), offset, size, (void*)&model);
+    // Обновляем данные в буффере юниформов.
+    // Делается только вне рендер пасса!!! Для средств движка не очень подходит
+    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+    VkDeviceSize offset = offsetof(UniformBufferObject, model);
+    VkDeviceSize size = sizeof(glm::mat4);
+    vkCmdUpdateBuffer(buffer->getBuffer(), modelUniformGPUBuffer->getBuffer(), offset, size, (void*)&model);
     
     // Информация о запуске рендер-прохода
     std::array<VkClearValue, 2> clearValues = {};
