@@ -289,12 +289,19 @@ void VulkanRender::createDescriptorsSetLayout(){
     VulkanDescriptorSetConfig sampler;
     sampler.binding = 1;         // Семплер будет на 1м индексе
     sampler.desriptorsCount = 1; // 1н дескриптор
-    sampler.desriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // Тип - семплер
+    sampler.desriptorType = VK_DESCRIPTOR_TYPE_SAMPLER; // Тип - семплер
     sampler.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
+
+	VulkanDescriptorSetConfig image;
+	image.binding = 2;         // Семплер будет на 1м индексе
+	image.desriptorsCount = 1; // 1н дескриптор
+	image.desriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; // Тип - семплер
+	image.descriptorStageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Используется в фраггментном шейдере
 
     std::vector<VulkanDescriptorSetConfig> configs;
     configs.push_back(uniformBuffer);
     configs.push_back(sampler);
+	configs.push_back(image);
     
     vulkanDescriptorSetLayout = std::make_shared<VulkanDescriptorSetLayout>(vulkanLogicalDevice, configs);
 }
@@ -483,13 +490,16 @@ void VulkanRender::createModelUniformBuffer() {
 void VulkanRender::createModelDescriptorPool() {
     // Структура с типами пулов
     std::vector<VkDescriptorPoolSize> poolSizes;
-    poolSizes.resize(2);
+    poolSizes.resize(3);
     // Юниформ буффер
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     poolSizes[0].descriptorCount = 1;
     // Семплер для текстуры
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
     poolSizes[1].descriptorCount = 1;
+	// Семплер для текстуры
+	poolSizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	poolSizes[2].descriptorCount = 1;
     
     // Создаем пул
     modelDescriptorPool = std::make_shared<VulkanDescriptorPool>(vulkanLogicalDevice, poolSizes, 1);
@@ -508,14 +518,22 @@ void VulkanRender::createModelDescriptorSet() {
     
     VulkanDescriptorSetUpdateConfig samplerSet;
     samplerSet.binding = 1; // Биндится на 1м значении в шейдере
-    samplerSet.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    samplerSet.imageInfo.imageView = modelTextureImageView->getImageView();
+    samplerSet.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    samplerSet.imageInfo.imageView = NULL;
     samplerSet.imageInfo.sampler = modelTextureSampler->getSampler();
+
+	VulkanDescriptorSetUpdateConfig imageSet;
+	imageSet.binding = 2; // Биндится на 1м значении в шейдере
+	imageSet.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	imageSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageSet.imageInfo.imageView = modelTextureImageView->getImageView();
+	imageSet.imageInfo.sampler = NULL;
     
     std::vector<VulkanDescriptorSetUpdateConfig> configs;
     configs.push_back(vertexBufferSet);
     configs.push_back(samplerSet);
+	configs.push_back(imageSet);
     modelDescriptorSet->updateDescriptorSet(configs);
 }
 
