@@ -14,7 +14,9 @@ struct VulkanBuffer {
 public:
     VulkanBuffer(VulkanLogicalDevicePtr logicalDevice, VkMemoryPropertyFlags properties, VkBufferUsageFlags usage, size_t dataSize);
     ~VulkanBuffer();
-    void uploadDataToBuffer(unsigned char* data, size_t dataSize);
+    void uploadDataToBuffer(unsigned char* data, size_t offset, size_t dataSize);
+    char* map(size_t offset, size_t dataSize);
+    void unmap();
     VkBuffer getBuffer() const;
     VkDeviceMemory getMemory() const;
     VulkanLogicalDevicePtr getBaseDevice() const;

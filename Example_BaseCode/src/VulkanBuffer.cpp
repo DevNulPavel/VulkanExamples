@@ -61,14 +61,26 @@ VulkanBuffer::~VulkanBuffer(){
     vkFreeMemory(_logicalDevice->getDevice(), _bufferMemory, nullptr);
 }
 
-void VulkanBuffer::uploadDataToBuffer(unsigned char* inputData, size_t dataSize){
+void VulkanBuffer::uploadDataToBuffer(unsigned char* inputData, size_t offset, size_t dataSize){
     // Маппим видео-память в адресное пространство оперативной памяти
     void* data = nullptr;
-    vkMapMemory(_logicalDevice->getDevice(), _bufferMemory, 0, static_cast<VkDeviceSize>(dataSize), 0, &data);
+    vkMapMemory(_logicalDevice->getDevice(), _bufferMemory, static_cast<VkDeviceSize>(offset), static_cast<VkDeviceSize>(dataSize), 0, &data);
     
     // Копируем вершины в память
     memcpy(data, inputData, dataSize);
     
+    // Размапим
+    vkUnmapMemory(_logicalDevice->getDevice(), _bufferMemory);
+}
+
+char* VulkanBuffer::map(size_t offset, size_t dataSize){
+    // Маппим видео-память в адресное пространство оперативной памяти
+    char* data = nullptr;
+    vkMapMemory(_logicalDevice->getDevice(), _bufferMemory, static_cast<VkDeviceSize>(offset), static_cast<VkDeviceSize>(dataSize), 0, (void**)&data);
+    return data;
+}
+
+void VulkanBuffer::unmap(){
     // Размапим
     vkUnmapMemory(_logicalDevice->getDevice(), _bufferMemory);
 }

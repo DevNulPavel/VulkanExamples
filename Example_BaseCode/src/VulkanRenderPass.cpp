@@ -11,8 +11,8 @@ VulkanRenderPassConfig::VulkanRenderPassConfig():
     loadOp(VK_ATTACHMENT_LOAD_OP_DONT_CARE),
     storeOp(VK_ATTACHMENT_STORE_OP_DONT_CARE),
     initLayout(VK_IMAGE_LAYOUT_UNDEFINED),
-    finalLayout(VK_IMAGE_LAYOUT_UNDEFINED),
-    refLayout(VK_IMAGE_LAYOUT_UNDEFINED){
+    refLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+    finalLayout(VK_IMAGE_LAYOUT_UNDEFINED){
 }
 
 VulkanRenderPass::VulkanRenderPass(VulkanLogicalDevicePtr device, const VkRenderPassCreateInfo& customPassInfo):

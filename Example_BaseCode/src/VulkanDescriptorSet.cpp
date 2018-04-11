@@ -70,6 +70,8 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
             writeSet.pImageInfo = &config.imageInfo;
         }else if(config.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER){
             writeSet.pBufferInfo = &config.bufferInfo;
+        }else if(config.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC){
+            writeSet.pBufferInfo = &config.bufferInfo;
         }
         
         descriptorWrites.push_back(writeSet);
