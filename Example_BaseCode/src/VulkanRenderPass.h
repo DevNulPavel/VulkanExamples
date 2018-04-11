@@ -14,8 +14,8 @@ struct VulkanRenderPassConfig{
     VkAttachmentLoadOp loadOp;
     VkAttachmentStoreOp storeOp;
     VkImageLayout initLayout;
-    VkImageLayout finalLayout;
     VkImageLayout refLayout;
+    VkImageLayout finalLayout;
     
     VulkanRenderPassConfig();
 };
