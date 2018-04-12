@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanLogicalDevice.h"
+#include "VulkanResource.h"
 
 struct VulkanRenderPassConfig{
     VkFormat format;
@@ -20,7 +21,7 @@ struct VulkanRenderPassConfig{
     VulkanRenderPassConfig();
 };
 
-class VulkanRenderPass {
+class VulkanRenderPass: public VulkanResource {
 public:
     VulkanRenderPass(VulkanLogicalDevicePtr device,
                      const VkRenderPassCreateInfo& customPassInfo);

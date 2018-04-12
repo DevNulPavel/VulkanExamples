@@ -11,6 +11,7 @@
 #include "VulkanShaderModule.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanRenderPass.h"
+#include "VulkanResource.h"
 
 
 struct VulkanPipelineDepthConfig{
@@ -37,7 +38,7 @@ struct VulkanPipelineBlendConfig{
     VulkanPipelineBlendConfig();
 };
 
-class VulkanPipeline {
+class VulkanPipeline: public VulkanResource {
 public:
     VulkanPipeline(VulkanLogicalDevicePtr device,
                    VulkanShaderModulePtr vertexShader, VulkanShaderModulePtr fragmentShader,

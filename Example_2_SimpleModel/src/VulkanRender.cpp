@@ -527,74 +527,55 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
     // Информация о запуске рендер-прохода
-    std::array<VkClearValue, 2> clearValues = {};
+    std::vector<VkClearValue> clearValues;
+    clearValues.resize(2);
     clearValues[0].color = {{0.5f, 0.5f, 0.5f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
+    VulkanRenderPassBeginInfo beginInfo;
+    beginInfo.renderPass = vulkanRenderPass;
+    beginInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex];
+    beginInfo.renderArea.offset = {0, 0};
+    beginInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
+    beginInfo.clearValues = clearValues;
     
-    VkRenderPassBeginInfo renderPassInfo = {};
-    memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = vulkanRenderPass->getPass();   // Рендер проход
-    renderPassInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex]->getBuffer();    // Фреймбуффер смены кадров
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
-    renderPassInfo.clearValueCount = clearValues.size();
-    renderPassInfo.pClearValues = clearValues.data();
-    
-    // Запуск рендер-прохода
-    // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
-    // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
-    vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+     // Запуск рендер-прохода
+    buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
     
     // Динамически изменяемый параметр в пайплайне
-    VkViewport viewport = {};
-    memset(&viewport, 0, sizeof(VkViewport));
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(vulkanSwapchain->getSwapChainExtent().width);
-    viewport.height = static_cast<float>(vulkanSwapchain->getSwapChainExtent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(buffer->getBuffer(), 0, 1, &viewport);
+    VkRect2D viewport = {};
+    memset(&viewport, 0, sizeof(VkRect2D));
+    viewport.offset = {0, 0};
+    viewport.extent = vulkanSwapchain->getSwapChainExtent();
+    buffer->cmdSetViewport(viewport);
     
     // Динамически изменяемый параметр в пайплайне
     VkRect2D scissor = {};
     memset(&scissor, 0, sizeof(VkRect2D));
     scissor.offset = {0, 0};
     scissor.extent = vulkanSwapchain->getSwapChainExtent();
-    vkCmdSetScissor(buffer->getBuffer(), 0, 1, &scissor);
+    buffer->cmdSetScissor(scissor);
     
     // Устанавливаем пайплайн у коммандного буффера
-    vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());
+    buffer->cmdBindPipeline(vulkanPipeline);
     
     // Привязываем вершинный буффер к пайлпайну
-    VkBuffer vertexBuffers[] = {modelVertexBuffer->getBuffer()};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(buffer->getBuffer(), 0, 1, vertexBuffers, offsets);
+    buffer->cmdBindVertexBuffer(modelVertexBuffer, 0);
     
     // Привязываем индексный буффер к пайплайну
-    vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-    
+    buffer->cmdBindIndexBuffer(modelIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
     // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    VkDescriptorSet set = modelDescriptorSet->getSet();
-    vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 0, nullptr);
-    
+    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet, 0);
+
     // Push константы для динамической отрисовки
     glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    vkCmdPushConstants(buffer->getBuffer(),
-                       vulkanPipeline->getLayout(),
-                       VK_SHADER_STAGE_VERTEX_BIT,
-                       0,
-                       sizeof(model),
-                       (unsigned char*)&model);
-    
-    // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-    // vkCmdDraw(vulkanCommandBuffers[i], QUAD_VERTEXES.size(), 1, 0, 0);
+    buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(model), (void*)&model);
+
     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-    vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+    buffer->cmdDrawIndexed(modelTotalIndexesCount);
     
     // Заканчиваем рендер проход
-    vkCmdEndRenderPass(buffer->getBuffer());
+    buffer->cmdEndRenderPass();
     
     // Заканчиваем подготовку коммандного буффера
 	buffer->end();

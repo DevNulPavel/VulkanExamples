@@ -10,9 +10,10 @@
 #include "VulkanLogicalDevice.h"
 #include "VulkanRenderPass.h"
 #include "VulkanImageView.h"
+#include "VulkanResource.h"
 
 
-class VulkanFrameBuffer {
+class VulkanFrameBuffer: public VulkanResource {
 public:
     VulkanFrameBuffer(VulkanLogicalDevicePtr device,
                       VulkanRenderPassPtr renderPass,

@@ -42,7 +42,7 @@ struct VulkanDescriptorSetUpdateConfig {
     VulkanDescriptorSetUpdateConfig();
 };
 
-class VulkanDescriptorSet {
+class VulkanDescriptorSet: public VulkanResource {
 public:
     VulkanDescriptorSet(VulkanLogicalDevicePtr logicalDevice, VulkanDescriptorSetLayoutPtr layout, VulkanDescriptorPoolPtr pool);
     ~VulkanDescriptorSet();
