@@ -44,13 +44,13 @@ public:
     void cmdSetViewport(const VkRect2D& viewport);
     void cmdSetScissor(const VkRect2D& scissor);
     void cmdBindPipeline(const VulkanPipelinePtr& pipeline);
-    void cmdBindVertexBuffer(const VulkanBufferPtr& buffer, VkDeviceSize offset);
+    void cmdBindVertexBuffer(const VulkanBufferPtr& buffer, VkDeviceSize offset = 0);
     void cmdBindVertexBuffers(const std::vector<VulkanBufferPtr>& buffers, const std::vector<VkDeviceSize>& offsets);
-    void cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkDeviceSize offset, VkIndexType type);
+    void cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkIndexType type, VkDeviceSize offset = 0);
     void cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout, const VulkanDescriptorSetPtr& set, uint32_t offset = 0);
     void cmdBindDescriptorSets(const VkPipelineLayout& pipelineLayout, const std::vector<VulkanDescriptorSetPtr>& sets);
     void cmdBindDescriptorSets(const VkPipelineLayout& pipelineLayout, const std::vector<VulkanDescriptorSetPtr>& sets, const std::vector<uint32_t>& offsets);
-    void cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, uint32_t offset, uint32_t size, const void* data);
+    void cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, const void* data, uint32_t size, uint32_t offset = 0);
     void cmdDraw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0);
     void cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0);
     

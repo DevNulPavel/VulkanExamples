@@ -170,7 +170,7 @@ void VulkanCommandBuffer::cmdBindVertexBuffers(const std::vector<VulkanBufferPtr
     vkCmdBindVertexBuffers(_commandBuffer, 0, static_cast<uint32_t>(vkBuffers.size()), vkBuffers.data(), offsets.data());
 }
 
-void VulkanCommandBuffer::cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkDeviceSize offset, VkIndexType type){
+void VulkanCommandBuffer::cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkIndexType type, VkDeviceSize offset){
     _usedObjects.insert(buffer);
     vkCmdBindIndexBuffer(_commandBuffer, buffer->getBuffer(), offset, type);
 }
@@ -220,7 +220,7 @@ void VulkanCommandBuffer::cmdBindDescriptorSets(const VkPipelineLayout& pipeline
                             offsets.size(), offsets.data());
 }
 
-void VulkanCommandBuffer::cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, uint32_t offset, uint32_t size, const void* data){
+void VulkanCommandBuffer::cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, const void* data, uint32_t size, uint32_t offset){
     vkCmdPushConstants(_commandBuffer,
                        pipelineLayout,
                        stage,
