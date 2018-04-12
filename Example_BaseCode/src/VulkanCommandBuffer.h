@@ -41,9 +41,17 @@ struct VulkanImageBarrierInfo{
 };
 
 struct VulkanBufferBarrierInfo{
+    VulkanBufferPtr buffer;
+    VkAccessFlags srcAccessMask;
+    VkAccessFlags dstAccessMask;
+    VkDeviceSize offset;
+    VkDeviceSize size;
+    
+    VulkanBufferBarrierInfo();
 };
 
 struct VulkanMemoryBarrierInfo{
+    // TODO: Дописать
 };
 
 class VulkanCommandBuffer {

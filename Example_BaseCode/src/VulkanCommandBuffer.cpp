@@ -24,6 +24,15 @@ VulkanImageBarrierInfo::VulkanImageBarrierInfo():
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+VulkanBufferBarrierInfo::VulkanBufferBarrierInfo():
+    srcAccessMask(0),
+    dstAccessMask(0),
+    offset(0),
+    size(0){
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool):
     _logicalDevice(logicalDevice),
     _pool(pool){
@@ -327,11 +336,13 @@ void VulkanCommandBuffer::cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, V
                                              VulkanBufferBarrierInfo* bufferInfo, uint32_t bufferInfoCount,
                                              VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount){
     
+    // Image
     std::vector<VkImageMemoryBarrier> imageBarriers(imageInfoCount);
     for (uint32_t i = 0; i < imageInfoCount; i++) {
         _usedObjects.insert(imageInfo[i].image);
         
         memset(&imageBarriers[i], 0, sizeof(VkImageMemoryBarrier));
+        
         imageBarriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         imageBarriers[i].oldLayout = imageInfo[i].oldLayout;  // Старый лаяут (способ использования)
         imageBarriers[i].newLayout = imageInfo[i].newLayout;  // Новый лаяут (способ использования)
@@ -349,13 +360,33 @@ void VulkanCommandBuffer::cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, V
         imageInfo[i].image->setNewLayout(imageInfo[i].newLayout);
     }
     
+    // Buffer
+    std::vector<VkBufferMemoryBarrier> bufferBarriers(bufferInfoCount);
+    for (uint32_t i = 0; i < bufferInfoCount; i++) {
+        _usedObjects.insert(bufferInfo[i].buffer);
+        
+        memset(&bufferBarriers[i], 0, sizeof(VkBufferMemoryBarrier));
+        
+        bufferBarriers[i].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        bufferBarriers[i].srcAccessMask = bufferInfo[i].srcAccessMask;
+        bufferBarriers[i].dstAccessMask = bufferInfo[i].dstAccessMask;
+        bufferBarriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        bufferBarriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        bufferBarriers[i].buffer = bufferInfo[i].buffer->getBuffer();
+        bufferBarriers[i].offset = bufferInfo[i].offset;
+        bufferBarriers[i].size = bufferInfo[i].size;
+    }
+    
+    // Memory
+    // TODO: Дописать
+    
     // Закидываем в очередь барьер конвертации использования для изображения
     vkCmdPipelineBarrier(_commandBuffer,
                          srcStage,
                          dstStage,
                          0,
                          0, nullptr,
-                         0, nullptr,
+                         bufferBarriers.size(), (bufferBarriers.size() > 0) ? bufferBarriers.data() : nullptr,
                          imageBarriers.size(), (imageBarriers.size() > 0) ? imageBarriers.data() : nullptr);
 }
 
