@@ -15,7 +15,7 @@
 #include "VulkanImageView.h"
 
 
-struct VulkanSwapchain {
+class VulkanSwapchain {
 public:
     VulkanSwapchain(VulkanSurfacePtr surface,
                     VulkanLogicalDevicePtr device,

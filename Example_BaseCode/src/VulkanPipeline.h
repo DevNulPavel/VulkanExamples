@@ -37,7 +37,7 @@ struct VulkanPipelineBlendConfig{
     VulkanPipelineBlendConfig();
 };
 
-struct VulkanPipeline {
+class VulkanPipeline {
 public:
     VulkanPipeline(VulkanLogicalDevicePtr device,
                    VulkanShaderModulePtr vertexShader, VulkanShaderModulePtr fragmentShader,

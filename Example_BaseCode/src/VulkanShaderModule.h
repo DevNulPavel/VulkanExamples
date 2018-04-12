@@ -12,7 +12,7 @@
 #include "VulkanLogicalDevice.h"
 
 
-struct VulkanShaderModule {
+class VulkanShaderModule {
 public:
     VulkanShaderModule(VulkanLogicalDevicePtr device, const std::vector<unsigned char>& code);
     ~VulkanShaderModule();

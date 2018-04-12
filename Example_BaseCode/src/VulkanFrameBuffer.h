@@ -12,7 +12,7 @@
 #include "VulkanImageView.h"
 
 
-struct VulkanFrameBuffer {
+class VulkanFrameBuffer {
 public:
     VulkanFrameBuffer(VulkanLogicalDevicePtr device,
                       VulkanRenderPassPtr renderPass,

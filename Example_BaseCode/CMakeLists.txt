@@ -205,6 +205,7 @@ print_current_cmake_config()
 set(ALL_SOURCES 
     src/VulkanHelpers.h
     src/VulkanHelpers.cpp
+    src/VulkanResource.h
     src/VulkanInstance.h
     src/VulkanInstance.cpp
     src/VulkanSurface.h

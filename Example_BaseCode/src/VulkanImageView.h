@@ -9,9 +9,10 @@
 
 #include "VulkanLogicalDevice.h"
 #include "VulkanImage.h"
+#include "VulkanResource.h"
 
 
-struct VulkanImageView {
+class VulkanImageView: public VulkanResource {
 public:
     VulkanImageView(VulkanLogicalDevicePtr device, VulkanImagePtr image, VkImageAspectFlags aspectFlags);
     ~VulkanImageView();

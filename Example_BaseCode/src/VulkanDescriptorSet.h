@@ -2,6 +2,7 @@
 #define VULKAN_DESCRIPTOR_SET_H
 
 #include <memory>
+#include <set>
 
 // GLFW include
 #define GLFW_INCLUDE_VULKAN
@@ -10,21 +11,38 @@
 #include "VulkanLogicalDevice.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanDescriptorPool.h"
+#include "VulkanSampler.h"
+#include "VulkanImageView.h"
+#include "VulkanBuffer.h"
+#include "VulkanResource.h"
 
 
+struct VulkanDescriptorSetImageInfo{
+    VulkanSamplerPtr sampler;
+    VulkanImageViewPtr imageView;
+    VkImageLayout imageLayout;
+    
+    VulkanDescriptorSetImageInfo();
+};
+
+struct VulkanDescriptorSetBufferInfo{
+    VulkanBufferPtr buffer;
+    VkDeviceSize offset;
+    VkDeviceSize range;
+    
+    VulkanDescriptorSetBufferInfo();
+};
 
 struct VulkanDescriptorSetUpdateConfig {
     VkDescriptorType type;
     uint32_t binding;
-    union{
-        VkDescriptorImageInfo imageInfo;
-        VkDescriptorBufferInfo bufferInfo;
-    };
+    VulkanDescriptorSetImageInfo imageInfo;
+    VulkanDescriptorSetBufferInfo bufferInfo;
     
     VulkanDescriptorSetUpdateConfig();
 };
 
-struct VulkanDescriptorSet {
+class VulkanDescriptorSet {
 public:
     VulkanDescriptorSet(VulkanLogicalDevicePtr logicalDevice, VulkanDescriptorSetLayoutPtr layout, VulkanDescriptorPoolPtr pool);
     ~VulkanDescriptorSet();
@@ -38,6 +56,7 @@ private:
     VulkanLogicalDevicePtr _logicalDevice;
     VulkanDescriptorSetLayoutPtr _layout;
     VulkanDescriptorPoolPtr _pool;
+    std::set<VulkanResourcePtr> _usedObjects;
     VkDescriptorSet _set;
     
 private:

@@ -8,9 +8,10 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanLogicalDevice.h"
+#include "VulkanResource.h"
 
 
-struct VulkanBuffer {
+class VulkanBuffer: public VulkanResource {
 public:
     VulkanBuffer(VulkanLogicalDevicePtr logicalDevice, VkMemoryPropertyFlags properties, VkBufferUsageFlags usage, size_t dataSize);
     ~VulkanBuffer();

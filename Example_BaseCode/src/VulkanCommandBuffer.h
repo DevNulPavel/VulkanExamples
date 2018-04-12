@@ -11,7 +11,7 @@
 #include "VulkanCommandPool.h"
 
 
-struct VulkanCommandBuffer {
+class VulkanCommandBuffer {
 public:
     VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool);
     ~VulkanCommandBuffer();

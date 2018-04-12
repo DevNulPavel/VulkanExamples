@@ -11,7 +11,7 @@
 #include "VulkanCommandBuffer.h"
 
 
-struct VulkanQueryPool {
+class VulkanQueryPool {
 public:
     VulkanQueryPool(VulkanLogicalDevicePtr device,
                     VkQueryPipelineStatisticFlags flags,

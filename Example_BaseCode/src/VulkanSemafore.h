@@ -10,7 +10,7 @@
 #include "VulkanLogicalDevice.h"
 
 
-struct VulkanSemafore {
+class VulkanSemafore {
 public:
     VulkanSemafore(VulkanLogicalDevicePtr device);
     ~VulkanSemafore();

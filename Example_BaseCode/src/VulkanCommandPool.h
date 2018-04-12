@@ -10,7 +10,7 @@
 #include "VulkanLogicalDevice.h"
 
 
-struct VulkanCommandPool {
+class VulkanCommandPool {
 public:
     VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex);
     ~VulkanCommandPool();

@@ -20,7 +20,7 @@ struct VulkanRenderPassConfig{
     VulkanRenderPassConfig();
 };
 
-struct VulkanRenderPass {
+class VulkanRenderPass {
 public:
     VulkanRenderPass(VulkanLogicalDevicePtr device,
                      const VkRenderPassCreateInfo& customPassInfo);

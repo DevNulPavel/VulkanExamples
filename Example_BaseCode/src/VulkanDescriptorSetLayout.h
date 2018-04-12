@@ -20,7 +20,7 @@ struct VulkanDescriptorSetConfig{
     VulkanDescriptorSetConfig();
 };
 
-struct VulkanDescriptorSetLayout {
+class VulkanDescriptorSetLayout {
 public:
     VulkanDescriptorSetLayout(VulkanLogicalDevicePtr device, const std::vector<VulkanDescriptorSetConfig>& configs);
     ~VulkanDescriptorSetLayout();

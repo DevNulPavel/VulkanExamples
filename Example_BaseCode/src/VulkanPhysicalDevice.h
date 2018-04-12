@@ -14,7 +14,7 @@
 
 
 
-struct VulkanPhysicalDevice {
+class VulkanPhysicalDevice {
 public:
     VulkanPhysicalDevice(VulkanInstancePtr instance,
 						 const std::vector<const char*>& extensions,

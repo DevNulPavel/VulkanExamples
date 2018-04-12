@@ -8,9 +8,10 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanLogicalDevice.h"
+#include "VulkanResource.h"
 
 
-struct VulkanSampler {
+class VulkanSampler: public VulkanResource {
 public:
     VulkanSampler(VulkanLogicalDevicePtr device,
                   VkFilter minFiler, VkFilter magFilter,

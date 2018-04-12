@@ -13,7 +13,7 @@
 #include "VulkanInstance.h"
 
 
-struct VulkanSurface {
+class VulkanSurface {
 public:
     VulkanSurface(GLFWwindow* window, VulkanInstancePtr instance);
     ~VulkanSurface();

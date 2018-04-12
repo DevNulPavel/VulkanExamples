@@ -9,8 +9,9 @@
 
 #include "VulkanPhysicalDevice.h"
 #include "VulkanLogicalDevice.h"
+#include "VulkanResource.h"
 
-struct VulkanImage {
+class VulkanImage: public VulkanResource {
 public:
     VulkanImage();
     VulkanImage(VkImage image, VkFormat format, VkExtent2D size);

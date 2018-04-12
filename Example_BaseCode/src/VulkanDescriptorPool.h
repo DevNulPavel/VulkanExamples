@@ -10,7 +10,7 @@
 #include "VulkanLogicalDevice.h"
 
 
-struct VulkanDescriptorPool {
+class VulkanDescriptorPool {
 public:
     VulkanDescriptorPool(VulkanLogicalDevicePtr logicalDevice, const std::vector<VkDescriptorPoolSize>& poolSize, uint32_t maxSets);
     ~VulkanDescriptorPool();

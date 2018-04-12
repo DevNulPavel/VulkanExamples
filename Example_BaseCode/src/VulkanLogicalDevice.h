@@ -11,9 +11,9 @@
 #include "VulkanSwapChainSupportDetails.h"
 #include "VulkanPhysicalDevice.h"
 
-struct VulkanQueue;
+class VulkanQueue;
 
-struct VulkanLogicalDevice: public std::enable_shared_from_this<VulkanLogicalDevice> {
+class VulkanLogicalDevice: public std::enable_shared_from_this<VulkanLogicalDevice> {
 public:
     VulkanLogicalDevice(VulkanPhysicalDevicePtr physicalDevice,
                         VulkanQueuesFamiliesIndexes queuesFamiliesIndexes,

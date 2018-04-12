@@ -13,7 +13,7 @@
 #include "TestDefines.h"
 
 
-struct VulkanInstance {
+class VulkanInstance {
 public:
     VulkanInstance();
     ~VulkanInstance();

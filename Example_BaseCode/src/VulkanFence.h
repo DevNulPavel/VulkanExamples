@@ -10,7 +10,7 @@
 #include "VulkanLogicalDevice.h"
 
 
-struct VulkanFence {
+class VulkanFence {
 public:
     VulkanFence(VulkanLogicalDevicePtr device, bool signaled);
     ~VulkanFence();

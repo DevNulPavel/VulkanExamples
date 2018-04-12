@@ -466,7 +466,7 @@ void VulkanRender::createModelUniformBuffer() {
     //ubo.proj[1][1] *= -1;
     
     // Отгружаем данные
-    modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(UniformBufferObject));
+    modelUniformStagingBuffer->uploadDataToBuffer((unsigned char*)&ubo, 0, sizeof(UniformBufferObject));
     
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
@@ -497,7 +497,7 @@ void VulkanRender::createModelDescriptorSet() {
     VulkanDescriptorSetUpdateConfig vertexBufferSet;
     vertexBufferSet.binding = 0; // Биндится на 0м значении в шейдере
     vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // Тип - юниформ буффер
-    vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer->getBuffer();
+    vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer;
     vertexBufferSet.bufferInfo.offset = 0;
     vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
     
@@ -505,8 +505,8 @@ void VulkanRender::createModelDescriptorSet() {
     samplerSet.binding = 1; // Биндится на 1м значении в шейдере
     samplerSet.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    samplerSet.imageInfo.imageView = modelTextureImageView->getImageView();
-    samplerSet.imageInfo.sampler = modelTextureSampler->getSampler();
+    samplerSet.imageInfo.imageView = modelTextureImageView;
+    samplerSet.imageInfo.sampler = modelTextureSampler;
     
     std::vector<VulkanDescriptorSetUpdateConfig> configs;
     configs.push_back(vertexBufferSet);

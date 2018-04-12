@@ -12,7 +12,7 @@
 #include "VulkanLogicalDevice.h"
 #include "VulkanCommandBuffer.h"
 
-struct VulkanQueue {
+class VulkanQueue {
     friend VulkanLogicalDevice;
 public:
     ~VulkanQueue();
