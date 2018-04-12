@@ -681,7 +681,7 @@ void VulkanRender::createModelUniformBuffer() {
     //ubo.proj[1][1] *= -1;
     
     // Отгружаем данные
-    staggingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(ModelUniformBuffer), 0);
+    staggingBuffer->uploadDataToBuffer((unsigned char*)&ubo, sizeof(ModelUniformBuffer));
     
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);

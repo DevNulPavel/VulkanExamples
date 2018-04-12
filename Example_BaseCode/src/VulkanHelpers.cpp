@@ -379,7 +379,7 @@ VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePt
                                                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // Буффер может быть использован как источник данных для копирования
                                                                     bufferSize);
     // Отгружаем данные
-    staggingBuffer->uploadDataToBuffer(data, 0, bufferSize);
+    staggingBuffer->uploadDataToBuffer(data, bufferSize);
     
     // Создаем рабочий буффер
     VulkanBufferPtr resultBuffer = std::make_shared<VulkanBuffer>(device,
