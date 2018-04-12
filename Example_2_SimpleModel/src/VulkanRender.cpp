@@ -470,7 +470,7 @@ void VulkanRender::createModelUniformBuffer() {
     
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
+    commandBuffer->cmdCopyAllBuffer(modelUniformStagingBuffer, modelUniformGPUBuffer);
     endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
