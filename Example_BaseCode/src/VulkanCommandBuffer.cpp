@@ -4,6 +4,25 @@
 #include <stdexcept>
 #include "Helpers.h"
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+VulkanRenderPassBeginInfo::VulkanRenderPassBeginInfo():
+    renderArea({{0, 0}, {0, 0}}){
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+VulkanImageBarrierInfo::VulkanImageBarrierInfo():
+    oldLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+    newLayout(VK_IMAGE_LAYOUT_UNDEFINED),
+    startMipmapLevel(0),
+    levelsCount(0),
+    aspectFlags(VK_IMAGE_ASPECT_COLOR_BIT),
+    srcAccessBarrier(0),
+    dstAccessBarrier(0){
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool):
     _logicalDevice(logicalDevice),
@@ -235,5 +254,108 @@ void VulkanCommandBuffer::cmdDraw(uint32_t vertexCount, uint32_t instanceCount, 
 
 void VulkanCommandBuffer::cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance){
     vkCmdDrawIndexed(_commandBuffer, indexCount, instanceCount, 0, 0, 0);
+}
+
+void VulkanCommandBuffer::cmdCopyImage(const VulkanImagePtr& srcImage, const VulkanImagePtr& dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel){
+    _usedObjects.insert(srcImage);
+    _usedObjects.insert(dstImage);
+    
+    // Описание ресурса
+    VkImageSubresourceLayers subResource = {};
+    memset(&subResource, 0, sizeof(VkImageSubresourceLayers));
+    subResource.aspectMask = aspectMask; // Текстура с цветом
+    subResource.layerCount = 1; // Всего 1н слой
+    subResource.baseArrayLayer = 0; // 0й слой
+    subResource.mipLevel = mipLevel;   // Уровень мипмаппинга
+    
+    // Регион копирования текстуры
+    VkImageCopy region = {};
+    memset(&region, 0, sizeof(VkImageCopy));
+    region.srcSubresource = subResource;
+    region.dstSubresource = subResource;
+    region.srcOffset = {0, 0, 0};
+    region.dstOffset = {0, 0, 0};
+    region.extent.width = srcImage->getBaseSize().width;
+    region.extent.height = srcImage->getBaseSize().height;
+    region.extent.depth = 1;
+    
+    // Создаем задачу на копирование данных
+    vkCmdCopyImage(_commandBuffer,
+                   srcImage->getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImage->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &region);
+}
+
+void VulkanCommandBuffer::cmdBlitImage(const VkImageBlit& imageBlit, const VulkanImagePtr& srcImage, const VulkanImagePtr& dstImage){
+    _usedObjects.insert(srcImage);
+    _usedObjects.insert(dstImage);
+    
+    vkCmdBlitImage(_commandBuffer,
+                   srcImage->getImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImage->getImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1,
+                   &imageBlit,
+                   VK_FILTER_LINEAR);
+}
+
+void VulkanCommandBuffer::cmdCopyBuffer(const VkBufferCopy& copyRegion, const VulkanBufferPtr& srcBuffer, const VulkanBufferPtr& dstBuffer){
+    _usedObjects.insert(srcBuffer);
+    _usedObjects.insert(dstBuffer);
+    
+    // Ставим в очередь копирование буффера
+    vkCmdCopyBuffer(_commandBuffer, srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
+}
+
+void VulkanCommandBuffer::cmdCopyAllBuffer(const VulkanBufferPtr& srcBuffer, const VulkanBufferPtr& dstBuffer){
+    _usedObjects.insert(srcBuffer);
+    _usedObjects.insert(dstBuffer);
+    
+    // Ставим в очередь копирование буффера
+    VkBufferCopy copyRegion = {};
+    memset(&copyRegion, 0, sizeof(VkBufferCopy));
+    copyRegion.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
+    
+    // Ставим в очередь копирование буффера
+    vkCmdCopyBuffer(_commandBuffer, srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
+}
+
+
+void VulkanCommandBuffer::cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage,
+                                             VulkanImageBarrierInfo* imageInfo, uint32_t imageInfoCount,
+                                             VulkanBufferBarrierInfo* bufferInfo, uint32_t bufferInfoCount,
+                                             VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount){
+    
+    std::vector<VkImageMemoryBarrier> imageBarriers(imageInfoCount);
+    for (uint32_t i = 0; i < imageInfoCount; i++) {
+        _usedObjects.insert(imageInfo[i].image);
+        
+        memset(&imageBarriers[i], 0, sizeof(VkImageMemoryBarrier));
+        imageBarriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageBarriers[i].oldLayout = imageInfo[i].oldLayout;  // Старый лаяут (способ использования)
+        imageBarriers[i].newLayout = imageInfo[i].newLayout;  // Новый лаяут (способ использования)
+        imageBarriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
+        imageBarriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
+        imageBarriers[i].image = imageInfo[i].image->getImage();  // Изображение, которое меняется
+        imageBarriers[i].srcAccessMask = imageInfo[i].srcAccessBarrier;
+        imageBarriers[i].dstAccessMask = imageInfo[i].dstAccessBarrier;
+        imageBarriers[i].subresourceRange.baseArrayLayer = 0;
+        imageBarriers[i].subresourceRange.layerCount = 1;
+        imageBarriers[i].subresourceRange.baseMipLevel = imageInfo[i].startMipmapLevel;
+        imageBarriers[i].subresourceRange.levelCount = imageInfo[i].levelsCount;    // Сколько уровней надо конвертить?? Как параметр для мипмапов VK_REMAINING_MIP_LEVELS
+        imageBarriers[i].subresourceRange.aspectMask = imageInfo[i].aspectFlags;
+        
+        imageInfo[i].image->setNewLayout(imageInfo[i].newLayout);
+    }
+    
+    // Закидываем в очередь барьер конвертации использования для изображения
+    vkCmdPipelineBarrier(_commandBuffer,
+                         srcStage,
+                         dstStage,
+                         0,
+                         0, nullptr,
+                         0, nullptr,
+                         imageBarriers.size(), (imageBarriers.size() > 0) ? imageBarriers.data() : nullptr);
 }
 

@@ -66,64 +66,22 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
                            VkAccessFlags srcAccessBarrier,
                            VkAccessFlags dstAccessBarrier) {
     
-    VkImageSubresourceRange range;
-    range.baseArrayLayer = 0;
-    range.layerCount = 1;
-    range.baseMipLevel = startMipmapLevel;
-    range.levelCount = levelsCount;    // Сколько уровней надо конвертить?? Как параметр для мипмапов VK_REMAINING_MIP_LEVELS
-    range.aspectMask = aspectFlags;
+    VulkanImageBarrierInfo info;
+    info.image = image;
+    info.oldLayout = oldLayout;
+    info.newLayout = newLayout;
+    info.startMipmapLevel = startMipmapLevel;
+    info.levelsCount = levelsCount;
+    info.aspectFlags = aspectFlags;
+    info.srcAccessBarrier = srcAccessBarrier;
+    info.dstAccessBarrier = dstAccessBarrier;
     
-    // Создаем барьер памяти для картинок
-    VkImageMemoryBarrier barrier = {};
-    memset(&barrier, 0, sizeof(VkImageMemoryBarrier));
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;  // Старый лаяут (способ использования)
-    barrier.newLayout = newLayout;  // Новый лаяут (способ использования)
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Очередь не меняется
-    barrier.image = image->getImage();  // Изображение, которое меняется
-    barrier.srcAccessMask = srcAccessBarrier;
-    barrier.dstAccessMask = dstAccessBarrier;
-    barrier.subresourceRange = range;
-    
-    // Закидываем в очередь барьер конвертации использования для изображения
-    vkCmdPipelineBarrier(commandBuffer->getBuffer(),
-                         srcStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         dstStage, // Закидываем на верх пайплайна VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                         0,
-                         0, nullptr,
-                         0, nullptr,
-                         1, &barrier);
+    commandBuffer->cmdPipelineBarrier(srcStage, dstStage,
+                                      &info, 1,
+                                      nullptr, 0,
+                                      nullptr, 0);
     
     image->setNewLayout(newLayout);
-}
-
-// Закидываем в очередь операцию копирования текстуры
-void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel) {
-    // Описание ресурса
-    VkImageSubresourceLayers subResource = {};
-    memset(&subResource, 0, sizeof(VkImageSubresourceLayers));
-    subResource.aspectMask = aspectMask; // Текстура с цветом
-    subResource.layerCount = 1; // Всего 1н слой
-    subResource.baseArrayLayer = 0; // 0й слой
-    subResource.mipLevel = mipLevel;   // Уровень мипмаппинга
-    
-    // Регион копирования текстуры
-    VkImageCopy region = {};
-    memset(&region, 0, sizeof(VkImageCopy));
-    region.srcSubresource = subResource;
-    region.dstSubresource = subResource;
-    region.srcOffset = {0, 0, 0};
-    region.dstOffset = {0, 0, 0};
-    region.extent.width = srcImage->getBaseSize().width;
-    region.extent.height = srcImage->getBaseSize().height;
-    region.extent.depth = 1;
-    
-    // Создаем задачу на копирование данных
-    vkCmdCopyImage(commandBuffer->getBuffer(),
-                   srcImage->getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImage->getImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   1, &region);
 }
 
 // Создаем мипмапы для картинок
@@ -134,15 +92,15 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
     // An alternative way would be to always blit from the first mip level and sample that one down
     
 	transitionImageLayout(commandBuffer,
-		image,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		0, 1,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_ACCESS_TRANSFER_READ_BIT,
-		VK_ACCESS_TRANSFER_WRITE_BIT);
+                          image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          0, 1,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          VK_PIPELINE_STAGE_TRANSFER_BIT,
+                          VK_PIPELINE_STAGE_TRANSFER_BIT,
+                          VK_ACCESS_TRANSFER_READ_BIT,
+                          VK_ACCESS_TRANSFER_WRITE_BIT);
 
     // Copy down mips from n-1 to n
     for (int32_t i = 1; i < static_cast<int32_t>(image->getBaseMipmapsCount()); i++){
@@ -164,6 +122,9 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
         imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imageBlit.srcSubresource.layerCount = 1;
         imageBlit.srcSubresource.mipLevel = i-1;
+        imageBlit.srcOffsets[0].x = 0;
+        imageBlit.srcOffsets[0].y = 0;
+        imageBlit.srcOffsets[0].z = 0;
         imageBlit.srcOffsets[1].x = int32_t(image->getBaseSize().width >> (i - 1));
         imageBlit.srcOffsets[1].y = int32_t(image->getBaseSize().height >> (i - 1));
         imageBlit.srcOffsets[1].z = 1;
@@ -172,19 +133,15 @@ void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePt
         imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imageBlit.dstSubresource.layerCount = 1;
         imageBlit.dstSubresource.mipLevel = i;
+        imageBlit.dstOffsets[0].x = 0;
+        imageBlit.dstOffsets[0].y = 0;
+        imageBlit.dstOffsets[0].z = 0;
         imageBlit.dstOffsets[1].x = int32_t(image->getBaseSize().width >> i);
         imageBlit.dstOffsets[1].y = int32_t(image->getBaseSize().height >> i);
         imageBlit.dstOffsets[1].z = 1;
         
-        // Blit from previous level
-        vkCmdBlitImage(commandBuffer->getBuffer(),
-                       image->getImage(),
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                       image->getImage(),
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       1,
-                       &imageBlit,
-                       VK_FILTER_LINEAR);
+        // Делаем blit
+        commandBuffer->cmdBlitImage(imageBlit, image, image);
         
         // Transiton current mip level to transfer source for read in next iteration
         transitionImageLayout(commandBuffer,
@@ -326,7 +283,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     // Копируем данные в пределах GPU из временной текстуры в целевую
     {
         //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-        copyImage(commandBuffer, staggingImage, resultImage, VK_IMAGE_ASPECT_COLOR_BIT, 0);
+        commandBuffer->cmdCopyImage(staggingImage, resultImage, VK_IMAGE_ASPECT_COLOR_BIT, 0);
         //endAndQueueSingleTimeCommands(commandBuffer, queue);
     }
     
@@ -340,15 +297,15 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
 		// Генерация мипмапов делает это самостоятельно
 		//VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
 		transitionImageLayout(commandBuffer,
-			resultImage,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			0, resultImage->getBaseMipmapsCount(),
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT);
+                              resultImage,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              0, resultImage->getBaseMipmapsCount(),
+                              VK_IMAGE_ASPECT_COLOR_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
 		//endAndQueueSingleTimeCommands(commandBuffer, queue);
 	}
 
@@ -359,15 +316,6 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
     
     
     return resultImage;
-}
-
-// Копирование буффера
-void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer) {
-    // Ставим в очередь копирование буффера
-    VkBufferCopy copyRegion = {};
-    memset(&copyRegion, 0, sizeof(VkBufferCopy));
-    copyRegion.size = static_cast<VkDeviceSize>(srcBuffer->getBaseSize());
-    vkCmdCopyBuffer(commandBuffer->getBuffer(), srcBuffer->getBuffer(), dstBuffer->getBuffer(), 1, &copyRegion);
 }
 
 // Создание буфферов
@@ -389,7 +337,7 @@ VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePt
     
     // Ставим задачу на копирование буфферов
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-    copyBuffer(commandBuffer, staggingBuffer, resultBuffer);
+    commandBuffer->cmdCopyAllBuffer(staggingBuffer, resultBuffer);
     endAndQueueWaitSingleTimeCommands(commandBuffer, queue);
     
     // Удаляем временный буффер, если есть

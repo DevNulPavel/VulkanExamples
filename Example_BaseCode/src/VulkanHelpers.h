@@ -37,9 +37,6 @@ void transitionImageLayout(VulkanCommandBufferPtr commandBuffer,
                            VkAccessFlags srcAccessBarrier,
                            VkAccessFlags dstAccessBarrier);
 
-// Закидываем в очередь операцию копирования текстуры
-void copyImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr srcImage, VulkanImagePtr dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel);
-
 // Создаем мипмапы для картинок
 void generateMipmapsForImage(VulkanCommandBufferPtr commandBuffer, VulkanImagePtr image);
 
@@ -54,9 +51,6 @@ void endSingleTimeCommands(VulkanCommandBufferPtr commandBuffer, VulkanQueuePtr 
 
 // Создание текстуры из изображения на диске
 VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, const std::string& path);
-
-// Копирование буффера
-void copyBuffer(VulkanCommandBufferPtr commandBuffer, VulkanBufferPtr srcBuffer, VulkanBufferPtr dstBuffer);
 
 // Создание буфферов
 VulkanBufferPtr createBufferForData(VulkanLogicalDevicePtr device, VulkanQueuePtr queue, VulkanCommandPoolPtr pool, VkBufferUsageFlagBits usage, unsigned char* data, size_t bufferSize);

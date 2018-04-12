@@ -23,8 +23,28 @@ struct VulkanRenderPassBeginInfo{
     VulkanFrameBufferPtr framebuffer;
     VkRect2D renderArea;
     std::vector<VkClearValue> clearValues;
+    
+    VulkanRenderPassBeginInfo();
 };
 
+struct VulkanImageBarrierInfo{
+    VulkanImagePtr image;
+    VkImageLayout oldLayout;
+    VkImageLayout newLayout;
+    uint32_t startMipmapLevel;
+    uint32_t levelsCount;
+    VkImageAspectFlags aspectFlags;
+    VkAccessFlags srcAccessBarrier;
+    VkAccessFlags dstAccessBarrier;
+    
+    VulkanImageBarrierInfo();
+};
+
+struct VulkanBufferBarrierInfo{
+};
+
+struct VulkanMemoryBarrierInfo{
+};
 
 class VulkanCommandBuffer {
 public:
@@ -53,6 +73,14 @@ public:
     void cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, const void* data, uint32_t size, uint32_t offset = 0);
     void cmdDraw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0);
     void cmdDrawIndexed(uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0);
+    void cmdCopyImage(const VulkanImagePtr& srcImage, const VulkanImagePtr& dstImage, VkImageAspectFlags aspectMask, uint32_t mipLevel = 0);
+    void cmdBlitImage(const VkImageBlit& imageBlit, const VulkanImagePtr& srcImage, const VulkanImagePtr& dstImage);
+    void cmdCopyBuffer(const VkBufferCopy& copyRegion, const VulkanBufferPtr& srcBuffer, const VulkanBufferPtr& dstBuffer);
+    void cmdCopyAllBuffer(const VulkanBufferPtr& srcBuffer, const VulkanBufferPtr& dstBuffer);
+    void cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage,
+                            VulkanImageBarrierInfo* imageInfo, uint32_t imageInfoCount,
+                            VulkanBufferBarrierInfo* bufferInfo, uint32_t bufferInfoCount,
+                            VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount);
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;
