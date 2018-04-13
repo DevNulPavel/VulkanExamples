@@ -549,22 +549,7 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     
     // Запуск рендер-прохода в режиме подбуфферов
     mainBuffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    
-    // Можем установить один раз, а можем устанавливать для каждого потока каждый раз
-    {
-        // Устанавливаем пайплайн у коммандного буффера
-        mainBuffer->cmdBindPipeline(vulkanPipeline);
         
-        // Привязываем вершинный буффер
-        mainBuffer->cmdBindVertexBuffer(modelVertexBuffer);
-        
-        // Привязываем индексный буффер
-        mainBuffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
-        
-        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-        mainBuffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
-    }
-    
     // Описание наследования для дочерних комманд буфферов
     VulkanCommandBufferInheritanceInfo inheritanceInfo;
     inheritanceInfo.renderPass = vulkanRenderPass;
@@ -591,6 +576,18 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
                 
                 // Продолжаем рендер-проход
                 buffer->begin(VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT, inheritanceInfo);
+
+				// Устанавливаем пайплайн у коммандного буффера
+				buffer->cmdBindPipeline(vulkanPipeline);
+
+				// Привязываем вершинный буффер
+				buffer->cmdBindVertexBuffer(modelVertexBuffer);
+
+				// Привязываем индексный буффер
+				buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
+
+				// Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+				buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
                 
                 // Push константы для динамической отрисовки
                 glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle + 15.0f*(j*THREADS_COUNT + i)), glm::vec3(0.0f, 0.0f, 1.0f));
