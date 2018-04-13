@@ -204,17 +204,21 @@ void VulkanCommandBuffer::cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkIn
 }
 
 void VulkanCommandBuffer::cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout,
+                                               const VulkanDescriptorSetPtr& set){
+    _usedObjects.insert(set);
+    
+    VkDescriptorSet vkSet = set->getSet();
+    vkCmdBindDescriptorSets(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &vkSet, 0, nullptr);
+}
+
+void VulkanCommandBuffer::cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout,
                                                const VulkanDescriptorSetPtr& set,
                                                uint32_t offset){
     _usedObjects.insert(set);
     
     VkDescriptorSet vkSet = set->getSet();
-    if (offset == 0) {
-        vkCmdBindDescriptorSets(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &vkSet, 0, nullptr);
-    }else{
-        uint32_t offsets[] = {offset};
-        vkCmdBindDescriptorSets(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &vkSet, 1, offsets);
-    }
+    uint32_t offsets[] = {offset};
+    vkCmdBindDescriptorSets(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &vkSet, 1, offsets);
 }
 
 void VulkanCommandBuffer::cmdBindDescriptorSets(const VkPipelineLayout& pipelineLayout,

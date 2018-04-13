@@ -76,7 +76,8 @@ public:
     void cmdBindVertexBuffer(const VulkanBufferPtr& buffer, VkDeviceSize offset = 0);
     void cmdBindVertexBuffers(const std::vector<VulkanBufferPtr>& buffers, const std::vector<VkDeviceSize>& offsets);
     void cmdBindIndexBuffer(const VulkanBufferPtr& buffer, VkIndexType type, VkDeviceSize offset = 0);
-    void cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout, const VulkanDescriptorSetPtr& set, uint32_t offset = 0);
+    void cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout, const VulkanDescriptorSetPtr& set);
+    void cmdBindDescriptorSet(const VkPipelineLayout& pipelineLayout, const VulkanDescriptorSetPtr& set, uint32_t offset);
     void cmdBindDescriptorSets(const VkPipelineLayout& pipelineLayout, const std::vector<VulkanDescriptorSetPtr>& sets);
     void cmdBindDescriptorSets(const VkPipelineLayout& pipelineLayout, const std::vector<VulkanDescriptorSetPtr>& sets, const std::vector<uint32_t>& offsets);
     void cmdPushConstants(const VkPipelineLayout& pipelineLayout, VkShaderStageFlags stage, const void* data, uint32_t size, uint32_t offset = 0);

@@ -475,14 +475,14 @@ void VulkanRender::createModelUniformBuffer() {
     //ubo.proj[1][1] *= -1;
     
     // Отгружаем данные
-    char* dataPtr = modelUniformStagingBuffer->map(0, bufferSize);
+    char* dataPtr = modelUniformStagingBuffer->map(bufferSize);
     memcpy(dataPtr, &ubo1, sizeof(UniformBufferObject));
     memcpy(dataPtr + modelUniformBufferDynamicAlignment, &ubo2, sizeof(UniformBufferObject));
     modelUniformStagingBuffer->unmap();
     
     // Закидываем задачу на копирование буффера
     VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(vulkanLogicalDevice, vulkanRenderCommandPool);
-    copyBuffer(commandBuffer, modelUniformStagingBuffer, modelUniformGPUBuffer);
+    commandBuffer->cmdCopyAllBuffer(modelUniformStagingBuffer, modelUniformGPUBuffer);
     endAndQueueWaitSingleTimeCommands(commandBuffer, vulkanRenderQueue);
 }
 
@@ -512,7 +512,7 @@ void VulkanRender::createModelDescriptorSet() {
     VulkanDescriptorSetUpdateConfig vertexBufferSet;
     vertexBufferSet.binding = 0; // Биндится на 0м значении в шейдере
     vertexBufferSet.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // Тип - юниформ буффер
-    vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer->getBuffer();
+    vertexBufferSet.bufferInfo.buffer = modelUniformGPUBuffer;
     vertexBufferSet.bufferInfo.offset = 0;
     vertexBufferSet.bufferInfo.range = sizeof(UniformBufferObject);
     
@@ -521,13 +521,13 @@ void VulkanRender::createModelDescriptorSet() {
     samplerSet.type = VK_DESCRIPTOR_TYPE_SAMPLER;
     samplerSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     samplerSet.imageInfo.imageView = NULL;
-    samplerSet.imageInfo.sampler = modelTextureSampler->getSampler();
+    samplerSet.imageInfo.sampler = modelTextureSampler;
 
 	VulkanDescriptorSetUpdateConfig imageSet;
 	imageSet.binding = 2; // Биндится на 1м значении в шейдере
 	imageSet.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	imageSet.imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageSet.imageInfo.imageView = modelTextureImageView->getImageView();
+	imageSet.imageInfo.imageView = modelTextureImageView;
 	imageSet.imageInfo.sampler = NULL;
     
     std::vector<VulkanDescriptorSetUpdateConfig> configs;
@@ -550,53 +550,43 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
     // Информация о запуске рендер-прохода
-    std::array<VkClearValue, 2> clearValues = {};
+    std::vector<VkClearValue> clearValues;
+    clearValues.resize(2);
     clearValues[0].color = {{0.5f, 0.5f, 0.5f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
-    
-    VkRenderPassBeginInfo renderPassInfo = {};
-    memset(&renderPassInfo, 0, sizeof(VkRenderPassBeginInfo));
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = vulkanRenderPass->getPass();   // Рендер проход
-    renderPassInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex]->getBuffer();    // Фреймбуффер смены кадров
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
-    renderPassInfo.clearValueCount = clearValues.size();
-    renderPassInfo.pClearValues = clearValues.data();
+    VulkanRenderPassBeginInfo beginInfo;
+    beginInfo.renderPass = vulkanRenderPass;
+    beginInfo.framebuffer = vulkanWindowFrameBuffers[frameIndex];
+    beginInfo.renderArea.offset = {0, 0};
+    beginInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
+    beginInfo.clearValues = clearValues;
     
     // Запуск рендер-прохода
-    // VK_SUBPASS_CONTENTS_INLINE: Команды render pass будут включены в первичный буфер команд и вторичные буферы команд не будут задействованы.
-    // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
-    vkCmdBeginRenderPass(buffer->getBuffer(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        
+    buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    
     // Устанавливаем пайплайн у коммандного буффера
-    vkCmdBindPipeline(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getPipeline());
+    buffer->cmdBindPipeline(vulkanPipeline);
     
-    // Привязываем вершинный буффер к пайлпайну
-    VkBuffer vertexBuffers[] = {modelVertexBuffer->getBuffer()};
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(buffer->getBuffer(), 0, 1, vertexBuffers, offsets);
+    // Привязываем вершинный буффер
+    buffer->cmdBindVertexBuffer(modelVertexBuffer);
     
-    // Привязываем индексный буффер к пайплайну
-    vkCmdBindIndexBuffer(buffer->getBuffer(), modelIndexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
-    
+    // Привязываем индексный буффер
+    buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
+        
     // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    VkDescriptorSet set = modelDescriptorSet->getSet();
-    uint32_t dynamicOffset = 0;
-    vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 1, &dynamicOffset);
+    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet, 0);
     
     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-    vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+    buffer->cmdDrawIndexed(modelTotalIndexesCount);
     
     // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    dynamicOffset = modelUniformBufferDynamicAlignment;
-    vkCmdBindDescriptorSets(buffer->getBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->getLayout(), 0, 1, &set, 1, &dynamicOffset);
+    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet, modelUniformBufferDynamicAlignment);
     
     // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-    vkCmdDrawIndexed(buffer->getBuffer(), modelTotalIndexesCount, 1, 0, 0, 0);
+    buffer->cmdDrawIndexed(modelTotalIndexesCount);
     
     // Заканчиваем рендер проход
-    vkCmdEndRenderPass(buffer->getBuffer());
+    buffer->cmdEndRenderPass();
     
     // Заканчиваем подготовку коммандного буффера
 	buffer->end();
