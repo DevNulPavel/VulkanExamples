@@ -14,38 +14,47 @@
 
 
 struct VulkanQueryPoolPipelineStatistics {
-	uint32_t flagsCount;
-	VkQueryPipelineStatisticFlagBits flags;
+    uint32_t flagsCount;
+    VkQueryPipelineStatisticFlagBits flags;
 
-	VulkanQueryPoolPipelineStatistics();
+    VulkanQueryPoolPipelineStatistics();
 };
 
 struct VulkanQueryPoolOcclusion {
-	uint32_t occlusionsCount;
+    uint32_t occlusionsCount;
 
-	VulkanQueryPoolOcclusion();
+    VulkanQueryPoolOcclusion();
+};
+
+struct VulkanQueryPoolTimeStamp {
+    uint32_t testCount;
+
+    VulkanQueryPoolTimeStamp();
 };
 
 
 class VulkanQueryPool {
 public:
     VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolPipelineStatistics& stat);
-	VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolOcclusion& occlusion);
+    VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolOcclusion& occlusion);
+    VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolTimeStamp& timeStamp);
     ~VulkanQueryPool();
     VkQueryPool getPool() const;
     void resetPool(const VulkanCommandBufferPtr& buffer);
     void beginPool(const VulkanCommandBufferPtr& buffer, VkQueryControlFlags flags, uint32_t index = 0);
     void endPool(const VulkanCommandBufferPtr& buffer, uint32_t index = 0);
     std::map<VkQueryPipelineStatisticFlags, uint64_t> getPoolStatResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT); // Получение результатов запросов
-	std::vector<uint64_t> getPoolOcclusionResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT); // Получение результатов запросов
-    
+    std::vector<uint64_t> getPoolOcclusionResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT);
+    std::vector<uint64_t> getPoolTimeStampResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT);
+
 private:
     VulkanLogicalDevicePtr _device;
-	VkQueryType _type;
-	union{
-		VulkanQueryPoolPipelineStatistics _pipelineStats;
-		VulkanQueryPoolOcclusion _occlusionConfig;
-	};
+    VkQueryType _type;
+    union{
+        VulkanQueryPoolPipelineStatistics _pipelineStats;
+        VulkanQueryPoolOcclusion _occlusionConfig;
+        VulkanQueryPoolTimeStamp _timeStampConfig;
+    };
     std::set<VulkanResourcePtr> _usedResources;
     VkQueryPool _pool;
     

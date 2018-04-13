@@ -54,7 +54,7 @@ void VulkanRender::init(GLFWwindow* window){
     // Получаем физическое устройство
     std::vector<const char*> vulkanInstanceValidationLayers = vulkanInstance->getValidationLayers();
     std::vector<const char*> vulkanDeviceExtensions;
-	vulkanDeviceExtensions.push_back("VK_KHR_swapchain");
+    vulkanDeviceExtensions.push_back("VK_KHR_swapchain");
     vulkanPhysicalDevice = std::make_shared<VulkanPhysicalDevice>(vulkanInstance, vulkanDeviceExtensions, vulkanInstanceValidationLayers, vulkanWindowSurface);
 
     // Создаем логическое устройство
@@ -62,12 +62,12 @@ void VulkanRender::init(GLFWwindow* window){
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
     std::vector<float> renderPriorities = {0.5f};
     VkPhysicalDeviceFeatures logicalDeviceFeatures = {};
-	if (vulkanPhysicalDevice->getPossibleDeviceFeatures().pipelineStatisticsQuery == VK_TRUE){
-		logicalDeviceFeatures.pipelineStatisticsQuery = VK_TRUE;
-	}
-	if (vulkanPhysicalDevice->getPossibleDeviceFeatures().occlusionQueryPrecise == VK_TRUE) {
-		logicalDeviceFeatures.occlusionQueryPrecise = VK_TRUE;
-	}
+    if (vulkanPhysicalDevice->getPossibleDeviceFeatures().pipelineStatisticsQuery == VK_TRUE){
+        logicalDeviceFeatures.pipelineStatisticsQuery = VK_TRUE;
+    }
+    if (vulkanPhysicalDevice->getPossibleDeviceFeatures().occlusionQueryPrecise == VK_TRUE) {
+        logicalDeviceFeatures.occlusionQueryPrecise = VK_TRUE;
+    }
     vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice,
                                                                 vulkanQueuesFamiliesIndexes,
                                                                 0.5f,
@@ -169,9 +169,9 @@ void VulkanRender::rebuildRendering(){
     // Создаем свопчейн + получаем изображения свопчейна
     VulkanQueuesFamiliesIndexes vulkanQueuesFamiliesIndexes = vulkanPhysicalDevice->getQueuesFamiliesIndexes(); // Получаем индексы семейств очередей для дальнейшего использования
     VulkanSwapChainSupportDetails vulkanSwapchainSuppportDetails = vulkanPhysicalDevice->getSwapChainSupportDetails();    // Получаем возможности свопчейна
-	VulkanSwapchainPtr newVulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, vulkanSwapchain);
-	vulkanSwapchain = nullptr;
-	vulkanSwapchain = newVulkanSwapchain;
+    VulkanSwapchainPtr newVulkanSwapchain = std::make_shared<VulkanSwapchain>(vulkanWindowSurface, vulkanLogicalDevice, vulkanQueuesFamiliesIndexes, vulkanSwapchainSuppportDetails, vulkanSwapchain);
+    vulkanSwapchain = nullptr;
+    vulkanSwapchain = newVulkanSwapchain;
     
     // Создаем текстуры для буффера глубины
     createWindowDepthResources();
@@ -201,49 +201,63 @@ void VulkanRender::rebuildRendering(){
 // Вывести статы GPU
 void VulkanRender::printGPUStats(){
     if (vulkanPipelineStatsQueryPool) {
-		LOG("Statistics for pipeline: \n");
+        LOG("Statistics for pipeline: \n");
 
         std::map<VkQueryPipelineStatisticFlags, uint64_t> stats = vulkanPipelineStatsQueryPool->getPoolStatResults();
-		for (const std::pair<VkQueryPipelineStatisticFlags, uint64_t>& info : stats) {
-			std::string text;
-			switch (info.first) {
-			case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT:
-				text = "Vertex count";
-				break;
-			case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT:
-				text = "Primitives count";
-				break;
-			case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT:
-				text = "Vertex shader call count";
-				break;
-			case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT:
-				text = "Clipping invocations";
-				break;
-			case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT:
-				text = "Clipping primitives";
-				break;
-			case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT:
-				text = "Fragment shader call count";
-				break;
-			default:
-				text = "NOTHING";
-				break;
-			}
-			LOG("-> %s: %lld\n", text.c_str(), info.second);
-		}
-		LOG("\n");
+        for (const std::pair<VkQueryPipelineStatisticFlags, uint64_t>& info : stats) {
+            std::string text;
+            switch (info.first) {
+            case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT:
+                text = "Vertex count";
+                break;
+            case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT:
+                text = "Primitives count";
+                break;
+            case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT:
+                text = "Vertex shader call count";
+                break;
+            case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT:
+                text = "Clipping invocations";
+                break;
+            case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT:
+                text = "Clipping primitives";
+                break;
+            case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT:
+                text = "Fragment shader call count";
+                break;
+            default:
+                text = "NOTHING";
+                break;
+            }
+            LOG("-> %s: %lld\n", text.c_str(), info.second);
+        }
+        LOG("\n");
     }
 
-	if (vulkanOcclusionQueryPool) {
-		LOG("Occlusions infos: \n");
+    if (vulkanOcclusionQueryPool) {
+        LOG("Occlusions infos: \n");
 
-		std::vector<uint64_t> occlusionResults = vulkanOcclusionQueryPool->getPoolOcclusionResults();
-		for (size_t i = 0; i < occlusionResults.size(); i++) {
-			LOG("-> %d: %lld\n", (int)i, occlusionResults[i]);
-		}
+        std::vector<uint64_t> occlusionResults = vulkanOcclusionQueryPool->getPoolOcclusionResults();
+        for (size_t i = 0; i < occlusionResults.size(); i++) {
+            LOG("-> %d: %lld\n", (int)i, occlusionResults[i]);
+        }
 
-		LOG("\n");
-	}
+        LOG("\n");
+    }
+
+    if (vulkanTimeStampQueryPool) {
+        LOG("Timestamp infos: \n");
+
+        //vulkanLogicalDevice->wait();
+        vulkanRenderQueue->wait();
+
+        std::vector<uint64_t> testResults = vulkanTimeStampQueryPool->getPoolTimeStampResults();
+        for (size_t i = 0; i < testResults.size(); i++) {
+            LOG("-> %d: %lld\n", (int)i, testResults[i]);
+        }
+
+        LOG("\n");
+    }
 }
 
 // Создаем буфферы для глубины
@@ -438,32 +452,39 @@ void VulkanRender::createGraphicsPipeline() {
 
 // Создание пула запроса статистики
 void VulkanRender::createQueryPool(){
+    // Stats
     if(vulkanLogicalDevice->getBaseFeatures().pipelineStatisticsQuery){
-		uint32_t flags = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
-			VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
-			VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
-			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
-			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
-			VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+        uint32_t flags = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
 
-		VulkanQueryPoolPipelineStatistics config;
-		config.flags = (VkQueryPipelineStatisticFlagBits)flags;
-		config.flagsCount = 6;
+        VulkanQueryPoolPipelineStatistics config;
+        config.flags = (VkQueryPipelineStatisticFlagBits)flags;
+        config.flagsCount = 6;
         
         vulkanPipelineStatsQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
     }
-	if (vulkanLogicalDevice->getBaseFeatures().occlusionQueryPrecise){
-		VulkanQueryPoolOcclusion config;
-		config.occlusionsCount = 2;
+    // Occlusion
+    if (vulkanLogicalDevice->getBaseFeatures().occlusionQueryPrecise){
+        VulkanQueryPoolOcclusion config;
+        config.occlusionsCount = 2;
 
-		vulkanOcclusionQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
-	}
+        vulkanOcclusionQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
+    }
+
+    // Time
+    VulkanQueryPoolTimeStamp config;
+    config.testCount = 2;
+    vulkanTimeStampQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
 }
 
 
 // Грузим данные для модели
 void VulkanRender::loadModelSrcData(){
-	LOG("Model loading started\n");
+    LOG("Model loading started\n");
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -601,14 +622,14 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     if(vulkanPipelineStatsQueryPool) {
         vulkanPipelineStatsQueryPool->resetPool(buffer);
     }
-	if (vulkanOcclusionQueryPool){
-		vulkanOcclusionQueryPool->resetPool(buffer);
-	}
+    if (vulkanOcclusionQueryPool){
+        vulkanOcclusionQueryPool->resetPool(buffer);
+    }
 
-	// Запускаем запрос пула
-	if (vulkanPipelineStatsQueryPool) {
-		vulkanPipelineStatsQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT);
-	}
+    // Запускаем запрос пула
+    if (vulkanPipelineStatsQueryPool) {
+        vulkanPipelineStatsQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT);
+    }
     
     // Информация о запуске рендер-прохода
     std::vector<VkClearValue> clearValues;
@@ -652,9 +673,12 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
     
     {
-		if (vulkanOcclusionQueryPool) {
-			vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 0);
-		}
+        if (vulkanOcclusionQueryPool) {
+            vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 0);
+        }
+        if (vulkanTimeStampQueryPool) {
+            vulkanTimeStampQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 0);
+        }
 
         // Push константы для динамической отрисовки
         glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -663,15 +687,21 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         buffer->cmdDrawIndexed(modelTotalIndexesCount);
 
-		if (vulkanOcclusionQueryPool) {
-			vulkanOcclusionQueryPool->endPool(buffer, 0);
-		}
+        if (vulkanOcclusionQueryPool) {
+            vulkanOcclusionQueryPool->endPool(buffer, 0);
+        }
+        if (vulkanTimeStampQueryPool) {
+            vulkanTimeStampQueryPool->endPool(buffer, 0);
+        }
     }
     
     {        
-		if (vulkanOcclusionQueryPool) {
-			vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 1);
-		}
+        if (vulkanOcclusionQueryPool) {
+            vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 1);
+        }
+        if (vulkanTimeStampQueryPool) {
+            vulkanTimeStampQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 1);
+        }
 
         // Push константы для динамической отрисовки
         glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -680,21 +710,24 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         buffer->cmdDrawIndexed(modelTotalIndexesCount);
 
-		if (vulkanOcclusionQueryPool) {
-			vulkanOcclusionQueryPool->endPool(buffer, 1);
-		}
+        if (vulkanOcclusionQueryPool) {
+            vulkanOcclusionQueryPool->endPool(buffer, 1);
+        }
+        if (vulkanTimeStampQueryPool) {
+            vulkanTimeStampQueryPool->endPool(buffer, 1);
+        }
     }
     
     // Заканчиваем рендер проход
     buffer->cmdEndRenderPass();
     
-	// Завершаем запрос пула
-	if (vulkanPipelineStatsQueryPool) {
-		vulkanPipelineStatsQueryPool->endPool(buffer);
-	}
+    // Завершаем запрос пула
+    if (vulkanPipelineStatsQueryPool) {
+        vulkanPipelineStatsQueryPool->endPool(buffer);
+    }
 
     // Заканчиваем подготовку коммандного буффера
-	buffer->end();
+    buffer->end();
 
 
     return buffer;
@@ -716,8 +749,8 @@ void VulkanRender::updateRender(float delta){
 void VulkanRender::drawFrame() {
 #ifdef __APPLE__
     // TODO: Помогает против подвисания на ресайзах и тд
-	vulkanRenderQueue->wait();
-	vulkanPresentQueue->wait();
+    vulkanRenderQueue->wait();
+    vulkanPresentQueue->wait();
 #endif
     
     TIME_BEGIN_OFF(DRAW_TIME);
@@ -742,13 +775,13 @@ void VulkanRender::drawFrame() {
     
     // Проверяем, совпадает ли номер картинки и индекс картинки свопчейна
     if (vulkanImageIndex != swapchainImageIndex) {
-		LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
+        LOG("Vulkan image index not equal to swapchain image index (swapchain %d, program %d)!\n", swapchainImageIndex, vulkanImageIndex);
     }
 
-	// Ожидаем доступность закидывания задач на рендеринг
-	TIME_BEGIN_OFF(WAIT_FENCE);
-	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
+    // Ожидаем доступность закидывания задач на рендеринг
+    TIME_BEGIN_OFF(WAIT_FENCE);
+    vulkanRenderFences[vulkanImageIndex]->waitAndReset();
+    TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
 
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
     TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
@@ -773,17 +806,17 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-	TIME_BEGIN_OFF(SUBMIT_TIME);
+    TIME_BEGIN_OFF(SUBMIT_TIME);
     if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
-	TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
+    TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
     
-	// Ждем доступности отображения
-	//TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
-	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	//TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
+    // Ждем доступности отображения
+    //TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
+    //vulkanPresentFences[vulkanImageIndex]->waitAndReset();
+    //TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
 
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
@@ -797,25 +830,25 @@ void VulkanRender::drawFrame() {
     presentInfo.pImageIndices = &swapchainImageIndex;
     
     // Закидываем в очередь задачу отображения картинки
-	TIME_BEGIN_OFF(PRESENT_DURATION);
+    TIME_BEGIN_OFF(PRESENT_DURATION);
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue->getQueue(), &presentInfo);
-	TIME_END_MICROSEC_OFF(PRESENT_DURATION, "Present wait time");
+    TIME_END_MICROSEC_OFF(PRESENT_DURATION, "Present wait time");
 
-	// Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
-	// TODO: Операции на семафорах - нужно ли вообще это???
-	vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapchain->getImageViews().size();
+    // Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
+    // TODO: Операции на семафорах - нужно ли вообще это???
+    vulkanImageIndex = (vulkanImageIndex + 1) % vulkanSwapchain->getImageViews().size();
 
     // В случае проблем - пересоздаем свопчейн
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
         rebuildRendering();
         return;
     } else if (presentResult != VK_SUCCESS) {
-		LOG("failed to present swap chain image!\n");
+        LOG("failed to present swap chain image!\n");
         throw std::runtime_error("failed to present swap chain image!");
     }
 
     TIME_END_MICROSEC_OFF(DRAW_TIME, "Total Draw method time");
-	//LOG("\n\n");
+    //LOG("\n\n");
 }
 
 VulkanRender::~VulkanRender(){    
