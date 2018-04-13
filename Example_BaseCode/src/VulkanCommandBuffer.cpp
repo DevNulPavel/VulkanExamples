@@ -4,6 +4,15 @@
 #include <stdexcept>
 #include "Helpers.h"
 
+VulkanCommandBufferInheritanceInfo::VulkanCommandBufferInheritanceInfo():
+    renderPass(0),
+    subpass(0),
+    framebuffer(0),
+    occlusionQueryEnable(0),
+    queryFlags(0),
+    pipelineStatistics(0){
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 VulkanRenderPassBeginInfo::VulkanRenderPassBeginInfo():
@@ -33,7 +42,7 @@ VulkanBufferBarrierInfo::VulkanBufferBarrierInfo():
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool):
+VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool, VkCommandBufferLevel level):
     _logicalDevice(logicalDevice),
     _pool(pool){
 
@@ -43,7 +52,7 @@ VulkanCommandBuffer::VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, V
     VkCommandBufferAllocateInfo allocInfo = {};
     memset(&allocInfo, 0, sizeof(VkCommandBufferAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // Первичный буффер, которыый будет исполняться сразу
+    allocInfo.level = level;  // Первичный буффер, которыый будет исполняться сразу
     allocInfo.commandPool = _pool->getPool();      // Пул комманд
     allocInfo.commandBufferCount = 1;
     
@@ -80,27 +89,42 @@ void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags) {
     VkCommandBufferBeginInfo beginInfo = {};
     memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = usageFlags; // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    beginInfo.flags = usageFlags;
+    beginInfo.pInheritanceInfo = nullptr;
     
     // Запускаем буффер комманд
     vkBeginCommandBuffer(_commandBuffer, &beginInfo);
 }
 
-void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags, const VkCommandBufferInheritanceInfo& inheritance){
+void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags, const VulkanCommandBufferInheritanceInfo& inheritance){
     // Очищаем задействованные объекты
     _usedObjects.clear();
     
-    // Параметр flags определяет, как использовать буфер команд. Возможны следующие значения:
-    // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT: Буфер команд будет перезаписан сразу после первого выполнения.
-    // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT: Это вторичный буфер команд, который будет в единственном render pass.
-    // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT: Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения.
+    // Сохраняем
+    if (inheritance.framebuffer) {
+        _usedObjects.insert(inheritance.framebuffer);
+    }
+    if (inheritance.renderPass) {
+        _usedObjects.insert(inheritance.renderPass);
+    }
+    
+    // Описание наследования для дочерних комманд буфферов
+    VkCommandBufferInheritanceInfo inheritanceInfo = {};
+    memset(&inheritanceInfo, 0, sizeof(VkCommandBufferInheritanceInfo));
+    inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+    inheritanceInfo.renderPass = inheritance.renderPass ? inheritance.renderPass->getPass() : nullptr;
+    inheritanceInfo.subpass = inheritance.subpass;
+    inheritanceInfo.framebuffer = inheritance.framebuffer ? inheritance.framebuffer->getBuffer() : nullptr;
+    inheritanceInfo.occlusionQueryEnable = inheritance.occlusionQueryEnable;
+    inheritanceInfo.queryFlags = inheritance.queryFlags;
+    inheritanceInfo.pipelineStatistics = inheritance.pipelineStatistics;
     
     // Настройки запуска коммандного буффера
     VkCommandBufferBeginInfo beginInfo = {};
     memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = usageFlags; // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-    beginInfo.pInheritanceInfo = &inheritance;
+    beginInfo.flags = usageFlags;
+    beginInfo.pInheritanceInfo = &inheritanceInfo;
     
     // Запускаем буффер комманд
 	if (vkBeginCommandBuffer(_commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -397,4 +421,18 @@ void VulkanCommandBuffer::cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, V
 void VulkanCommandBuffer::cmdUpdateBuffer(const VulkanBufferPtr& buffer, unsigned char* data, VkDeviceSize size, VkDeviceSize offset){
     _usedObjects.insert(buffer);
     vkCmdUpdateBuffer(_commandBuffer, buffer->getBuffer(), offset, size, (void*)data);
+}
+
+void VulkanCommandBuffer::cmdExecuteCommands(const std::vector<VulkanCommandBufferPtr>& buffers){
+    _usedObjects.insert(buffers.begin(), buffers.end());
+    
+    std::vector<VkCommandBuffer> vkBuffers;
+    vkBuffers.reserve(buffers.size());
+    for (const VulkanCommandBufferPtr& buf: buffers) {
+        vkBuffers.push_back(buf->getBuffer());
+    }
+    
+    // Закидываем задачи на исполнение
+    vkCmdExecuteCommands(_commandBuffer, static_cast<uint32_t>(vkBuffers.size()), vkBuffers.data());
+    
 }

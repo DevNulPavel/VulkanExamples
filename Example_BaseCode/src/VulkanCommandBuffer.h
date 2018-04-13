@@ -18,6 +18,16 @@
 #include "VulkanDescriptorSet.h"
 #include "VulkanResource.h"
 
+struct VulkanCommandBufferInheritanceInfo{
+    VulkanRenderPassPtr renderPass;
+    uint32_t subpass;
+    VulkanFrameBufferPtr framebuffer;
+    VkBool32 occlusionQueryEnable;
+    VkQueryControlFlags queryFlags;
+    VkQueryPipelineStatisticFlags pipelineStatistics;
+    
+    VulkanCommandBufferInheritanceInfo();
+};
 
 struct VulkanRenderPassBeginInfo{
     VulkanRenderPassPtr renderPass;
@@ -57,14 +67,14 @@ struct VulkanMemoryBarrierInfo{
 
 class VulkanCommandBuffer: public VulkanResource {
 public:
-    VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool);
+    VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     ~VulkanCommandBuffer();
     VkCommandBuffer getBuffer() const;
     VulkanLogicalDevicePtr getBaseDevice() const;
     VulkanCommandPoolPtr getBasePool() const;
     
     void begin(VkCommandBufferUsageFlags usageFlags);
-    void begin(VkCommandBufferUsageFlags usageFlags, const VkCommandBufferInheritanceInfo& inheritance);
+    void begin(VkCommandBufferUsageFlags usageFlags, const VulkanCommandBufferInheritanceInfo& inheritance);
     void end();
     void reset(VkCommandBufferResetFlags flags);
     
@@ -92,6 +102,7 @@ public:
                             VulkanBufferBarrierInfo* bufferInfo, uint32_t bufferInfoCount,
                             VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount);
     void cmdUpdateBuffer(const VulkanBufferPtr& buffer, unsigned char* data, VkDeviceSize size, VkDeviceSize offset = 0);
+    void cmdExecuteCommands(const std::vector<std::shared_ptr<VulkanCommandBuffer>>& buffers);
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;
