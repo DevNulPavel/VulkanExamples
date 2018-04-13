@@ -17,18 +17,20 @@ class VulkanQueryPool {
 public:
     VulkanQueryPool(VulkanLogicalDevicePtr device,
                     VkQueryPipelineStatisticFlags flags,
-                    uint32_t flagsCount);
+                    uint32_t flagsCount,
+                    uint32_t queriesCount);
     ~VulkanQueryPool();
     VkQueryPool getPool() const;
     void resetPool(const VulkanCommandBufferPtr& buffer);
-    void beginPool(const VulkanCommandBufferPtr& buffer);
-    void endPool(const VulkanCommandBufferPtr& buffer);
-    std::map<VkQueryPipelineStatisticFlags, uint64_t> getPoolResults(); // Получение результатов запросов
+    void beginPool(const VulkanCommandBufferPtr& buffer, uint32_t index, VkQueryControlFlags flags);
+    void endPool(const VulkanCommandBufferPtr& buffer, uint32_t index);
+    std::vector<std::map<VkQueryPipelineStatisticFlags, uint64_t>> getPoolResults(); // Получение результатов запросов
     
 private:
     VulkanLogicalDevicePtr _device;
     VkQueryPipelineStatisticFlags _flags;
     uint32_t _flagsCount;
+    uint32_t _queriesCount;
     std::set<VulkanResourcePtr> _usedResources;
     VkQueryPool _pool;
     
