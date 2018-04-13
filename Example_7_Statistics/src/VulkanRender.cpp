@@ -246,18 +246,24 @@ void VulkanRender::printGPUStats(){
     }
 
     if (vulkanTimeStampQueryPool) {
-        // TODO: Что с битностью у FamilyQueueProps, часть битов не значимые???
-        LOG("Timestamp infos: \n");
-
+        // Подождем пока сформируется таймстамп
         //vulkanLogicalDevice->wait();
         vulkanRenderQueue->wait();
 
-        std::vector<uint64_t> testResults = vulkanTimeStampQueryPool->getPoolTimeStampResults();
         float period = vulkanPhysicalDevice->getDeviceProperties().limits.timestampPeriod;
         uint32_t validBitscount = vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueuesTimeStampValidBits;
+        uint64_t maskValue = 0;
+        for (uint32_t i = 0; i < validBitscount; i++){
+            maskValue |= 1 << i;
+        }
+        LOG("Timestamp infos (period %f, bitsCount %d): \n", period, validBitscount);
+
+        std::vector<uint64_t> testResults = vulkanTimeStampQueryPool->getPoolTimeStampResults();
         for (size_t i = 0; i < testResults.size(); i += 2) {
-            double microsecondsValue = ((testResults[i+1] - testResults[i]) * period) / 1000.0;
-            LOG("-> %d-%d: %.1fmicroSec\n", testResults[i], testResults[i + 1], microsecondsValue);
+            uint64_t val1 = testResults[i] & maskValue;
+            uint64_t val2 = testResults[i+1] & maskValue;
+            double microsecondsValue = ((val2 - val1) * period) / 1000.0;
+            LOG("-> %d-%d: %.1fmicroSec\n", i, i + 1, microsecondsValue);
         }
 
         LOG("\n");
@@ -652,56 +658,71 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     beginInfo.renderArea.extent = vulkanSwapchain->getSwapChainExtent();
     beginInfo.clearValues = clearValues;
     
-    buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+    // Timestamp 0-1
+    {
+        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
 
-    // Запуск рендер-прохода
-    buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        // Запуск рендер-прохода
+        buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
-    
-    // Динамически изменяемый параметр в пайплайне
-    VkRect2D viewport = {};
-    memset(&viewport, 0, sizeof(VkRect2D));
-    viewport.offset = {0, 0};
-    viewport.extent = vulkanSwapchain->getSwapChainExtent();
-    buffer->cmdSetViewport(viewport);
-    
-    // Динамически изменяемый параметр в пайплайне
-    VkRect2D scissor = {};
-    memset(&scissor, 0, sizeof(VkRect2D));
-    scissor.offset = {0, 0};
-    scissor.extent = vulkanSwapchain->getSwapChainExtent();
-    buffer->cmdSetScissor(scissor);
-    
-    // Устанавливаем пайплайн у коммандного буффера
-    buffer->cmdBindPipeline(vulkanPipeline);
-    
-    // Привязываем вершинный буффер
-    buffer->cmdBindVertexBuffer(modelVertexBuffer);
-    
-    // Привязываем индексный буффер
-    buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
-    
-    // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
+        // Динамически изменяемый параметр в пайплайне
+        VkRect2D viewport = {};
+        memset(&viewport, 0, sizeof(VkRect2D));
+        viewport.offset = { 0, 0 };
+        viewport.extent = vulkanSwapchain->getSwapChainExtent();
+        buffer->cmdSetViewport(viewport);
+
+        // Динамически изменяемый параметр в пайплайне
+        VkRect2D scissor = {};
+        memset(&scissor, 0, sizeof(VkRect2D));
+        scissor.offset = { 0, 0 };
+        scissor.extent = vulkanSwapchain->getSwapChainExtent();
+        buffer->cmdSetScissor(scissor);
+
+        // Устанавливаем пайплайн у коммандного буффера
+        buffer->cmdBindPipeline(vulkanPipeline);
+
+        // Привязываем вершинный буффер
+        buffer->cmdBindVertexBuffer(modelVertexBuffer);
+
+        // Привязываем индексный буффер
+        buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
+
+        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+        buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
+
+        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+    }
     
     {
         if (vulkanOcclusionQueryPool) {
             vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 0);
         }
-        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
 
-        // Push константы для динамической отрисовки
-        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-        buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
-        
-        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-        buffer->cmdDrawIndexed(modelTotalIndexesCount);
+        // Timestamp 2-3
+        {
+            buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+
+            // Push константы для динамической отрисовки
+            glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+            buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
+
+            buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+        }
+
+        // Timestamp 4-5
+        {
+            buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+
+            // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+            buffer->cmdDrawIndexed(modelTotalIndexesCount);
+
+            buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
+        }
 
         if (vulkanOcclusionQueryPool) {
             vulkanOcclusionQueryPool->endPool(buffer, 0);
         }
-        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
     }
     
     {        
@@ -713,12 +734,8 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
         glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(1.0f, 0.0f, 0.0f));
         buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
         
-        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
-
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         buffer->cmdDrawIndexed(modelTotalIndexesCount);
-
-        buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, timeStampIndex++);
 
         if (vulkanOcclusionQueryPool) {
             vulkanOcclusionQueryPool->endPool(buffer, 1);
