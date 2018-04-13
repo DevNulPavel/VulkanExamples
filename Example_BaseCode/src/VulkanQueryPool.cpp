@@ -5,6 +5,7 @@
 #include <chrono>
 #include <array>
 #include "Helpers.h"
+#include "VulkanCommandBuffer.h"
 
 VulkanQueryPoolPipelineStatistics::VulkanQueryPoolPipelineStatistics(): flagsCount(0), flags(VK_QUERY_PIPELINE_STATISTIC_FLAG_BITS_MAX_ENUM) {
 }

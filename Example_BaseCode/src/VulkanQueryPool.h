@@ -10,7 +10,9 @@
 
 #include "VulkanResource.h"
 #include "VulkanLogicalDevice.h"
-#include "VulkanCommandBuffer.h"
+
+
+class VulkanCommandBuffer;
 
 
 struct VulkanQueryPoolPipelineStatistics {
@@ -33,16 +35,16 @@ struct VulkanQueryPoolTimeStamp {
 };
 
 
-class VulkanQueryPool {
+class VulkanQueryPool: public VulkanResource {
 public:
     VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolPipelineStatistics& stat);
     VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolOcclusion& occlusion);
     VulkanQueryPool(const VulkanLogicalDevicePtr& device, const VulkanQueryPoolTimeStamp& timeStamp);
     ~VulkanQueryPool();
     VkQueryPool getPool() const;
-    void resetPool(const VulkanCommandBufferPtr& buffer);
-    void beginPool(const VulkanCommandBufferPtr& buffer, VkQueryControlFlags flags, uint32_t index = 0);
-    void endPool(const VulkanCommandBufferPtr& buffer, uint32_t index = 0);
+    void resetPool(const std::shared_ptr<VulkanCommandBuffer>& buffer);
+    void beginPool(const std::shared_ptr<VulkanCommandBuffer>& buffer, VkQueryControlFlags flags, uint32_t index = 0);
+    void endPool(const std::shared_ptr<VulkanCommandBuffer>& buffer, uint32_t index = 0);
     std::map<VkQueryPipelineStatisticFlags, uint64_t> getPoolStatResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT); // Получение результатов запросов
     std::vector<uint64_t> getPoolOcclusionResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT);
     std::vector<uint64_t> getPoolTimeStampResults(VkQueryResultFlagBits flags = VK_QUERY_RESULT_WAIT_BIT);

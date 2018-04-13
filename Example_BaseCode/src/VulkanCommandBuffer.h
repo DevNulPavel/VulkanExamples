@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanResource.h"
+#include "VulkanResource.h"
 #include "VulkanLogicalDevice.h"
 #include "VulkanCommandPool.h"
 #include "VulkanRenderPass.h"
@@ -16,7 +17,9 @@
 #include "VulkanPipeline.h"
 #include "VulkanBuffer.h"
 #include "VulkanDescriptorSet.h"
-#include "VulkanResource.h"
+#include "VulkanQueryPool.h"
+
+
 
 struct VulkanCommandBufferInheritanceInfo{
     VulkanRenderPassPtr renderPass;
@@ -65,6 +68,7 @@ struct VulkanMemoryBarrierInfo{
     // TODO: Дописать
 };
 
+
 class VulkanCommandBuffer: public VulkanResource {
 public:
     VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
@@ -103,7 +107,8 @@ public:
                             VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount);
     void cmdUpdateBuffer(const VulkanBufferPtr& buffer, unsigned char* data, VkDeviceSize size, VkDeviceSize offset = 0);
     void cmdExecuteCommands(const std::vector<std::shared_ptr<VulkanCommandBuffer>>& buffers);
-    
+    void cmdWriteTimeStamp(VkPipelineStageFlagBits stage, const VulkanQueryPoolPtr& pool, uint32_t query);
+
 private:
     VulkanLogicalDevicePtr _logicalDevice;
     VulkanCommandPoolPtr _pool;

@@ -244,11 +244,12 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
     // Подбираем информацию об очередях
     int i = 0;
     for (const VkQueueFamilyProperties& queueFamily: queueFamilies) {
-        
+
         // Для группы очередей отрисовки проверяем, что там есть очереди + есть очередь отрисовки
         if ((queueFamily.queueCount > 0) && (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
             result.renderQueuesFamilyIndex = i;
             result.renderQueuesFamilyQueuesCount = queueFamily.queueCount;
+            result.renderQueuesTimeStampValidBits = queueFamily.timestampValidBits;
         }
         
         // Провеяем, может является ли данная очередь - очередью отображения
@@ -257,6 +258,7 @@ VulkanQueuesFamiliesIndexes VulkanPhysicalDevice::findQueueFamiliesIndexInDevice
         if ((queueFamily.queueCount > 0) && presentSupport) {
             result.presentQueuesFamilyIndex = i;
             result.presentQueuesFamilyQueuesCount = queueFamily.queueCount;
+            result.presentQueuesTimeStampValidBits = queueFamily.timestampValidBits;
         }
         
         // Нашли очереди
