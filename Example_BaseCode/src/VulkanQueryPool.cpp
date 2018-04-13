@@ -86,15 +86,19 @@ void VulkanQueryPool::resetPool(const VulkanCommandBufferPtr& buffer){
     _usedResources.clear();
 
     switch (_type) {
-    case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
-        vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _pipelineStats.flagsCount);
-    }break;
-    case VK_QUERY_TYPE_OCCLUSION: {
-        vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _occlusionConfig.occlusionsCount);
-    }break;
-    case VK_QUERY_TYPE_TIMESTAMP: {
-        vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _timeStampConfig.testCount);
-    }break;
+        case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
+            vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _pipelineStats.flagsCount);
+        }break;
+        case VK_QUERY_TYPE_OCCLUSION: {
+            vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _occlusionConfig.occlusionsCount);
+        }break;
+        case VK_QUERY_TYPE_TIMESTAMP: {
+            vkCmdResetQueryPool(buffer->getBuffer(), _pool, 0, _timeStampConfig.testCount);
+        }break;
+        default:{
+            LOG("Invalid query type!\n");
+            throw std::runtime_error("Failed to create query pool");
+        }break;
     }
 }
 
@@ -102,29 +106,37 @@ void VulkanQueryPool::beginPool(const VulkanCommandBufferPtr& buffer, VkQueryCon
     _usedResources.insert(buffer);
 
     switch (_type) {
-    case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
-        vkCmdBeginQuery(buffer->getBuffer(), _pool, 0, flags);
-    }break;
-    case VK_QUERY_TYPE_OCCLUSION: {
-        vkCmdBeginQuery(buffer->getBuffer(), _pool, index, flags);
-    }break;
-    case VK_QUERY_TYPE_TIMESTAMP: {
-        vkCmdBeginQuery(buffer->getBuffer(), _pool, index, flags);
-    }break;
+        case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
+            vkCmdBeginQuery(buffer->getBuffer(), _pool, 0, flags);
+        }break;
+        case VK_QUERY_TYPE_OCCLUSION: {
+            vkCmdBeginQuery(buffer->getBuffer(), _pool, index, flags);
+        }break;
+        case VK_QUERY_TYPE_TIMESTAMP: {
+            vkCmdBeginQuery(buffer->getBuffer(), _pool, index, flags);
+        }break;
+        default:{
+            LOG("Invalid query type!\n");
+            throw std::runtime_error("Failed to create query pool");
+        }break;
     }
 }
 
 void VulkanQueryPool::endPool(const VulkanCommandBufferPtr& buffer, uint32_t index){
     switch (_type) {
-    case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
-        vkCmdEndQuery(buffer->getBuffer(), _pool, 0);
-    }break;
-    case VK_QUERY_TYPE_OCCLUSION: {
-        vkCmdEndQuery(buffer->getBuffer(), _pool, index);
-    }break;
-    case VK_QUERY_TYPE_TIMESTAMP: {
-        vkCmdEndQuery(buffer->getBuffer(), _pool, index);
-    }break;
+        case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
+            vkCmdEndQuery(buffer->getBuffer(), _pool, 0);
+        }break;
+        case VK_QUERY_TYPE_OCCLUSION: {
+            vkCmdEndQuery(buffer->getBuffer(), _pool, index);
+        }break;
+        case VK_QUERY_TYPE_TIMESTAMP: {
+            vkCmdEndQuery(buffer->getBuffer(), _pool, index);
+        }break;
+        default:{
+            LOG("Invalid query type!\n");
+            throw std::runtime_error("Failed to create query pool");
+        }break;
     }
 }
 

@@ -263,7 +263,7 @@ void VulkanRender::printGPUStats(){
             uint64_t val1 = testResults[i] & maskValue;
             uint64_t val2 = testResults[i+1] & maskValue;
             double microsecondsValue = ((val2 - val1) * period) / 1000.0;
-            LOG("-> %d-%d: %.1fmicroSec\n", i, i + 1, microsecondsValue);
+            LOG("-> %d-%d: %.0f microSec\n", (int)i, (int)i + 1, microsecondsValue);
         }
 
         LOG("\n");
