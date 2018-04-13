@@ -78,7 +78,8 @@ public:
     VulkanShaderModulePtr vulkanVertexModule;
     VulkanShaderModulePtr vulkanFragmentModule;
     VulkanPipelinePtr vulkanPipeline;
-    VulkanQueryPoolPtr vulkanQueryPool;
+    VulkanQueryPoolPtr vulkanPipelineStatsQueryPool;
+	VulkanQueryPoolPtr vulkanOcclusionQueryPool;
     
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;

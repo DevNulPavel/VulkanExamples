@@ -65,6 +65,9 @@ void VulkanRender::init(GLFWwindow* window){
 	if (vulkanPhysicalDevice->getPossibleDeviceFeatures().pipelineStatisticsQuery == VK_TRUE){
 		logicalDeviceFeatures.pipelineStatisticsQuery = VK_TRUE;
 	}
+	if (vulkanPhysicalDevice->getPossibleDeviceFeatures().occlusionQueryPrecise == VK_TRUE) {
+		logicalDeviceFeatures.occlusionQueryPrecise = VK_TRUE;
+	}
     vulkanLogicalDevice = std::make_shared<VulkanLogicalDevice>(vulkanPhysicalDevice,
                                                                 vulkanQueuesFamiliesIndexes,
                                                                 0.5f,
@@ -197,41 +200,50 @@ void VulkanRender::rebuildRendering(){
 
 // Вывести статы GPU
 void VulkanRender::printGPUStats(){
-    if (vulkanQueryPool) {
-        std::vector<std::map<VkQueryPipelineStatisticFlags, uint64_t>> stats = vulkanQueryPool->getPoolResults();
-        for (size_t i = 0; i < stats.size(); i++) {
-            for (const std::pair<VkQueryPipelineStatisticFlags, uint64_t>& info: stats[i]) {
-                LOG("Info for querry %d\n", (int)i);
-                
-                std::string text;
-                switch (info.first) {
-                    case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT:
-                        text = "Vertex count";
-                        break;
-                    case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT:
-                        text = "Primitives count";
-                        break;
-                    case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT:
-                        text = "Vertex shader call count";
-                        break;
-                    case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT:
-                        text = "Clipping invocations";
-                        break;
-                    case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT:
-                        text = "Clipping primitives";
-                        break;
-                    case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT:
-                        text = "Fragment shader call count";
-                        break;
-                    default:
-                        text = "NOTHING";
-                        break;
-                }
-                LOG("-> %s: %lld\n", text.c_str(), info.second);
-            }
-            LOG("\n");
-        }
+    if (vulkanPipelineStatsQueryPool) {
+		LOG("Statistics for pipeline: \n");
+
+        std::map<VkQueryPipelineStatisticFlags, uint64_t> stats = vulkanPipelineStatsQueryPool->getPoolStatResults();
+		for (const std::pair<VkQueryPipelineStatisticFlags, uint64_t>& info : stats) {
+			std::string text;
+			switch (info.first) {
+			case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT:
+				text = "Vertex count";
+				break;
+			case VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT:
+				text = "Primitives count";
+				break;
+			case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT:
+				text = "Vertex shader call count";
+				break;
+			case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT:
+				text = "Clipping invocations";
+				break;
+			case VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT:
+				text = "Clipping primitives";
+				break;
+			case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT:
+				text = "Fragment shader call count";
+				break;
+			default:
+				text = "NOTHING";
+				break;
+			}
+			LOG("-> %s: %lld\n", text.c_str(), info.second);
+		}
+		LOG("\n");
     }
+
+	if (vulkanOcclusionQueryPool) {
+		LOG("Occlusions infos: \n");
+
+		std::vector<uint64_t> occlusionResults = vulkanOcclusionQueryPool->getPoolOcclusionResults();
+		for (size_t i = 0; i < occlusionResults.size(); i++) {
+			LOG("-> %d: %lld\n", (int)i, occlusionResults[i]);
+		}
+
+		LOG("\n");
+	}
 }
 
 // Создаем буфферы для глубины
@@ -427,15 +439,25 @@ void VulkanRender::createGraphicsPipeline() {
 // Создание пула запроса статистики
 void VulkanRender::createQueryPool(){
     if(vulkanLogicalDevice->getBaseFeatures().pipelineStatisticsQuery){
-        VkQueryPipelineStatisticFlags flags = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
-        VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
-        VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
-        VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
-        VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
-        VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+		uint32_t flags = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+			VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+			VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
+			VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+
+		VulkanQueryPoolPipelineStatistics config;
+		config.flags = (VkQueryPipelineStatisticFlagBits)flags;
+		config.flagsCount = 6;
         
-        vulkanQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, flags, 6, 2);
+        vulkanPipelineStatsQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
     }
+	if (vulkanLogicalDevice->getBaseFeatures().occlusionQueryPrecise){
+		VulkanQueryPoolOcclusion config;
+		config.occlusionsCount = 2;
+
+		vulkanOcclusionQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
+	}
 }
 
 
@@ -576,9 +598,17 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT); // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     
     // Сбрасываем пул
-    if(vulkanQueryPool) {
-        vulkanQueryPool->resetPool(buffer);
+    if(vulkanPipelineStatsQueryPool) {
+        vulkanPipelineStatsQueryPool->resetPool(buffer);
     }
+	if (vulkanOcclusionQueryPool){
+		vulkanOcclusionQueryPool->resetPool(buffer);
+	}
+
+	// Запускаем запрос пула
+	if (vulkanPipelineStatsQueryPool) {
+		vulkanPipelineStatsQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT);
+	}
     
     // Информация о запуске рендер-прохода
     std::vector<VkClearValue> clearValues;
@@ -622,48 +652,50 @@ VulkanCommandBufferPtr VulkanRender::makeModelCommandBuffer(uint32_t frameIndex)
     buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
     
     {
-        // Запускаем запрос пула
-        if (vulkanQueryPool) {
-            vulkanQueryPool->beginPool(buffer, 0, VK_QUERY_CONTROL_PRECISE_BIT);
-        }
-        
+		if (vulkanOcclusionQueryPool) {
+			vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 0);
+		}
+
         // Push константы для динамической отрисовки
         glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
         buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
         
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         buffer->cmdDrawIndexed(modelTotalIndexesCount);
-        
-        // Завершаем запрос пула
-        if (vulkanQueryPool) {
-            vulkanQueryPool->endPool(buffer, 0);
-        }
+
+		if (vulkanOcclusionQueryPool) {
+			vulkanOcclusionQueryPool->endPool(buffer, 0);
+		}
     }
     
-    {
-        // Запускаем запрос пула
-        if (vulkanQueryPool) {
-            vulkanQueryPool->beginPool(buffer, 1, VK_QUERY_CONTROL_PRECISE_BIT);
-        }
-        
+    {        
+		if (vulkanOcclusionQueryPool) {
+			vulkanOcclusionQueryPool->beginPool(buffer, VK_QUERY_CONTROL_PRECISE_BIT, 1);
+		}
+
         // Push константы для динамической отрисовки
-        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(1.0f, 0.0f, 0.0f));
         buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
         
         // Вызов поиндексной отрисовки - индексы вершин, один инстанс
         buffer->cmdDrawIndexed(modelTotalIndexesCount);
-        
-        // Завершаем запрос пула
-        if (vulkanQueryPool) {
-            vulkanQueryPool->endPool(buffer, 1);
-        }
+
+		if (vulkanOcclusionQueryPool) {
+			vulkanOcclusionQueryPool->endPool(buffer, 1);
+		}
     }
     
     // Заканчиваем рендер проход
     buffer->cmdEndRenderPass();
     
+	// Завершаем запрос пула
+	if (vulkanPipelineStatsQueryPool) {
+		vulkanPipelineStatsQueryPool->endPool(buffer);
+	}
+
     // Заканчиваем подготовку коммандного буффера
 	buffer->end();
+
 
     return buffer;
 }

@@ -107,6 +107,8 @@ int local_main(int argc, char** argv) {
                     (double)std::chrono::duration_cast<std::chrono::microseconds>(drawCallDuration).count() / 1000.0,
                     (double)std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0 );
             glfwSetWindowTitle(window, outText);
+
+			VulkanRender::getInstance()->printGPUStats();
         }
    }
         
