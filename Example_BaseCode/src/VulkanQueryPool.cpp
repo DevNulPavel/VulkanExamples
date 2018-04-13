@@ -44,6 +44,8 @@ void VulkanQueryPool::resetPool(const VulkanCommandBufferPtr& buffer){
 }
 
 void VulkanQueryPool::beginPool(const VulkanCommandBufferPtr& buffer){
+    //_usedResources.insert(buffer);
+    
     // Start capture of pipeline statistics
     vkCmdBeginQuery(buffer->getBuffer(), _pool, 0, VK_QUERY_CONTROL_PRECISE_BIT);
 }
@@ -51,6 +53,8 @@ void VulkanQueryPool::beginPool(const VulkanCommandBufferPtr& buffer){
 void VulkanQueryPool::endPool(const VulkanCommandBufferPtr& buffer){
     // End capture of pipeline statistics
     vkCmdEndQuery(buffer->getBuffer(), _pool, 0);
+    
+    //_usedResources.erase(buffer);
 }
 
 // Получение результатов запросов

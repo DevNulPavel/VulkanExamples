@@ -16,6 +16,7 @@
 #include "VulkanPipeline.h"
 #include "VulkanBuffer.h"
 #include "VulkanDescriptorSet.h"
+#include "VulkanResource.h"
 
 
 struct VulkanRenderPassBeginInfo{
@@ -54,7 +55,7 @@ struct VulkanMemoryBarrierInfo{
     // TODO: Дописать
 };
 
-class VulkanCommandBuffer {
+class VulkanCommandBuffer: public VulkanResource {
 public:
     VulkanCommandBuffer(VulkanLogicalDevicePtr logicalDevice, VulkanCommandPoolPtr pool);
     ~VulkanCommandBuffer();
@@ -89,6 +90,7 @@ public:
                             VulkanImageBarrierInfo* imageInfo, uint32_t imageInfoCount,
                             VulkanBufferBarrierInfo* bufferInfo, uint32_t bufferInfoCount,
                             VulkanMemoryBarrierInfo* memoryInfo, uint32_t memoryInfoCount);
+    void cmdUpdateBuffer(const VulkanBufferPtr& buffer, unsigned char* data, VkDeviceSize size, VkDeviceSize offset = 0);
     
 private:
     VulkanLogicalDevicePtr _logicalDevice;

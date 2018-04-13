@@ -390,3 +390,7 @@ void VulkanCommandBuffer::cmdPipelineBarrier(VkPipelineStageFlagBits srcStage, V
                          imageBarriers.size(), (imageBarriers.size() > 0) ? imageBarriers.data() : nullptr);
 }
 
+void VulkanCommandBuffer::cmdUpdateBuffer(const VulkanBufferPtr& buffer, unsigned char* data, VkDeviceSize size, VkDeviceSize offset){
+    _usedObjects.insert(buffer);
+    vkCmdUpdateBuffer(_commandBuffer, buffer->getBuffer(), offset, size, (void*)data);
+}

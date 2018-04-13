@@ -2,6 +2,7 @@
 #define VULKAN_QUERY_POOL_H
 
 #include <memory>
+#include <set>
 
 // GLFW include
 #define GLFW_INCLUDE_VULKAN
@@ -9,6 +10,7 @@
 
 #include "VulkanLogicalDevice.h"
 #include "VulkanCommandBuffer.h"
+#include "VulkanResource.h"
 
 
 class VulkanQueryPool {
@@ -27,6 +29,7 @@ private:
     VulkanLogicalDevicePtr _device;
     VkQueryPipelineStatisticFlags _flags;
     uint32_t _flagsCount;
+    std::set<VulkanResourcePtr> _usedResources;
     VkQueryPool _pool;
     
 private:
