@@ -64,15 +64,15 @@ macro(spirv_cross_add_library name config_name)
       PUBLIC_HEADERS "${hdrs}")
   target_compile_options(${name} PRIVATE ${spirv-compiler-options})
   target_compile_definitions(${name} PRIVATE ${spirv-compiler-defines})
-  install(TARGETS ${name}
-      EXPORT ${config_name}Config
-      RUNTIME DESTINATION bin
-      LIBRARY DESTINATION lib
-      ARCHIVE DESTINATION lib
-      PUBLIC_HEADER DESTINATION include/spirv_cross)
-  install(FILES ${hdrs} DESTINATION include/spirv_cross)
-  install(EXPORT ${config_name}Config DESTINATION share/${config_name}/cmake)
-  export(TARGETS ${targets} FILE ${config_name}Config.cmake)
+  # install(TARGETS ${name}
+      # EXPORT ${config_name}Config
+      # RUNTIME DESTINATION bin
+      # LIBRARY DESTINATION lib
+      # ARCHIVE DESTINATION lib
+      # PUBLIC_HEADER DESTINATION include/spirv_cross)
+  # install(FILES ${hdrs} DESTINATION include/spirv_cross)
+  # install(EXPORT ${config_name}Config DESTINATION share/${config_name}/cmake)
+  # export(TARGETS ${targets} FILE ${config_name}Config.cmake)
 endmacro()
 
 

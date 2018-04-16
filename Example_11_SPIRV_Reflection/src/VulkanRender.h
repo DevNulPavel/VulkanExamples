@@ -29,6 +29,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
+#include "VulkanReflection.h"
 
 #include "Vertex.h"
 #include "UniformBuffer.h"

@@ -100,9 +100,20 @@ message("******** Source libraries search ***********")
 message("SPIRV-Cross added")
 option(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS "Instead of throwing exceptions assert" OFF)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross/include")
-set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross")
 set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} spirv-cross-core)
+
+
+##############
+# SPIRV-Reflect library
+# Устанавливаем нужные нам настройки
+message("SPIRV-Reflect added")
+set(VULKAN_DIR "${VULKAN_INCLUDE_DIR}/..")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_reflect")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_reflect" ${SPIRV_REFLECT_SPIRV_HEADERS_DIR})
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_reflect" ${SPIRV_REFLECT_SPIRV_HEADERS_DIR})
+set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} spirv-reflect)
 
 
 ##############
@@ -216,6 +227,8 @@ print_current_cmake_config()
 set(ALL_SOURCES 
     src/VulkanHelpers.h
     src/VulkanHelpers.cpp
+    src/VulkanReflection.h
+    src/VulkanReflection.cpp
     src/VulkanResource.h
     src/VulkanInstance.h
     src/VulkanInstance.cpp
