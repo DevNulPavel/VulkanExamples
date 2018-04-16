@@ -95,6 +95,17 @@ endif()
 message("******** Source libraries search ***********")
 
 ##############
+# SPIRV-Cross library
+# Устанавливаем нужные нам настройки
+message("SPIRV-Cross added")
+option(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS "Instead of throwing exceptions assert" OFF)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross/include")
+set(VULKAN_BASE_LIBRARY_INCLUDES ${VULKAN_BASE_LIBRARY_INCLUDES} "${CMAKE_CURRENT_SOURCE_DIR}/libs/spirv_cross/include")
+set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} spirv-cross-core)
+
+
+##############
 # GLM library (Header Only mode)
 message("GLM added")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/glm")
