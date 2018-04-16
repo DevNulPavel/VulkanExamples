@@ -49,6 +49,8 @@ public:
     void updateRender(float delta);
     // Непосредственно отрисовка кадра
     void drawFrame();
+    // Вывести статы GPU
+    void printGPUStats();
     
 private:
     VulkanRender();
@@ -76,6 +78,7 @@ public:
     VulkanShaderModulePtr vulkanVertexModule;
     VulkanShaderModulePtr vulkanFragmentModule;
     VulkanPipelinePtr vulkanPipeline;
+    VulkanQueryPoolPtr vulkanTimeStampQueryPool;
     
     VulkanImagePtr modelTextureImage;
     VulkanImageViewPtr modelTextureImageView;
@@ -115,6 +118,8 @@ private:
     void loadShaders();
     // Создание пайплайна отрисовки
     void createGraphicsPipeline();
+    // Создание пула запроса статистики
+    void createQueryPool();
     
     // Грузим данные для модели
     void loadModelSrcData();

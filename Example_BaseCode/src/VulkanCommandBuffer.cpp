@@ -438,7 +438,9 @@ void VulkanCommandBuffer::cmdExecuteCommands(const std::vector<VulkanCommandBuff
 }
 
 void VulkanCommandBuffer::cmdWriteTimeStamp(VkPipelineStageFlagBits stage, const VulkanQueryPoolPtr& pool, uint32_t query) {
-    _usedObjects.insert(pool);
-
-    vkCmdWriteTimestamp(_commandBuffer, stage, pool->getPool(), query);
+    if (pool) {
+        _usedObjects.insert(pool);
+        
+        vkCmdWriteTimestamp(_commandBuffer, stage, pool->getPool(), query);
+    }
 }

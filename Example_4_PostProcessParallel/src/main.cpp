@@ -85,7 +85,7 @@ int local_main(int argc, char** argv) {
         //TIME_BEGIN(SLEEP_TEST);
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
             // Низкая точность на винде
-            //sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
+            sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
         }
         //TIME_END_MICROSEC(SLEEP_TEST, "Sleep time");
         
@@ -103,6 +103,8 @@ int local_main(int argc, char** argv) {
                     (double)std::chrono::duration_cast<std::chrono::microseconds>(drawCallDuration).count() / 1000.0,
                     (double)std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0 );
             glfwSetWindowTitle(window, outText);
+            
+            VulkanRender::getInstance()->printGPUStats();
         }
    }
         

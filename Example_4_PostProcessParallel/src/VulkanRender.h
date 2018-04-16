@@ -50,6 +50,8 @@ public:
     void updateRender(float delta);
     // Непосредственно отрисовка кадра
     void drawFrame();
+    // Вывести статы GPU
+    void printGPUStats();
     
 private:
     VulkanRender();
@@ -74,6 +76,7 @@ public:
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
     std::vector<VulkanCommandBufferPtr> vulkanModelDrawCommandBuffers;
     std::vector<VulkanCommandBufferPtr> vulkanPostDrawCommandBuffers;
+    VulkanQueryPoolPtr vulkanTimeStampQueryPool;
     
     VulkanImagePtr postImage;
     VulkanImageViewPtr postImageView;
@@ -127,6 +130,8 @@ private:
     void createPostDepthResources();
     // Создание рендер прохода
     void createRenderToWindowsRenderPass();
+    // Создание пула запроса статистики
+    void createQueryPool();
     
     // Создаем картинки для отрисовки в текстуру
     void createPostImageAndView();

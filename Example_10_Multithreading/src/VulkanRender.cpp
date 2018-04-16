@@ -122,6 +122,9 @@ void VulkanRender::init(GLFWwindow* window){
     // Создание пайплайна отрисовки
     createGraphicsPipeline();
     
+    // Создание пула запроса статистики
+    createQueryPool();
+    
     // Грузим текстуру
     modelTextureImage = createTextureImage(vulkanLogicalDevice, vulkanRenderQueue, vulkanMainRenderCommandPool, "static_res/textures/chalet.jpg");
     
@@ -198,6 +201,33 @@ void VulkanRender::rebuildRendering(){
     
     // Обнуляем индекс отрисовки
     vulkanImageIndex = 0;
+}
+
+// Вывести статы GPU
+void VulkanRender::printGPUStats(){
+    if (vulkanTimeStampQueryPool) {
+        // Подождем пока сформируется таймстамп
+        //vulkanLogicalDevice->wait();
+        vulkanRenderQueue->wait();
+        
+        float period = vulkanPhysicalDevice->getDeviceProperties().limits.timestampPeriod;
+        uint32_t validBitscount = vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueuesTimeStampValidBits;
+        uint64_t maskValue = 0;
+        for (uint32_t i = 0; i < validBitscount; i++){
+            maskValue |= 1 << i;
+        }
+        LOG("Timestamp infos (period %f, bitsCount %d): \n", period, validBitscount);
+        
+        std::vector<uint64_t> testResults = vulkanTimeStampQueryPool->getPoolTimeStampResults();
+        for (size_t i = 0; i < testResults.size(); i += 2) {
+            uint64_t val1 = testResults[i] & maskValue;
+            uint64_t val2 = testResults[i+1] & maskValue;
+            double microsecondsValue = ((val2 - val1) * period) / 1000.0;
+            LOG("-> %d-%d: %.0f microSec\n", (int)i, (int)i + 1, microsecondsValue);
+        }
+        
+        LOG("\n");
+    }
 }
 
 // Создаем буфферы для глубины
@@ -389,6 +419,16 @@ void VulkanRender::createGraphicsPipeline() {
                                                       dynamicStates);
 }
 
+// Создание пула запроса статистики
+void VulkanRender::createQueryPool(){
+    // Time
+    if (vulkanPhysicalDevice->getDeviceProperties().limits.timestampComputeAndGraphics &&
+        (vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueuesTimeStampValidBits > 0)) {
+        VulkanQueryPoolTimeStamp config;
+        config.testCount = 1 * 2;
+        vulkanTimeStampQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
+    }
+}
 
 // Грузим данные для модели
 void VulkanRender::loadModelSrcData(){
@@ -535,6 +575,8 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     // Продолжаем рендер-проход
     mainBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
+    mainBuffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, 0);
+    
     // Информация о запуске рендер-прохода
     std::vector<VkClearValue> clearValues;
     clearValues.resize(2);
@@ -616,6 +658,8 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     // Заканчиваем рендер проход
     mainBuffer->cmdEndRenderPass();
     
+    mainBuffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vulkanTimeStampQueryPool, 1);
+    
     // Заканчиваем подготовку коммандного буффера
 	mainBuffer->end();
 
@@ -642,10 +686,10 @@ void VulkanRender::drawFrame() {
 	vulkanPresentQueue->wait();
 #endif
     
-    TIME_BEGIN(DRAW_TIME);
+    TIME_BEGIN_OFF(DRAW_TIME);
 
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
-    TIME_BEGIN(NEXT_IMAGE_TIME);
+    TIME_BEGIN_OFF(NEXT_IMAGE_TIME);
     uint32_t swapchainImageIndex = 0;    // Индекс картинки свопчейна
     VkResult result = vkAcquireNextImageKHR(vulkanLogicalDevice->getDevice(),
                                             vulkanSwapchain->getSwapchain(),
@@ -653,7 +697,7 @@ void VulkanRender::drawFrame() {
                                             vulkanImageAvailableSemaphore->getSemafore(), // Семафор ожидания доступной картинки
                                             /*vulkanPresentFences[vulkanImageIndex]->getFence()*/ VK_NULL_HANDLE,
                                             &swapchainImageIndex);
-    TIME_END_MICROSEC(NEXT_IMAGE_TIME, "Next image index wait time");
+    TIME_END_MICROSEC_OFF(NEXT_IMAGE_TIME, "Next image index wait time");
     
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         rebuildRendering();
@@ -668,15 +712,15 @@ void VulkanRender::drawFrame() {
     }
 
 	// Ожидаем доступность закидывания задач на рендеринг
-	TIME_BEGIN(WAIT_FENCE);
+	TIME_BEGIN_OFF(WAIT_FENCE);
 	vulkanRenderFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC(WAIT_FENCE, "Fence render wait time");
+	TIME_END_MICROSEC_OFF(WAIT_FENCE, "Fence render wait time");
 
     //VkCommandBuffer drawBuffer = modelDrawCommandBuffers[vulkanImageIndex]->getBuffer();
-    TIME_BEGIN(MAKE_MODEL_DRAW_BUFFER);
+    TIME_BEGIN_OFF(MAKE_MODEL_DRAW_BUFFER);
     VulkanCommandBufferPtr buffer = updateModelCommandBuffer(vulkanImageIndex);
     VkCommandBuffer drawBuffer = buffer->getBuffer();
-    TIME_END_MICROSEC(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
+    TIME_END_MICROSEC_OFF(MAKE_MODEL_DRAW_BUFFER, "Make model draw buffer wait time");
 
     // Настраиваем отправление в очередь комманд отрисовки
     VkSemaphore waitSemaphores[] = {vulkanImageAvailableSemaphore->getSemafore()}; // Семафор ожидания картинки для вывода туда графики
@@ -694,17 +738,17 @@ void VulkanRender::drawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
     
     // Кидаем в очередь задачу на отрисовку с указанным коммандным буффером
-	TIME_BEGIN(SUBMIT_TIME);
+	TIME_BEGIN_OFF(SUBMIT_TIME);
     if (vkQueueSubmit(vulkanRenderQueue->getQueue(), 1, &submitInfo, vulkanRenderFences[vulkanImageIndex]->getFence()/*VK_NULL_HANDLE*/) != VK_SUCCESS) {
         LOG("Failed to submit draw command buffer!\n");
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
-	TIME_END_MICROSEC(SUBMIT_TIME, "Submit wait time");
+	TIME_END_MICROSEC_OFF(SUBMIT_TIME, "Submit wait time");
     
 	// Ждем доступности отображения
-	TIME_BEGIN(WAIT_FENCE_PRESENT);
+	TIME_BEGIN_OFF(WAIT_FENCE_PRESENT);
 	//vulkanPresentFences[vulkanImageIndex]->waitAndReset();
-	TIME_END_MICROSEC(WAIT_FENCE_PRESENT, "Present fence wait time");
+	TIME_END_MICROSEC_OFF(WAIT_FENCE_PRESENT, "Present fence wait time");
     
     // Настраиваем задачу отображения полученного изображения
     VkSwapchainKHR swapChains[] = {vulkanSwapchain->getSwapchain()};
@@ -718,9 +762,9 @@ void VulkanRender::drawFrame() {
     presentInfo.pImageIndices = &swapchainImageIndex;
     
     // Закидываем в очередь задачу отображения картинки
-	TIME_BEGIN(PRESENT_DURATION);
+	TIME_BEGIN_OFF(PRESENT_DURATION);
     VkResult presentResult = vkQueuePresentKHR(vulkanPresentQueue->getQueue(), &presentInfo);
-	TIME_END_MICROSEC(PRESENT_DURATION, "Present wait time");
+	TIME_END_MICROSEC_OFF(PRESENT_DURATION, "Present wait time");
 
 	// Можно не получать индекс, а просто делать как в Metal, либо на всякий случай получить индекс на старте
 	// TODO: Операции на семафорах - нужно ли вообще это???
@@ -735,8 +779,8 @@ void VulkanRender::drawFrame() {
         throw std::runtime_error("failed to present swap chain image!");
     }
 
-    TIME_END_MICROSEC(DRAW_TIME, "Total Draw method time");
-	LOG("\n\n");
+    TIME_END_MICROSEC_OFF(DRAW_TIME, "Total Draw method time");
+	//LOG("\n\n");
 }
 
 VulkanRender::~VulkanRender(){    

@@ -185,6 +185,33 @@ void VulkanRender::rebuildRendering(){
     vulkanImageIndex = 0;
 }
 
+// Вывести статы GPU
+void VulkanRender::printGPUStats(){
+    if (vulkanTimeStampQueryPool) {
+        // Подождем пока сформируется таймстамп
+        //vulkanLogicalDevice->wait();
+        vulkanRenderQueue->wait();
+        
+        float period = vulkanPhysicalDevice->getDeviceProperties().limits.timestampPeriod;
+        uint32_t validBitscount = vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueuesTimeStampValidBits;
+        uint64_t maskValue = 0;
+        for (uint32_t i = 0; i < validBitscount; i++){
+            maskValue |= 1 << i;
+        }
+        LOG("Timestamp infos (period %f, bitsCount %d): \n", period, validBitscount);
+        
+        std::vector<uint64_t> testResults = vulkanTimeStampQueryPool->getPoolTimeStampResults();
+        for (size_t i = 0; i < testResults.size(); i += 2) {
+            uint64_t val1 = testResults[i] & maskValue;
+            uint64_t val2 = testResults[i+1] & maskValue;
+            double microsecondsValue = ((val2 - val1) * period) / 1000.0;
+            LOG("-> %d-%d: %.0f microSec\n", (int)i, (int)i + 1, microsecondsValue);
+        }
+        
+        LOG("\n");
+    }
+}
+
 // Создаем рабочие объекты Vulkan
 void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
     // Создание инстанса Vulkan
@@ -239,6 +266,9 @@ void VulkanRender::createSharedVulkanObjects(GLFWwindow* window){
     
     // Создание рендер прохода
     createRenderToWindowsRenderPass();
+    
+    // Создание пула запроса статистики
+    createQueryPool();
 }
 
 // Создание рендер прохода
@@ -251,6 +281,17 @@ void VulkanRender::createRenderToWindowsRenderPass(){
     imageConfig.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     imageConfig.refLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     vulkanRenderToWindowRenderPass = std::make_shared<VulkanRenderPass>(vulkanLogicalDevice, imageConfig);
+}
+
+// Создание пула запроса статистики
+void VulkanRender::createQueryPool(){
+    // Time
+    if (vulkanPhysicalDevice->getDeviceProperties().limits.timestampComputeAndGraphics &&
+        (vulkanPhysicalDevice->getQueuesFamiliesIndexes().renderQueuesTimeStampValidBits > 0)) {
+        VulkanQueryPoolTimeStamp config;
+        config.testCount = 1 * 2;
+        vulkanTimeStampQueryPool = std::make_shared<VulkanQueryPool>(vulkanLogicalDevice, config);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -775,6 +816,8 @@ VulkanCommandBufferPtr VulkanRender::updateModelRenderCommandBuffer(uint32_t fra
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
+    buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, 0);
+    
     // Отрисовка модели
     {
         // Изменяем лаяут текстуры, в которую рисуем
@@ -823,14 +866,14 @@ VulkanCommandBufferPtr VulkanRender::updateModelRenderCommandBuffer(uint32_t fra
             -rotateAngle,
         };
         glm::vec3 axis[6] = {
-            glm::vec3(1.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f),
             glm::vec3(0.0f, 0.0f, 1.0f),
-            glm::vec3(1.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f),
         };
-        for (size_t i = 0; i < 40; i++) {
+        for (size_t i = 0; i < 1; i++) {
             // Push константы для динамической отрисовки
             glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(angles[i%6] + i*5), axis[i%6]);
             buffer->cmdPushConstants(modelPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
@@ -860,6 +903,8 @@ VulkanCommandBufferPtr VulkanRender::updatePostRenderCommandBuffer(uint32_t fram
     
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     buffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    
+    //buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, 2);
     
     // Отрисовка текстуры пост эффекта
     {
@@ -900,7 +945,7 @@ VulkanCommandBufferPtr VulkanRender::updatePostRenderCommandBuffer(uint32_t fram
         buffer->cmdBindDescriptorSet(postPipeline->getLayout(), postDescriptorSet);
         
         // Push константы для динамической отрисовки
-        for(int i = 0; i < 600; i++){
+        for(int i = 0; i < 1; i++){
             float effectCoeff = std::abs(std::sin(totalTime * 3.1415926535 / 10.0f));
             buffer->cmdPushConstants(postPipeline->getLayout(), VK_SHADER_STAGE_FRAGMENT_BIT, (void*)&effectCoeff, sizeof(effectCoeff));
             
@@ -912,8 +957,11 @@ VulkanCommandBufferPtr VulkanRender::updatePostRenderCommandBuffer(uint32_t fram
         buffer->cmdEndRenderPass();
     }
     
+    buffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vulkanTimeStampQueryPool, 1);
+    
     // Заканчиваем подготовку коммандного буффера
     buffer->end();
+    
     
     return buffer;
 }

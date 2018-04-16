@@ -29,6 +29,7 @@
 #include <VulkanBuffer.h>
 #include <VulkanDescriptorPool.h>
 #include <VulkanDescriptorSet.h>
+#include <VulkanQueryPool.h>
 
 #include "Vertex2D.h"
 #include "Vertex3D.h"
@@ -50,6 +51,8 @@ public:
     void updateRender(float delta);
     // Непосредственно отрисовка кадра
     void drawFrame();
+    // Вывести статы GPU
+    void printGPUStats();
     
 private:
     VulkanRender();
@@ -71,6 +74,7 @@ public:
     VulkanImagePtr postDepthImage;
     std::vector<VulkanFrameBufferPtr> vulkanWindowFrameBuffers;
     std::vector<VulkanCommandBufferPtr> vulkanDrawCommandBuffers;
+    VulkanQueryPoolPtr vulkanTimeStampQueryPool;
     
     VulkanImagePtr postImage;
     VulkanImageViewPtr postImageView;
@@ -123,6 +127,8 @@ private:
     void createPostDepthResources();
     // Создание рендер прохода
     void createRenderToWindowsRenderPass();
+    // Создание пула запроса статистики
+    void createQueryPool();
     
     // Создаем картинки для отрисовки в текстуру
     void createPostImageAndView();
