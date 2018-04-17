@@ -304,8 +304,9 @@ void VulkanRender::loadShaders(){
     std::vector<unsigned char> vertShaderCode = readFile("res/shaders/shader_vert.spv");
     std::vector<unsigned char> fragShaderCode = readFile("res/shaders/shader_frag.spv");
     
-    LOG("\nInformation about vertex shader:\n");
-    reflectShaderUsingSPIRVCross(vertShaderCode);
+    LOG("\nInformation about vertex shader %s\n", "res/shaders/shader_vert.spv");
+    //reflectShaderUsingSPIRVCross(vertShaderCode);
+    reflectShaderUsingSPIRVReflect(vertShaderCode);
     
     // Создаем шейдерные модули
     vulkanVertexModule = std::make_shared<VulkanShaderModule>(vulkanLogicalDevice, vertShaderCode);

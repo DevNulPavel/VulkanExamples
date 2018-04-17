@@ -5,16 +5,19 @@
 #include <cmath>
 #include <algorithm>
 
-// SPIRV
+// SPIRV Cross
 #include <spirv.hpp>
 #include <spirv_cross.hpp>
 #include <spirv_common.hpp>
 #include <spirv_cfg.cpp>
 
+// SPIRV Reflect
+#include <spirv_reflect.h>
+
 #include "Helpers.h"
 
 
-std::string convertTypeToName(spirv_cross::SPIRType::BaseType type){
+std::string convertTypeToNameSPIRVCross(spirv_cross::SPIRType::BaseType type){
     std::string typeName;
     switch (type) {
         case spirv_cross::SPIRType::BaseType::Float:
@@ -45,13 +48,13 @@ std::string convertTypeToName(spirv_cross::SPIRType::BaseType type){
 // Запускаем рефлексию шейдера
 void reflectShaderUsingSPIRVCross(const std::vector<unsigned char>& data){    
     spirv_cross::Compiler compiler((uint32_t*)data.data(), data.size() / sizeof(uint32_t));
-    spirv_cross::SPIREntryPoint& entryPoint = compiler.get_entry_point("main", spv::ExecutionModel::ExecutionModelVertex);
+    //spirv_cross::SPIREntryPoint& entryPoint = compiler.get_entry_point("main", spv::ExecutionModel::ExecutionModelVertex);
     
-    const std::vector<spirv_cross::CombinedImageSampler>& samplers = compiler.get_combined_image_samplers();
+    //const std::vector<spirv_cross::CombinedImageSampler>& samplers = compiler.get_combined_image_samplers();
     
-    const std::vector<spv::Capability>& capabilities = compiler.get_declared_capabilities();
+    //const std::vector<spv::Capability>& capabilities = compiler.get_declared_capabilities();
     
-    const std::vector<std::string>& extentions = compiler.get_declared_extensions();
+    //const std::vector<std::string>& extentions = compiler.get_declared_extensions();
     
     spirv_cross::ShaderResources resources = compiler.get_shader_resources();
     
@@ -159,12 +162,103 @@ void reflectShaderUsingSPIRVCross(const std::vector<unsigned char>& data){
     }
     
     // Images
-    for (const spirv_cross::Resource& resource : resources.sampled_images) {
-        uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-        uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-        
-        LOG("Info about images:\n");
-    }
+    //for (const spirv_cross::Resource& resource : resources.sampled_images) {
+        //uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+        //uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+        //LOG("Info about images:\n");
+    //}
     
     //spirv_cross::SPIRConstant& constant = compiler.get_constant(0);
+}
+
+void reflectShaderUsingSPIRVReflect(const std::vector<unsigned char>& data){
+    SpvReflectResult result = SPV_REFLECT_RESULT_NOT_READY;
+    
+    // Создаем рефлектор
+    SpvReflectShaderModule module;
+    result = spvReflectCreateShaderModule(data.size(), data.data(), &module);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    
+    // Перечислим список входных переменных
+    {
+        LOG("Input variables info\n");
+        uint32_t variablesCount = 0;
+        spvReflectEnumerateInputVariables(&module, &variablesCount, nullptr);
+        std::vector<SpvReflectInterfaceVariable*> variables(variablesCount);
+        spvReflectEnumerateInputVariables(&module, &variablesCount, variables.data());
+        for (SpvReflectInterfaceVariable* variable: variables) {
+            LOG("\tVariable name: %s\n", variable->name);
+            LOG("\t\t- location: %d\n", variable->location);
+            LOG("\t\t- format: %d\n", variable->format);
+            LOG("\t\t- component size: %d bits\n", variable->numeric.scalar.width);
+            LOG("\t\t- component count: %d\n", variable->numeric.vector.component_count);
+        }
+    }
+    
+    // Перечислим список юниформов
+    {
+        LOG("Descriptor sets info\n");
+        uint32_t setsCount = 0;
+        spvReflectEnumerateDescriptorSets(&module, &setsCount, nullptr);
+        std::vector<SpvReflectDescriptorSet*> sets(setsCount);
+        spvReflectEnumerateDescriptorSets(&module, &setsCount, sets.data());
+        for (SpvReflectDescriptorSet* setInfo: sets) {
+            LOG("\tSet at index: %d\n", setInfo->set);
+            for (uint32_t i = 0; i < setInfo->binding_count; i++) {
+                SpvReflectDescriptorBinding* binding = setInfo->bindings[i];
+                LOG("\t\tBinding with name: %s\n", binding->name);
+                LOG("\t\t\t- index: %d\n", binding->binding);
+                LOG("\t\t\t- descriptor type: %d\n", binding->descriptor_type);
+                LOG("\t\t\t- resource type: %d\n", binding->resource_type);
+                LOG("\t\t\t- type description name: %s\n", binding->type_description->type_name);
+                for (uint32_t j = 0; j < binding->type_description->member_count; j++) {
+                    SpvReflectTypeDescription* member = &(binding->type_description->members[j]);
+                    LOG("\t\t\tMember with name: %s\n", member->struct_member_name ? member->struct_member_name : "none");
+                    LOG("\t\t\t\t- component size: %d bits\n", member->traits.numeric.scalar.width);
+                    LOG("\t\t\t\t- components count: %d\n", member->traits.numeric.vector.component_count);
+                    LOG("\t\t\t\t- matrix column count: %d\n", member->traits.numeric.matrix.column_count);
+                    LOG("\t\t\t\t- matrix row count: %d\n", member->traits.numeric.matrix.row_count);
+                    LOG("\t\t\t\t- matrix stride: %d\n", member->traits.numeric.matrix.stride);
+                }
+            }
+        }
+    }
+    
+    // Перечислим список push констант
+    {
+        LOG("Push constants info\n");
+        uint32_t pushCount = 0;
+        spvReflectEnumeratePushConstantBlocks(&module, &pushCount, nullptr);
+        std::vector<SpvReflectBlockVariable*> pushConsts(pushCount);
+        spvReflectEnumeratePushConstantBlocks(&module, &pushCount, pushConsts.data());
+        for (SpvReflectBlockVariable* pushConstant: pushConsts) {
+            LOG("\tPush constant: %s\n", pushConstant->name);
+            LOG("\t\t- offset: %d\n", pushConstant->offset);
+            LOG("\t\t- absolute offset: %d\n", pushConstant->absolute_offset);
+            LOG("\t\t- size: %d\n", pushConstant->size);
+            LOG("\t\t- padded size: %d\n", pushConstant->padded_size);
+            LOG("\t\t- component size: %d bits\n", pushConstant->numeric.scalar.width);
+            LOG("\t\t- components count: %d\n", pushConstant->numeric.vector.component_count);
+            LOG("\t\t- matrix column count: %d\n", pushConstant->numeric.matrix.column_count);
+            LOG("\t\t- matrix row count: %d\n", pushConstant->numeric.matrix.row_count);
+            LOG("\t\t- matrix stride: %d\n", pushConstant->numeric.matrix.stride);
+            for (uint32_t j = 0; j < pushConstant->member_count; j++) {
+                SpvReflectBlockVariable* member = &(pushConstant->members[j]);
+                LOG("\t\tMember with name: %s\n", member->name);
+                LOG("\t\t\t- offset: %d\n", member->offset);
+                LOG("\t\t\t- absolute offset: %d\n", member->absolute_offset);
+                LOG("\t\t\t- size: %d\n", member->size);
+                LOG("\t\t\t- padded size: %d\n", member->padded_size);
+                LOG("\t\t\t- component size: %d bits\n", member->numeric.scalar.width);
+                LOG("\t\t\t- components count: %d\n", member->numeric.vector.component_count);
+                LOG("\t\t\t- matrix column count: %d\n", member->numeric.matrix.column_count);
+                LOG("\t\t\t- matrix row count: %d\n", member->numeric.matrix.row_count);
+                LOG("\t\t\t- matrix stride: %d\n", member->numeric.matrix.stride);
+            }
+        }
+    }
+
+    
+    // Destroy the reflection data when no longer required.
+    spvReflectDestroyShaderModule(&module);
 }

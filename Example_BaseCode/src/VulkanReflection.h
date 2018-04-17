@@ -10,4 +10,6 @@
 // Запускаем рефлексию шейдера
 void reflectShaderUsingSPIRVCross(const std::vector<unsigned char>& data);
 
+void reflectShaderUsingSPIRVReflect(const std::vector<unsigned char>& data);
+
 #endif
