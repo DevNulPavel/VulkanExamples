@@ -215,9 +215,9 @@ void VulkanInstance::createVulkanInstance(){
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());  // Включаем стандартные слои валидации
-    createInfo.ppEnabledLayerNames = _validationLayers.data();
+    createInfo.ppEnabledLayerNames = _validationLayers.size() > 0 ? _validationLayers.data() : nullptr;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(_instanceExtensions.size());  // Включаем расширения
-    createInfo.ppEnabledExtensionNames = _instanceExtensions.data();
+    createInfo.ppEnabledExtensionNames = _instanceExtensions.size() > 0 ? _instanceExtensions.data() : nullptr;
     
     // Непосредственно создание инстанса Vulkan
     VkResult createStatus = vkCreateInstance(&createInfo, nullptr, &_instance);
