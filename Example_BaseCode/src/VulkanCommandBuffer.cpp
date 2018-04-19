@@ -112,9 +112,9 @@ void VulkanCommandBuffer::begin(VkCommandBufferUsageFlags usageFlags, const Vulk
     VkCommandBufferInheritanceInfo inheritanceInfo = {};
     memset(&inheritanceInfo, 0, sizeof(VkCommandBufferInheritanceInfo));
     inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-    inheritanceInfo.renderPass = inheritance.renderPass ? inheritance.renderPass->getPass() : nullptr;
+    inheritanceInfo.renderPass = (inheritance.renderPass != nullptr) ? inheritance.renderPass->getPass() : 0;
     inheritanceInfo.subpass = inheritance.subpass;
-    inheritanceInfo.framebuffer = inheritance.framebuffer ? inheritance.framebuffer->getBuffer() : nullptr;
+    inheritanceInfo.framebuffer = (inheritance.framebuffer != nullptr) ? inheritance.framebuffer->getBuffer() : 0;
     inheritanceInfo.occlusionQueryEnable = inheritance.occlusionQueryEnable;
     inheritanceInfo.queryFlags = inheritance.queryFlags;
     inheritanceInfo.pipelineStatistics = inheritance.pipelineStatistics;
