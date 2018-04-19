@@ -569,7 +569,7 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     if (mainBuffer == nullptr) {
         mainBuffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanMainRenderCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     }else{
-        mainBuffer->reset(0);   // Можно отправить флаг сброса
+        //buffer->reset(0);   // Можно отправить сброс, но с VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - не нужно
     }
     
     // Продолжаем рендер-проход

@@ -505,7 +505,7 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     if (buffer == nullptr) {
         buffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanRenderCommandPool);
     }else{
-        buffer->reset(0);   // Можно отправить флаг сброса
+        //buffer->reset(0);   // Можно отправить сброс, но с VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - не нужно
     }
     
     // Буфер команд может быть представлен еще раз, если он так же уже находится в ожидании исполнения. VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
