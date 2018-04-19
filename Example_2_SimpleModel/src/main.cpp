@@ -44,6 +44,13 @@ int local_main(int argc, char** argv) {
 #endif
     glfwInit();
     
+    // Проверяем наличие поддержки Vulkan
+    int vulkanSupportStatus = glfwVulkanSupported();
+    if (vulkanSupportStatus != GLFW_TRUE){
+        LOG("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
+        throw std::runtime_error("Vulkan support not found!");
+    }
+    
     // Говорим GLFW, что не нужно создавать GL контекст
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     // Окно без изменения размера
@@ -56,13 +63,6 @@ int local_main(int argc, char** argv) {
     // Создаем окно
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);
     glfwSetWindowSizeCallback(window, onGLFWWindowResized);
-    
-    // Проверяем наличие поддержки Vulkan
-    int vulkanSupportStatus = glfwVulkanSupported();
-    if (vulkanSupportStatus != GLFW_TRUE){
-        LOG("Vulkan support not found, error 0x%08x\n", vulkanSupportStatus);
-        throw std::runtime_error("Vulkan support not found!");
-    }
 
     // Создаем рендер
     VulkanRender::initInstance(window);    

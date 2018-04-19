@@ -12,7 +12,7 @@
 
 class VulkanCommandPool {
 public:
-    VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex);
+    VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex, VkCommandPoolCreateFlags flags = 0);
     ~VulkanCommandPool();
     VkCommandPool getPool() const;
     VulkanLogicalDevicePtr getBaseDevice() const;

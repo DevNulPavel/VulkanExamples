@@ -5,7 +5,7 @@
 #include "Helpers.h"
 
 
-VulkanCommandPool::VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex):
+VulkanCommandPool::VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint32_t queuesFamilyIndex, VkCommandPoolCreateFlags flags):
     _logicalDevice(logicalDevice),
     _queuesFamilyIndex(queuesFamilyIndex){
     
@@ -14,7 +14,7 @@ VulkanCommandPool::VulkanCommandPool(VulkanLogicalDevicePtr logicalDevice, uint3
     memset(&poolInfo, 0, sizeof(VkCommandPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = queuesFamilyIndex;   // Пулл будет для семейства очередей рендеринга
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Optional
+    poolInfo.flags = flags; // Optional - VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
     
     if (vkCreateCommandPool(_logicalDevice->getDevice(), &poolInfo, nullptr, &_pool) != VK_SUCCESS) {
         LOG("Failed to create command pool!\n");
