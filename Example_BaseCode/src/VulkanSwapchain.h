@@ -26,8 +26,8 @@ public:
     VkSwapchainKHR getSwapchain() const;
     VkFormat getSwapChainImageFormat() const;
     VkExtent2D getSwapChainExtent() const;
-    std::vector<VulkanImagePtr> getImages() const;
-    std::vector<VulkanImageViewPtr> getImageViews() const;
+    const std::vector<VulkanImagePtr>& getImages() const;
+    const std::vector<VulkanImageViewPtr>& getImageViews() const;
     VulkanSurfacePtr getBaseSurface() const;
     VulkanLogicalDevicePtr getBaseLogicalDevice() const;
     VulkanQueuesFamiliesIndexes getBaseQueuesFamiliesIndexes() const;

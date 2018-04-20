@@ -44,11 +44,11 @@ VkExtent2D VulkanSwapchain::getSwapChainExtent() const{
     return _swapChainExtent;
 }
 
-std::vector<VulkanImagePtr> VulkanSwapchain::getImages() const{
+const std::vector<VulkanImagePtr>& VulkanSwapchain::getImages() const{
     return _images;
 }
 
-std::vector<VulkanImageViewPtr> VulkanSwapchain::getImageViews() const{
+const std::vector<VulkanImageViewPtr>& VulkanSwapchain::getImageViews() const{
     return _imageViews;
 }
 
