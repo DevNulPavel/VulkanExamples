@@ -9,10 +9,20 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        ndk {
+            // abiFilters "armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'
+
+            // Only armv7 using
+            abiFilters "armeabi-v7a"
+        }
         externalNativeBuild {
             cmake {
-                abiFilters "armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'
-                //arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
+                // abiFilters "armeabi-v7a", 'arm64-v8a', 'x86', 'x86_64'
+                // arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
+
+                // Only armv7 build binaries
+                abiFilters "armeabi-v7a"
+                // Flags
                 cppFlags "-std=c++11"
             }
         }
@@ -28,10 +38,10 @@ android {
             path "CMakeLists.txt"
         }
     }
-    // Для слоев валидации Vulkan
     sourceSets {
         main {
             jniLibs {
+                // Для слоев валидации Vulkan
                 srcDir "${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs"
                 // Must have ndk-r12 or better which including layer binaries
                 //srcDirs = ["${valLayerBinDir}"]
