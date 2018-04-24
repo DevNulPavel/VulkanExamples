@@ -363,6 +363,10 @@ void VulkanRender::createGraphicsPipeline() {
     dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
     dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
     
+    // Лаяуты дескрипторов
+    std::vector<VulkanDescriptorSetLayoutPtr> layouts;
+    layouts.push_back(vulkanDescriptorSetLayout);
+    
     // Пайплайн
     vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
                                                       vulkanVertexModule, vulkanFragmentModule,
@@ -374,7 +378,7 @@ void VulkanRender::createGraphicsPipeline() {
                                                       scissor,
                                                       cullingConfig,
                                                       blendConfig,
-                                                      vulkanDescriptorSetLayout,
+                                                      layouts,
                                                       vulkanRenderPass,
                                                       pushConstants,
                                                       dynamicStates);
@@ -540,6 +544,9 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     
      // Запуск рендер-прохода
     buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+    // Устанавливаем пайплайн у коммандного буффера
+    buffer->cmdBindPipeline(vulkanPipeline);
     
     // Динамически изменяемый параметр в пайплайне
     VkRect2D viewport = {};
@@ -554,9 +561,6 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     scissor.offset = {0, 0};
     scissor.extent = vulkanSwapchain->getSwapChainExtent();
     buffer->cmdSetScissor(scissor);
-    
-    // Устанавливаем пайплайн у коммандного буффера
-    buffer->cmdBindPipeline(vulkanPipeline);
     
     // Привязываем вершинный буффер
     buffer->cmdBindVertexBuffer(modelVertexBuffer);

@@ -50,7 +50,7 @@ public:
                    VkRect2D scissor,
                    VulkanPipelineCullingConfig cullingConfig,
                    VulkanPipelineBlendConfig blendConfig,
-                   VulkanDescriptorSetLayoutPtr descriptorSetLayout,
+                   std::vector<VulkanDescriptorSetLayoutPtr> descriptorSetLayouts,
                    VulkanRenderPassPtr renderPass,
                    const std::vector<VkPushConstantRange>& pushConstants = std::vector<VkPushConstantRange>(),
                    const std::vector<VkDynamicState>& dynamicStates = std::vector<VkDynamicState>(),
@@ -74,7 +74,7 @@ private:
     VkRect2D _scissor;
     VulkanPipelineCullingConfig _cullingConfig;
     VulkanPipelineBlendConfig _blendConfig;
-    VulkanDescriptorSetLayoutPtr _descriptorSetLayout;
+    std::vector<VulkanDescriptorSetLayoutPtr> _descriptorSetLayouts;
     VulkanRenderPassPtr _renderPass;
     std::vector<VkPushConstantRange> _pushConstants;
     std::vector<VkDynamicState> _dynamicStates;

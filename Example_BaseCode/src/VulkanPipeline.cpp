@@ -34,7 +34,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
                                VkRect2D scissor,
                                VulkanPipelineCullingConfig cullingConfig,
                                VulkanPipelineBlendConfig blendConfig,
-                               VulkanDescriptorSetLayoutPtr descriptorSetLayout,
+                               std::vector<VulkanDescriptorSetLayoutPtr> descriptorSetLayouts,
                                VulkanRenderPassPtr renderPass,
                                const std::vector<VkPushConstantRange>& pushConstants,
                                const std::vector<VkDynamicState>& dynamicStates,
@@ -52,7 +52,7 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     _scissor(scissor),
     _cullingConfig(cullingConfig),
     _blendConfig(blendConfig),
-    _descriptorSetLayout(descriptorSetLayout),
+    _descriptorSetLayouts(descriptorSetLayouts),
     _renderPass(renderPass),
     _pushConstants(pushConstants),
     _dynamicStates(dynamicStates),
@@ -167,12 +167,16 @@ VulkanPipeline::VulkanPipeline(VulkanLogicalDevicePtr device,
     dynamicInfo.pDynamicStates = _dynamicStates.data();
     
     // Лаяут пайплайна
-    VkDescriptorSetLayout setLayouts[] = {_descriptorSetLayout->getLayout()};   // Лаяют для юниформ буффер и семплера
+    std::vector<VkDescriptorSetLayout> setLayouts;
+    setLayouts.reserve(_descriptorSetLayouts.size());
+    for(const VulkanDescriptorSetLayoutPtr& layout: _descriptorSetLayouts){
+        setLayouts.push_back(layout->getLayout());
+    }
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     memset(&pipelineLayoutInfo, 0, sizeof(VkPipelineLayoutCreateInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = setLayouts; // Устанавливаем лаяут
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = setLayouts.data(); // Устанавливаем лаяут
     pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(_pushConstants.size());
     pipelineLayoutInfo.pPushConstantRanges = (_pushConstants.size() > 0) ? _pushConstants.data() : nullptr; // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам
     

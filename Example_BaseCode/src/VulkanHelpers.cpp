@@ -241,7 +241,7 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
                                                                imagesFormat,      // Формат текстуры
                                                                VK_IMAGE_TILING_OPTIMAL,       // Тайлинг
                                                                VK_IMAGE_LAYOUT_UNDEFINED,       // Лаяут использования (must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED)
-															   VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
+															                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,   // Используется как получаетель + для отрисовки
                                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,    // Хранится только на GPU
                                                                mipmapLevels);
     
@@ -292,22 +292,22 @@ VulkanImagePtr createTextureImage(VulkanLogicalDevicePtr device, VulkanQueuePtr 
         //VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
         generateMipmapsForImage(commandBuffer, resultImage);
         //endAndQueueSingleTimeCommands(commandBuffer, queue);
-	} else {
-		// Конвертируем использование текстуры в оптимальное для рендеринга
-		// Генерация мипмапов делает это самостоятельно
-		//VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
-		transitionImageLayout(commandBuffer,
-                              resultImage,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                              0, resultImage->getBaseMipmapsCount(),
-                              VK_IMAGE_ASPECT_COLOR_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_ACCESS_TRANSFER_WRITE_BIT,
-                              VK_ACCESS_SHADER_READ_BIT);
-		//endAndQueueSingleTimeCommands(commandBuffer, queue);
-	}
+  	} else {
+  		// Конвертируем использование текстуры в оптимальное для рендеринга
+  		// Генерация мипмапов делает это самостоятельно
+  		//VulkanCommandBufferPtr commandBuffer = beginSingleTimeCommands(device, pool);
+  		transitionImageLayout(commandBuffer,
+                                resultImage,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                0, resultImage->getBaseMipmapsCount(),
+                                VK_IMAGE_ASPECT_COLOR_BIT,
+                                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                VK_ACCESS_TRANSFER_WRITE_BIT,
+                                VK_ACCESS_SHADER_READ_BIT);
+  		//endAndQueueSingleTimeCommands(commandBuffer, queue);
+  	}
 
     endAndQueueWaitSingleTimeCommands(commandBuffer, queue);
     
