@@ -17,7 +17,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #define THREADS_COUNT 4
-#define BUFFERS_PER_THREAD 4
+#define BUFFERS_PER_THREAD 1
+#define DRAWS_COUNT_IN_THREAD 500
 
 static VulkanRender* renderInstance = nullptr;
 
@@ -402,6 +403,10 @@ void VulkanRender::createGraphicsPipeline() {
     // Динамически изменяемые параметры
     std::vector<VkDynamicState> dynamicStates;
     
+    // Список лаяутов
+    std::vector<VulkanDescriptorSetLayoutPtr> descriptorSetsLayouts(1);
+    descriptorSetsLayouts[0] = vulkanDescriptorSetLayout;
+    
     // Пайплайн
     vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
                                                       vulkanVertexModule, vulkanFragmentModule,
@@ -413,7 +418,7 @@ void VulkanRender::createGraphicsPipeline() {
                                                       scissor,
                                                       cullingConfig,
                                                       blendConfig,
-                                                      vulkanDescriptorSetLayout,
+                                                      descriptorSetsLayouts,
                                                       vulkanRenderPass,
                                                       pushConstants,
                                                       dynamicStates);
@@ -619,24 +624,26 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
                 // Продолжаем рендер-проход
                 buffer->begin(VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT, inheritanceInfo);
 
-				// Устанавливаем пайплайн у коммандного буффера
-				buffer->cmdBindPipeline(vulkanPipeline);
-
-				// Привязываем вершинный буффер
-				buffer->cmdBindVertexBuffer(modelVertexBuffer);
-
-				// Привязываем индексный буффер
-				buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
-
-				// Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-				buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
-                
-                // Push константы для динамической отрисовки
-                glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle + 15.0f*(j*THREADS_COUNT + i)), glm::vec3(0.0f, 0.0f, 1.0f));
-                buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
-                
-                // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-                buffer->cmdDrawIndexed(modelTotalIndexesCount);
+                for (size_t k = 0; k < DRAWS_COUNT_IN_THREAD; k++) {
+                    // Устанавливаем пайплайн у коммандного буффера
+                    buffer->cmdBindPipeline(vulkanPipeline);
+                    
+                    // Привязываем вершинный буффер
+                    buffer->cmdBindVertexBuffer(modelVertexBuffer);
+                    
+                    // Привязываем индексный буффер
+                    buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
+                    
+                    // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+                    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
+                    
+                    // Push константы для динамической отрисовки
+                    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle + 15.0f*(j*THREADS_COUNT + k * BUFFERS_PER_THREAD + i)), glm::vec3(0.0f, 0.0f, 1.0f));
+                    buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
+                    
+                    // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+                    buffer->cmdDrawIndexed(3*64); // modelTotalIndexesCount
+                }
                 
                 // Заканчиваем подготовку коммандного буффера
                 buffer->end();
