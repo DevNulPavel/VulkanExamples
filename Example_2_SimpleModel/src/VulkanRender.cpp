@@ -544,39 +544,43 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     
      // Запуск рендер-прохода
     buffer->cmdBeginRenderPass(beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-        
-    // Устанавливаем пайплайн у коммандного буффера
-    buffer->cmdBindPipeline(vulkanPipeline);
-    
+
     // Динамически изменяемый параметр в пайплайне
     VkRect2D viewport = {};
     memset(&viewport, 0, sizeof(VkRect2D));
-    viewport.offset = {0, 0};
+    viewport.offset = { 0, 0 };
     viewport.extent = vulkanSwapchain->getSwapChainExtent();
     buffer->cmdSetViewport(viewport);
-    
+
     // Динамически изменяемый параметр в пайплайне
     VkRect2D scissor = {};
     memset(&scissor, 0, sizeof(VkRect2D));
-    scissor.offset = {0, 0};
+    scissor.offset = { 0, 0 };
     scissor.extent = vulkanSwapchain->getSwapChainExtent();
     buffer->cmdSetScissor(scissor);
-    
-    // Привязываем вершинный буффер
-    buffer->cmdBindVertexBuffer(modelVertexBuffer);
-    
-    // Привязываем индексный буффер
-    buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
+        
+    for (uint32_t i = 0; i < 100000; i++) {
+        // Устанавливаем пайплайн у коммандного буффера
+        buffer->cmdBindPipeline(vulkanPipeline);
 
-    // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
-    buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
+        // Привязываем вершинный буффер
+        //buffer->cmdBindVertexBuffer(modelVertexBuffer);
+        buffer->cmdBindVertexBuffer(modelVertexBuffer, sizeof(Vertex) * 3 * i);
 
-    // Push константы для динамической отрисовки
-    glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle), glm::vec3(0.0f, 0.0f, 1.0f));
-    buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
+        // Привязываем индексный буффер
+        //buffer->cmdBindIndexBuffer(modelIndexBuffer, VK_INDEX_TYPE_UINT32);
 
-    // Вызов поиндексной отрисовки - индексы вершин, один инстанс
-    buffer->cmdDrawIndexed(modelTotalIndexesCount);
+        // Подключаем дескрипторы ресурсов для юниформ буффера и текстуры
+        buffer->cmdBindDescriptorSet(vulkanPipeline->getLayout(), modelDescriptorSet);
+
+        // Push константы для динамической отрисовки
+        glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle + i), glm::vec3(0.0f, 0.0f, 1.0f));
+        buffer->cmdPushConstants(vulkanPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, (void*)&model, sizeof(model));
+
+        // Вызов поиндексной отрисовки - индексы вершин, один инстанс
+        //buffer->cmdDrawIndexed(3 * 64); // modelTotalIndexesCount
+        buffer->cmdDraw(3 * 64);
+    }
     
     // Заканчиваем рендер проход
     buffer->cmdEndRenderPass();
