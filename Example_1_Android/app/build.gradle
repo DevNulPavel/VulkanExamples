@@ -49,9 +49,10 @@ android {
         main {
             jniLibs {
                 // Для слоев валидации Vulkan
-                srcDir "${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs"
+                //srcDir "${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs"
                 // Must have ndk-r12 or better which including layer binaries
-                //srcDirs = ["${valLayerBinDir}"]
+                //srcDirs = ["${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs",
+                //           "/Applications/Mali_Graphics_Debugger/target/android/arm/unrooted"]
             }
         }
     }

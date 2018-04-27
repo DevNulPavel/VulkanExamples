@@ -129,7 +129,8 @@ std::vector<const char *> VulkanDevice::getPossibleDebugValidationLayers(){
 
         if (!checkAllLayersInVectorAvailable(allValidationLayers, result)) {
             LOGE("Failed to get validation layers!\n");
-            throw std::runtime_error("Failed to create instance!");
+            //throw std::runtime_error("Failed to create instance!");
+            result.clear();
         }
     }
 
