@@ -41,7 +41,6 @@ public:
 public:
     VulkanModelInfo(VulkanDevice* device, VulkanVisualizer* visualizer, VulkanRenderInfo* renderInfo, AAssetManager* assetManager);
     ~VulkanModelInfo();
-    void updateUniformBuffer(float delta); // Обновляем юниформ буффер
 
 private:
     // Стадии инициализации

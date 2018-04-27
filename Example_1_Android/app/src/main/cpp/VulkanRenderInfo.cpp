@@ -308,6 +308,15 @@ void VulkanRenderInfo::createGraphicsPipeline() {
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    // Push константы
+    std::vector<VkPushConstantRange> pushConstants;
+    VkPushConstantRange pushConstantRange = {};
+    memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(glm::mat4);
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstants.push_back(pushConstantRange);
+
     // Лаяут пайплайна
     VkDescriptorSetLayout setLayouts[] = {vulkanDescriptorSetLayout};   // Лаяют для юниформ буффер и семплера
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -315,8 +324,8 @@ void VulkanRenderInfo::createGraphicsPipeline() {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = setLayouts; // Устанавливаем лаяут
-    pipelineLayoutInfo.pushConstantRangeCount = 0;  // TODO: Пуш-константы??
-    pipelineLayoutInfo.pPushConstantRanges = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstants.size());  // TODO: Пуш-константы??
+    pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
     // Пуш константы нужны для того, чтобы передавать данные в отрисовку, как альтернатива юниформам, но без изменения??
 
     if (vkCreatePipelineLayout(vulkanDevice->vulkanLogicalDevice, &pipelineLayoutInfo, nullptr, &vulkanPipelineLayout) != VK_SUCCESS) {

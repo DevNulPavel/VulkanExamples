@@ -32,7 +32,7 @@ bool fistDraw = true;
 ////////////////////////////////////////////////////////////////////////////////////
 
 // Непосредственно отрисовка кадра
-void drawFrame() {
+void drawFrame(float lastFrameDuration) {
     // Запрашиваем изображение для отображения из swapchain, время ожидания делаем максимальным
     uint32_t imageIndex = 0;
     VkResult result = vkAcquireNextImageKHR(vulkanDevice->vulkanLogicalDevice, vulkanVisualizer->vulkanSwapchain,
@@ -133,8 +133,7 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDraw(JNIEnv *e
         fistDraw = false;
     }
 
-    vulkanModelInfo->updateUniformBuffer(static_cast<float>(lastFrameDuration));
-    drawFrame();
+    drawFrame(static_cast<float>(lastFrameDuration));
 
     // Стабилизация времени кадра
     std::chrono::high_resolution_clock::duration curFrameDuration = std::chrono::high_resolution_clock::now() - lastDrawTime;
@@ -145,6 +144,8 @@ void Java_com_example_devnul_vulkanexample_VulkanDrawThread_vulkanDraw(JNIEnv *e
     // Расчет времени кадра
     lastFrameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - lastDrawTime).count() / 1000.0;
     lastDrawTime = std::chrono::high_resolution_clock::now(); // TODO: Возможно - правильнее было бы перетащить в начало цикла
+
+    LOGE("Draw time: %.1fmSec\n", lastFrameDuration*1000);
 }
 
 JNICALL

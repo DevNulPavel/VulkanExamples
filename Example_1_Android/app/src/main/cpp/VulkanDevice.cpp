@@ -500,7 +500,7 @@ void VulkanDevice::createLogicalDeviceAndQueue() {
 
     // Создаем экземпляры настроек создания очереди
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    const float queuePriority[2] = {0.9f, 0.9f};
+    const float queuePriority[2] = {0.9f, 0.1f};
     for (int32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         memset(&queueCreateInfo, 0, sizeof(VkDeviceQueueCreateInfo));
