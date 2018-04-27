@@ -575,11 +575,12 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     if (mainBuffer == nullptr) {
         mainBuffer = std::make_shared<VulkanCommandBuffer>(vulkanLogicalDevice, vulkanMainRenderCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     }else{
+        //return mainBuffer;
         //buffer->reset(0);   // Можно отправить сброс, но с VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - не нужно
     }
     
     // Продолжаем рендер-проход
-    mainBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    mainBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT); // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
     
     mainBuffer->cmdWriteTimeStamp(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vulkanTimeStampQueryPool, 0);
     
@@ -625,7 +626,7 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
                                                                                       VK_COMMAND_BUFFER_LEVEL_SECONDARY);
                 
                 // Продолжаем рендер-проход
-                buffer->begin(VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT, inheritanceInfo);
+                buffer->begin(VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT | VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, inheritanceInfo);
 
                 for (size_t k = 0; k < DRAWS_COUNT_IN_THREAD; k++) {
                     // Устанавливаем пайплайн у коммандного буффера

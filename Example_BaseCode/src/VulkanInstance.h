@@ -25,6 +25,7 @@ private:
     std::vector<const char*> _validationLayers;
     std::vector<const char*> _instanceExtensions;
     VkInstance _instance;
+    std::vector<VkLayerProperties> _allValidationLayers;
     #ifdef VALIDATION_LAYERS_ENABLED
         VkDebugReportCallbackEXT _debugCallback;
     #endif

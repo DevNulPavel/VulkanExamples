@@ -20,7 +20,9 @@ uint32_t findMemoryType(VkPhysicalDevice device, uint32_t typeFilter, VkMemoryPr
     
     // Найдем тип памяти, который подходит для самого буфера
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+        uint32_t testFilter = (1 << i);
+        uint32_t testProperties = memProperties.memoryTypes[i].propertyFlags;
+        if ((typeFilter & testFilter) && ((testProperties & properties) == properties)) {
             return i;
         }
     }
