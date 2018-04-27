@@ -611,7 +611,7 @@ VulkanCommandBufferPtr VulkanRender::updateModelCommandBuffer(uint32_t frameInde
     std::vector<VulkanCommandBufferPtr> resultBuffers;
     resultBuffers.resize(THREADS_COUNT*BUFFERS_PER_THREAD);
     
-    std::atomic_int32_t offset = 0;
+    std::atomic_int32_t offset(0);
 
     std::vector<std::thread> threads;
     threads.reserve(THREADS_COUNT);
