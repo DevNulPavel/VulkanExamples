@@ -65,7 +65,7 @@ VkSurfaceFormatKHR VulkanVisualizer::chooseSwapSurfaceFormat(const std::vector<V
 VkPresentModeKHR VulkanVisualizer::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
     // Проверяем, можно ли использовать тройную буфферизацию??
     for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        if (availablePresentMode == VK_PRESENT_MODE_FIFO_KHR) { // VK_PRESENT_MODE_MAILBOX_KHR
             return availablePresentMode;
         }
     }
