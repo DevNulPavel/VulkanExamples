@@ -31,6 +31,10 @@ android {
 
                 // Flags
                 cppFlags "-std=c++11"
+
+                // Release build
+                arguments "-DCMAKE_BUILD_TYPE=Release", "-DANDROID_ARM_NEON=TRUE"
+                //arguments '-DCMAKE_BUILD_TYPE=Debug'
             }
         }
     }

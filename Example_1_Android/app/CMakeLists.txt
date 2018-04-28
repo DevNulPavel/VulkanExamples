@@ -36,9 +36,14 @@ add_library(vulkan_wrapper
             src/main/cpp_libs/vulkan_wrapper/vulkan_wrapper.cpp)
 include_directories(src/main/cpp_libs/vulkan_wrapper/)
 
+# Release build
+set(CMAKE_BUILD_TYPE "Release")
+
 # Flags
 #  -DNDEBUG
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -g -O2 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -g -O2 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
 
 if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
    set(CMAKE_CXX_FLAGS} "${CMAKE_CXX_FLAGS} -mhard-float -D_NDK_MATH_NO_SOFTFP=1 -mfloat-abi=hard")

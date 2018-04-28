@@ -257,7 +257,7 @@ void VulkanModelInfo::loadModel(){
             vertex.color = {1.0f, 1.0f, 1.0f};
 
             vulkanVertices.push_back(vertex);
-            vulkanIndices.push_back(static_cast<uint32_t>(vulkanIndices.size()));
+            //vulkanIndices.push_back(static_cast<uint32_t>(vulkanIndices.size()));
         }
     }
 
@@ -370,7 +370,7 @@ void VulkanModelInfo::createVertexBuffer(){
 
 // Создание буффера индексов
 void VulkanModelInfo::createIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(vulkanIndices[0]) * vulkanIndices.size();
+    /*VkDeviceSize bufferSize = sizeof(vulkanIndices[0]) * vulkanIndices.size();
 
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
@@ -411,7 +411,7 @@ void VulkanModelInfo::createIndexBuffer() {
     }
 
     // Чистим исходные данные
-    vulkanIndices.clear();
+    vulkanIndices.clear();*/
 }
 
 // Создаем буффер юниформов
@@ -588,7 +588,7 @@ void VulkanModelInfo::createCommandBuffers() {
         // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
         vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        for(uint32_t j = 0; j < 5000; j++){
+        for(uint32_t j = 0; j < 1; j++){
             // Устанавливаем пайплайн у коммандного буффера
             vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderInfo->vulkanPipeline);
 
@@ -609,7 +609,7 @@ void VulkanModelInfo::createCommandBuffers() {
             vkCmdPushConstants(vulkanCommandBuffers[i], vulkanRenderInfo->vulkanPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, (uint32_t)sizeof(model), (void*)&model);
 
             // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-            vkCmdDraw(vulkanCommandBuffers[i], 3*2, 1, 0, 0);
+            vkCmdDraw(vulkanCommandBuffers[i], vulkanTotalVertexesCount, 1, 0, 0); // vulkanTotalVertexesCount
             // Вызов поиндексной отрисовки - индексы вершин, один инстанс
             //vkCmdDrawIndexed(vulkanCommandBuffers[i], 3*180, 1, 0, 0, 0);  //static_cast<uint32_t>(vulkanTotalIndexesCount)
         }
