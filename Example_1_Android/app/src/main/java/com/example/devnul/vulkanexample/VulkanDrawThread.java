@@ -9,6 +9,7 @@ import android.graphics.Canvas;
 public class VulkanDrawThread extends Thread{
     static {
         System.loadLibrary("vulkan_cpp_code");
+        //System.loadLibrary("MGD");
     }
 
     private boolean runFlag = false;

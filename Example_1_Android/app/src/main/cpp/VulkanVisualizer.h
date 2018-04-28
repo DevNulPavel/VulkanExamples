@@ -21,6 +21,8 @@ public:
     VkDeviceMemory vulkanDepthImageMemory;
     VkImageView vulkanDepthImageView;
     std::vector<VkFramebuffer> vulkanSwapChainFramebuffers;
+    std::vector<VkSemaphore> vulkanImageAvailableSemaphores;
+    std::vector<VkSemaphore> vulkanRenderFinishedSemaphores;
 
 public:
     VulkanVisualizer(VulkanDevice* device);
@@ -31,9 +33,10 @@ private:
     // Стадии инициализации
     void createSwapChain();         // Создание логики смены кадров
     void getSwapchainImages();      // Получаем изображения из свопчейна
-    void createSwapchainImageViews();    // Создание вьюшек изображений буффера кадра свопчейна
+    void createSwapchainImageViews(); // Создание вьюшек изображений буффера кадра свопчейна
     VkFormat findDepthFormat();     // Подбираем нужный формат глубины
     void createDepthResources();    // Создаем буфферы для глубины
+    void createSemaphores();        // Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 

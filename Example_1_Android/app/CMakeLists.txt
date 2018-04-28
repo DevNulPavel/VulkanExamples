@@ -38,7 +38,7 @@ include_directories(src/main/cpp_libs/vulkan_wrapper/)
 
 # Flags
 #  -DNDEBUG
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -std=c++11 -Wall -Werror -DVK_USE_PLATFORM_ANDROID_KHR")
 
 if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
    set(CMAKE_CXX_FLAGS} "${CMAKE_CXX_FLAGS} -mhard-float -D_NDK_MATH_NO_SOFTFP=1 -mfloat-abi=hard")

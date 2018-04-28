@@ -588,7 +588,7 @@ void VulkanModelInfo::createCommandBuffers() {
         // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: Команды render pass будут выполняться из вторичных буферов.
         vkCmdBeginRenderPass(vulkanCommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        for(uint32_t j = 0; j < 2000; j++){
+        for(uint32_t j = 0; j < 5000; j++){
             // Устанавливаем пайплайн у коммандного буффера
             vkCmdBindPipeline(vulkanCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderInfo->vulkanPipeline);
 
@@ -609,7 +609,7 @@ void VulkanModelInfo::createCommandBuffers() {
             vkCmdPushConstants(vulkanCommandBuffers[i], vulkanRenderInfo->vulkanPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, (uint32_t)sizeof(model), (void*)&model);
 
             // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
-            vkCmdDraw(vulkanCommandBuffers[i], 3*180, 1, 0, 0);
+            vkCmdDraw(vulkanCommandBuffers[i], 3*2, 1, 0, 0);
             // Вызов поиндексной отрисовки - индексы вершин, один инстанс
             //vkCmdDrawIndexed(vulkanCommandBuffers[i], 3*180, 1, 0, 0, 0);  //static_cast<uint32_t>(vulkanTotalIndexesCount)
         }

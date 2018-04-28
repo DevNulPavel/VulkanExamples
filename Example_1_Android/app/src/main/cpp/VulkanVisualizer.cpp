@@ -22,9 +22,15 @@ VulkanVisualizer::VulkanVisualizer(VulkanDevice* device):
     createSwapchainImageViews();
     findDepthFormat();
     createDepthResources();
+    createSemaphores();
 }
 
 VulkanVisualizer::~VulkanVisualizer(){
+    for (uint32_t i = 0; i < vulkanImageAvailableSemaphores.size(); i++){
+        vkDestroySemaphore(vulkanDevice->vulkanLogicalDevice, vulkanImageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(vulkanDevice->vulkanLogicalDevice, vulkanRenderFinishedSemaphores[i], nullptr);
+    }
+
     for (const auto& buffer: vulkanSwapChainFramebuffers) {
         vkDestroyFramebuffer(vulkanDevice->vulkanLogicalDevice, buffer, nullptr);
     }
@@ -72,9 +78,15 @@ VkPresentModeKHR VulkanVisualizer::chooseSwapPresentMode(const std::vector<VkPre
             return availablePresentMode;
         }
     }
+    // Проверяем, можно ли использовать тройную буфферизацию??
+    for (const auto& availablePresentMode : availablePresentModes) {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) { // VK_PRESENT_MODE_MAILBOX_KHR
+            return availablePresentMode;
+        }
+    }
 
     // Если нет - просто двойная буфферизация
-    return VK_PRESENT_MODE_FIFO_KHR;
+    return availablePresentModes[0];
 }
 
 // Выбираем размер кадра-свопа
@@ -266,6 +278,25 @@ void VulkanVisualizer::createFramebuffers(VulkanRenderInfo* renderInfo){
         if (createStatus != VK_SUCCESS) {
             LOGE("Failed to create framebuffer!");
             throw std::runtime_error("Failed to create framebuffer!");
+        }
+    }
+}
+
+// Создаем семафоры для синхронизаций, чтобы не начинался энкодинг, пока не отобразится один из старых кадров
+void VulkanVisualizer::createSemaphores(){
+    vulkanImageAvailableSemaphores.resize(vulkanSwapChainImageViews.size());
+    vulkanRenderFinishedSemaphores.resize(vulkanSwapChainImageViews.size());
+
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    memset(&semaphoreInfo, 0, sizeof(VkSemaphoreCreateInfo));
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    // Создаем семафор для отображения и для кодирования графики
+    for (uint32_t i = 0; i < vulkanSwapChainImageViews.size(); i++){
+        if (vkCreateSemaphore(vulkanDevice->vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanImageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(vulkanDevice->vulkanLogicalDevice, &semaphoreInfo, nullptr, &vulkanRenderFinishedSemaphores[i]) != VK_SUCCESS) {
+            LOGE("Failed to create semaphores!");
+            throw std::runtime_error("Failed to create semaphores!");
         }
     }
 }

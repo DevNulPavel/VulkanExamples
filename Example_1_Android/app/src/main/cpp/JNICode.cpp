@@ -24,6 +24,7 @@ VulkanDevice* vulkanDevice = nullptr;
 VulkanVisualizer* vulkanVisualizer = nullptr;
 VulkanRenderInfo* vulkanRenderInfo = nullptr;
 VulkanModelInfo* vulkanModelInfo = nullptr;
+uint32_t  vulkanImageIndex = 0;
 std::chrono::high_resolution_clock::time_point lastDrawTime = std::chrono::high_resolution_clock::now();
 double lastFrameDuration = 1.0/60.0;
 bool fistDraw = true;
@@ -37,7 +38,7 @@ void drawFrame(float lastFrameDuration) {
     uint32_t imageIndex = 0;
     VkResult result = vkAcquireNextImageKHR(vulkanDevice->vulkanLogicalDevice, vulkanVisualizer->vulkanSwapchain,
                                             std::numeric_limits<uint64_t>::max(),
-                                            vulkanDevice->vulkanImageAvailableSemaphore, // Семафор ожидания доступной картинки
+                                            vulkanVisualizer->vulkanImageAvailableSemaphores[vulkanImageIndex], // Семафор ожидания доступной картинки
                                             VK_NULL_HANDLE, &imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -47,11 +48,15 @@ void drawFrame(float lastFrameDuration) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
+    if(imageIndex != vulkanImageIndex){
+        LOGE("Not equal images indexes %d != %d", imageIndex, vulkanImageIndex);
+    }
+
     // Настраиваем отправление в очередь комманд отрисовки
     // http://vulkanapi.ru/2016/11/14/vulkan-api-%D1%83%D1%80%D0%BE%D0%BA-29-%D1%80%D0%B5%D0%BD%D0%B4%D0%B5%D1%80%D0%B8%D0%BD%D0%B3-%D0%B8-%D0%BF%D1%80%D0%B5%D0%B4%D1%81%D1%82%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-hello-wo/
-    VkSemaphore waitSemaphores[] = {vulkanDevice->vulkanImageAvailableSemaphore}; // Семафор ожидания картинки для вывода туда графики
+    VkSemaphore waitSemaphores[] = {vulkanVisualizer->vulkanImageAvailableSemaphores[vulkanImageIndex]}; // Семафор ожидания картинки для вывода туда графики
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};    // Ждать будем возможности вывода в буфер цвета
-    VkSemaphore signalSemaphores[] = {vulkanDevice->vulkanRenderFinishedSemaphore}; // Семафор оповещения о завершении рендеринга
+    VkSemaphore signalSemaphores[] = {vulkanVisualizer->vulkanRenderFinishedSemaphores[vulkanImageIndex]}; // Семафор оповещения о завершении рендеринга
     VkSubmitInfo submitInfo = {};
     memset(&submitInfo, 0, sizeof(VkSubmitInfo));
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -89,6 +94,8 @@ void drawFrame(float lastFrameDuration) {
     } else if (presentResult != VK_SUCCESS) {
         throw std::runtime_error("failed to present swap chain image!");
     }
+
+    vulkanImageIndex = (vulkanImageIndex + 1) % (uint32_t)vulkanVisualizer->vulkanSwapChainImageViews.size();
 }
 
 extern "C" {
