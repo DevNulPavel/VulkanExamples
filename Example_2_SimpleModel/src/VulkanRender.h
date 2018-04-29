@@ -61,8 +61,8 @@ public:
     VulkanLogicalDevicePtr vulkanLogicalDevice;
     VulkanQueuePtr vulkanRenderQueue;
     VulkanQueuePtr vulkanPresentQueue;
-    VulkanSemaforePtr vulkanImageAvailableSemaphore;
-    VulkanSemaforePtr vulkanRenderFinishedSemaphore;
+    std::vector<VulkanSemaforePtr> vulkanImageAvailableSemaphores;
+    std::vector<VulkanSemaforePtr> vulkanRenderFinishedSemaphores;
     std::vector<VulkanFencePtr> vulkanPresentFences;
     std::vector<VulkanFencePtr> vulkanRenderFences;
     VulkanCommandPoolPtr vulkanRenderCommandPool;
@@ -94,7 +94,7 @@ public:
     
     float rotateAngle;
     
-    uint32_t vulkanImageIndex;
+    uint32_t vulkanSemaphoreIndex;
     
 private:
     void init(GLFWwindow* window);

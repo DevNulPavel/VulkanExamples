@@ -89,7 +89,8 @@ int local_main(int argc, char** argv) {
         TIME_BEGIN_OFF(SLEEP_TEST);
         if (std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count() > 0) {
             // Низкая точность на винде
-            sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
+            // Выставлен режим FIFO в Swapchain - поэтому не нужно
+            //sleepShort(std::chrono::duration_cast<std::chrono::microseconds>(sleepDuration).count() / 1000.0f);
         }
         TIME_END_MICROSEC_OFF(SLEEP_TEST, "Sleep time");
         
