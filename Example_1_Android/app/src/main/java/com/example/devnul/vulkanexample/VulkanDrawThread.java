@@ -19,6 +19,7 @@ public class VulkanDrawThread extends Thread{
     VulkanDrawThread(SurfaceHolder surfaceHolder, AssetManager inAssetManager){
         this.surfaceHolder = surfaceHolder;
         this.assetManager = inAssetManager;
+        setPriority(MAX_PRIORITY);
     }
 
     public void setRunning(boolean run) {
