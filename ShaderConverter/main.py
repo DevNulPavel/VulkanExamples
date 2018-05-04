@@ -11,6 +11,11 @@ def processShaderFile(inputPath, outputPath):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
+    # Вершинный или фрагментный у нас шейдер
+    isVertexShader = False
+    if ".vsh" in inputPath:
+        isVertexShader = True
+
     # Табы заменяем на пробелы
     inputFileText = inputFileText.replace("\t", "    ")
 
@@ -24,10 +29,14 @@ def processShaderFile(inputPath, outputPath):
 
     words = inputFileText.replace("\n", " ").split(" ")
 
-    attributesList = []
-    uniformsList = []
-    varyingsList = []
-    samplersList = []
+    attributesNamesList = []
+    attributesMap = {}
+    uniformsNamesList = []
+    uniformsMap = {}
+    varyingsNamesList = []
+    varyingsMap = {}
+    samplersNamesList = []
+    samplersMap = {}
 
     # Обходим слова и ищем аттрибуты
     attributeIndex = 0
@@ -50,9 +59,11 @@ def processShaderFile(inputPath, outputPath):
             attributeName = words[i]
 
             # Добавляем аттрибут к тексту нового шейдера
-            newShaderVariableName = "layout(location = %d) in %s %s\n" % (attributeIndex, attributeType, attributeName)
-            attributesList.append(newShaderVariableName)
-            attributeIndex += 1
+            if attributeName not in attributesMap:
+                newShaderVariableName = "layout(location = %d) in %s %s\n" % (attributeIndex, attributeType, attributeName)
+                attributesMap[attributeName] = newShaderVariableName
+                attributesNamesList.append(attributeName)
+                attributeIndex += 1
 
         if words[i] == "uniform":
             # TODO: ???
@@ -71,18 +82,21 @@ def processShaderFile(inputPath, outputPath):
                 uniformName = words[i]
 
                 # Добавляем аттрибут к тексту нового шейдера
-                newShaderVariableName = "    %s %s\n" % (uniformType, uniformName)
-                uniformsList.append(newShaderVariableName)
+                if uniformName not in uniformsMap:
+                    newShaderVariableName = "    %s %s\n" % (uniformType, uniformName)
+                    uniformsMap[uniformName] = newShaderVariableName
+                    uniformsNamesList.append(uniformName)
             else:
                 # Получаем имя семплера
                 i += 1
                 samplerName = words[i]
 
                 # Добавляем аттрибут к тексту нового шейдера
-                newShaderVariableName = "layout(set = %s, binding = 0) uniform sampler2D %s\n" % (samplerIndex, samplerName)
-                samplersList.append(newShaderVariableName)
-                samplerIndex += 1
-
+                if samplerName not in samplersMap:
+                    newShaderVariableName = "layout(set = %s, binding = 0) uniform sampler2D %s\n" % (samplerIndex, samplerName)
+                    samplersMap[samplerName] = newShaderVariableName
+                    samplersNamesList.append(samplerName)
+                    samplerIndex += 1
 
         if words[i] == "varying":
             # TODO: ???
@@ -99,9 +113,14 @@ def processShaderFile(inputPath, outputPath):
             varyingName = words[i]
 
             # Добавляем аттрибут к тексту нового шейдера
-            newShaderVariableName = "layout(location = %d) out %s %s\n" % (varyingIndex, varyingType, varyingName)
-            varyingsList.append(newShaderVariableName)
-            varyingIndex += 1
+            if varyingName not in varyingsMap:
+                if isVertexShader:
+                    newShaderVariableName = "layout(location = %d) out %s %s\n" % (varyingIndex, varyingType, varyingName)
+                else:
+                    newShaderVariableName = "layout(location = %d) in %s %s\n" % (varyingIndex, varyingType, varyingName)
+                varyingsMap[varyingName] = newShaderVariableName
+                varyingsNamesList.append(varyingName)
+                varyingIndex += 1
 
         i += 1
 
@@ -109,41 +128,63 @@ def processShaderFile(inputPath, outputPath):
     resultShaderText = "#version 450\n" \
                        "#extension GL_ARB_separate_shader_objects : enable\n\n"
 
-    # Attributes
-    if len(attributesList) > 0:
-        resultShaderText += "// Input\n"
-        for attributeString in attributesList:
-            resultShaderText += attributeString
-        resultShaderText += "\n"
+    if isVertexShader:
+        # Attributes
+        if len(attributesNamesList) > 0:
+            resultShaderText += "// Input\n"
+            for attributeString in attributesNamesList:
+                resultShaderText += attributesMap[attributeString]
+            resultShaderText += "\n"
 
-    # Uniforms
-    if len(uniformsList) > 0:
-        resultShaderText += "// Push constants\n" \
-                            "layout(push_constant) uniform PushConstants {\n"
-        for uniformName in uniformsList:
-            resultShaderText += uniformName
-        resultShaderText += "} pc;\n\n"   # TODO: ???
+        # Uniforms
+        if len(uniformsNamesList) > 0:
+            resultShaderText += "// Push constants\n" \
+                                "layout(push_constant) uniform PushConstants {\n"
+            for uniformName in uniformsNamesList:
+                resultShaderText += uniformsMap[uniformName]
+            resultShaderText += "} pc;\n\n"  # TODO: ???
 
-    # Samplers
-    if len(samplersList) > 0:
-        resultShaderText += "// Samplers\n"
-        for samplerName in samplersList:
-            resultShaderText += samplerName
-        resultShaderText += "\n"
+        # Varying
+        if len(varyingsNamesList) > 0:
+            resultShaderText += "// Varying variables\n"
+            for varyingName in varyingsNamesList:
+                resultShaderText += varyingsMap[varyingName]
+            resultShaderText += "\n"
 
-    # Varying
-    if len(varyingsList) > 0:
-        resultShaderText += "// Out variables\n"
-        for varyingName in varyingsList:
-            resultShaderText += varyingName
-        resultShaderText += "\n"
+        # Выходные переменные
+        resultShaderText += "// Vertex output\n" \
+                            "out gl_PerVertex {\n" \
+                            "    vec4 gl_Position;\n" \
+                            "};"
+    else:
+        # Varying
+        if len(varyingsNamesList) > 0:
+            resultShaderText += "// Varying variables\n"
+            for varyingName in varyingsNamesList:
+                resultShaderText += varyingsMap[varyingName]
+            resultShaderText += "\n"
 
+        # Samplers
+        if len(samplersNamesList) > 0:
+            resultShaderText += "// Samplers\n"
+            for samplerName in samplersNamesList:
+                resultShaderText += samplersMap[samplerName]
+            resultShaderText += "\n"
 
-    print(resultShaderText)
+        # Uniforms
+        if len(uniformsNamesList) > 0:
+            resultShaderText += "// Push constants\n" \
+                                "layout(push_constant) uniform PushConstants {\n"
+            for uniformName in uniformsNamesList:
+                resultShaderText += uniformsMap[uniformName]
+            resultShaderText += "} pc;\n\n"  # TODO: ???
 
+        # Выходные переменные
+        resultShaderText += "// Fragment output\n" \
+                            "layout(location = 0) out vec4 outputFragColor;\n"
 
-
-
+    with open(outputPath, "w") as file:
+        file.write(resultShaderText)
 
 
 def processShadersFolder(inputPath, outputPath):
