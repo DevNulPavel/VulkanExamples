@@ -310,12 +310,23 @@ void VulkanRenderInfo::createGraphicsPipeline() {
 
     // Push константы
     std::vector<VkPushConstantRange> pushConstants;
-    VkPushConstantRange pushConstantRange = {};
-    memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(glm::mat4);
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstants.push_back(pushConstantRange);
+    {
+        VkPushConstantRange pushConstantRange = {};
+        memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(glm::mat4);
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstants.push_back(pushConstantRange);
+    }
+    {
+        VkPushConstantRange pushConstantRange = {};
+        memset(&pushConstantRange, 0, sizeof(VkPushConstantRange));
+        pushConstantRange.offset = sizeof(glm::mat4);
+        pushConstantRange.size = sizeof(glm::vec4);
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstants.push_back(pushConstantRange);
+    }
+
 
     // Лаяут пайплайна
     VkDescriptorSetLayout setLayouts[] = {vulkanDescriptorSetLayout};   // Лаяют для юниформ буффер и семплера

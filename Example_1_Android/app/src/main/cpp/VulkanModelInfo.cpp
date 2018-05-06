@@ -607,6 +607,8 @@ void VulkanModelInfo::createCommandBuffers() {
             float angleOffset = j*10.0f;
             glm::mat4 model = glm::rotate(glm::mat4(), glm::radians(rotateAngle + angleOffset), glm::vec3(0.0f, 0.0f, 1.0f));
             vkCmdPushConstants(vulkanCommandBuffers[i], vulkanRenderInfo->vulkanPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, (uint32_t)sizeof(model), (void*)&model);
+            glm::vec4 color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f);
+            vkCmdPushConstants(vulkanCommandBuffers[i], vulkanRenderInfo->vulkanPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, (uint32_t)sizeof(model), (uint32_t)sizeof(color), (void*)&color);
 
             // Вызов отрисовки - 3 вершины, 1 инстанс, начинаем с 0 вершины и 0 инстанса
             vkCmdDraw(vulkanCommandBuffers[i], vulkanTotalVertexesCount, 1, 0, 0); // vulkanTotalVertexesCount
