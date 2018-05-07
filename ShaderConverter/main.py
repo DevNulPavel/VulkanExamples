@@ -6,8 +6,29 @@ import getopt
 import sys
 import re
 
+def convertTypeToOffset(typeName):
+    if typeName == "int":
+        return 4
+    elif typeName == "float":
+        return 4
+    elif typeName == "vec2":
+        return 4*2
+    elif typeName == "vec3":
+        return 4*3
+    elif typeName == "vec4":
+        return 4*4
+    elif typeName == "mat2":
+        return 4*2*2
+    elif typeName == "mat3":
+        return 4*3*3
+    elif typeName == "mat4":
+        return 4*4*4
+    else:
+        print("Invalid constant buffer type: %s" % typeName)
+        sys.exit(2)
 
-def processShaderFile(isVertexShader, inputPath, outputPath):
+
+def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffset: int) -> int:
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -23,6 +44,9 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
     # inputFileText = re.sub("^\s*$", "", inputFileText, flags=re.MULTILINE)
 
     words = inputFileText.replace("\n", " ").split(" ")
+
+    # Main function handle
+    mainFunctionText = re.search("void main\s*\(void\)\s*{[\s\S=]+}", inputFileText, flags=re.MULTILINE)[0]
 
     attributesNamesList = []
     attributesMap = {}
@@ -77,10 +101,14 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
                 uniformName = words[i].replace(";", "")
 
                 # Добавляем аттрибут к тексту нового шейдера
-                if uniformName not in uniformsMap:
-                    newShaderVariableName = "    %s %s;\n" % (uniformType, uniformName)
-                    uniformsMap[uniformName] = newShaderVariableName
-                    uniformsNamesList.append(uniformName)
+                if (uniformName not in uniformsMap):
+                    if uniformName in mainFunctionText:
+                        newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformType, uniformName)
+                        constantBufferOffset += convertTypeToOffset(uniformType)
+                        uniformsMap[uniformName] = newShaderVariableName
+                        uniformsNamesList.append(uniformName)
+                    else:
+                        print("Unused uniform variable %s in shader %s" % (uniformName, inputPath))
             else:
                 # Получаем имя семплера
                 i += 1
@@ -119,9 +147,6 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
 
         i += 1
 
-    # Main function handle
-    mainFunctionText = re.search("void main\s*\(void\)\s*{[\s\S=]+}", inputFileText, flags=re.MULTILINE)[0]
-
     # Result shader header
     resultShaderText = "#version 450\n\n"
                        #"#extension GL_ARB_separate_shader_objects : enable\n\n"
@@ -141,10 +166,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
             pushConstantsText = ""
             for uniformName in uniformsNamesList:
                 # Only used uniforms
-                if uniformName in mainFunctionText:
-                    pushConstantsText += uniformsMap[uniformName]
-                else:
-                    print("Not used uniform variable %s in shader %s" % (uniformName, inputPath))
+                pushConstantsText += uniformsMap[uniformName]
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Push constants\n" \
@@ -186,10 +208,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
             pushConstantsText = ""
             for uniformName in uniformsNamesList:
                 # Only used uniforms
-                if uniformName in mainFunctionText:
-                    pushConstantsText += uniformsMap[uniformName]
-                else:
-                    print("Not used uniform variable %s in shader %s" % (uniformName, inputPath))
+                pushConstantsText += uniformsMap[uniformName]
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Push constants\n" \
@@ -218,29 +237,37 @@ def processShaderFile(isVertexShader, inputPath, outputPath):
     resultShaderText += "\n\n// Main function\n"
     resultShaderText += mainFunctionText
 
+    # Сохраняем
     with open(outputPath, "w") as file:
         file.write(resultShaderText)
 
+    # Выравнивание
+    if (constantBufferOffset % 16) != 0:
+        constantBufferOffset += 16
+        constantBufferOffset -= constantBufferOffset % 16
+    return constantBufferOffset
 
 
 def processShadersFolder(inputPath, outputPath):
     for root, dirs, files in os.walk(inputPath, topdown=True):
         for fileName in files:
-            if (not fileName.startswith(".")) and ((".vsh" in fileName) or (".psh" in fileName)):
+            if (not fileName.startswith(".")) and (".vsh" in fileName):
                 resultFolder = root.replace(inputPath, outputPath)
 
-                sourceFilePath = os.path.join(root, fileName)
-                resultFilePath = os.path.join(resultFolder, fileName)
+                sourceVertexFilePath = os.path.join(root, fileName)
+                sourceFragmentFilePath = sourceVertexFilePath.replace(".vsh", ".psh")
+                resultVertexFilePath = os.path.join(resultFolder, fileName).replace(".vsh", ".vert")
+                resultFragmentFilePath = os.path.join(resultFolder, fileName).replace(".vsh", ".frag")
 
-                # Вершинный или фрагментный у нас шейдер
-                isVertexShader = False
-                if ".vsh" in fileName:
-                    isVertexShader = True
-                    resultFilePath = resultFilePath.replace(".vsh", ".vert")
-                else:
-                    resultFilePath = resultFilePath.replace(".psh", ".frag")
+                # Проверка налиция обоих файлов
+                if not os.path.exists(sourceVertexFilePath) or not os.path.exists(sourceFragmentFilePath):
+                    print("Missing shaders %s + %s" % (sourceVertexFilePath, sourceFragmentFilePath))
+                    sys.exit(2)
 
-                processShaderFile(isVertexShader, sourceFilePath, resultFilePath)
+                # Обработка шейдеров
+                constantBufferSize = 0
+                constantBufferSize += processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, constantBufferSize)
+                constantBufferSize += processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, constantBufferSize)
 
 
 if __name__ == '__main__':
