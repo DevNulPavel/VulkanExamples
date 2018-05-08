@@ -6,7 +6,7 @@ import getopt
 import sys
 import re
 
-def convertTypeToOffset(typeName):
+def convertTypeToSize(typeName):
     if typeName == "int":
         return 4
     elif typeName == "float":
@@ -27,6 +27,27 @@ def convertTypeToOffset(typeName):
         print("Invalid constant buffer type: %s" % typeName)
         sys.exit(2)
 
+def convertTypeToSortPriority(typeName):
+    if typeName == "int":
+        return 1
+    elif typeName == "float":
+        return 2
+    elif typeName == "vec2":
+        return 3
+    elif typeName == "vec3":
+        return 4
+    elif typeName == "vec4":
+        return 5
+    elif typeName == "mat2":
+        return 6
+    elif typeName == "mat3":
+        return 7
+    elif typeName == "mat4":
+        return 8
+    else:
+        print("Invalid constant buffer type: %s" % typeName)
+        sys.exit(2)
+
 
 def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffset: int) -> int:
     with open(inputPath, "r") as file:
@@ -40,14 +61,30 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     inputFileText = re.sub("\/\*.+\*\/\n", "\n", inputFileText, flags=0)
     inputFileText = re.sub("\/\/.+\n", "\n", inputFileText, flags=0)
 
+    # Удаляем странные дефайны
+    inputFileText = inputFileText.replace("FLOAT", "float")
+
     # Удаляем пустые строки
     # inputFileText = re.sub("^\s*$", "", inputFileText, flags=re.MULTILINE)
 
     words = inputFileText.replace("\n", " ").split(" ")
+    words = list(filter(lambda a: a != "", words))
 
     # Main function handle
     mainFunctionText = re.search("void main\s*\(void\)\s*{[\s\S=]+}", inputFileText, flags=re.MULTILINE)[0]
 
+    # Remove precision words
+    precisionWords = ["lowp", "mediump", "highp", "PRECISION_LOW", "PRECISION_MEDIUM", "PRECISION_HIGH", "PLATFORM_PRECISION"]
+    for precisionWord in precisionWords:
+        mainFunctionText = mainFunctionText.replace(precisionWord, "PRECISION")
+    mainFunctionText = mainFunctionText.replace("PRECISION ", "")
+
+    # Ignore defines
+    ignoreDefinesList = ["float", "FLOAT", "VEC2"]
+
+    # Lists
+    definesNamesList = []
+    definesMap = {}
     attributesNamesList = []
     attributesMap = {}
     uniformsNamesList = []
@@ -63,11 +100,27 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     samplerIndex = 0
     i = 0
     while i < len(words):
+        if words[i] == "#define":
+            # Получаем тип аттрибута
+            i += 1
+            defineName = words[i]
+
+            if (defineName in mainFunctionText) and (defineName not in ignoreDefinesList):
+                # Получаем значение
+                i += 1
+                defineValue = words[i]
+
+                # Добавляем аттрибут к тексту нового шейдера
+                if defineName not in definesNamesList:
+                    newShaderDefineName = "#define %s %s\n" % (defineName, defineValue)
+                    definesMap[defineName] = newShaderDefineName
+                    definesNamesList.append(defineName)
+
         if words[i] == "attribute":
             # TODO: ???
             # Если после attribute идет описание точности - пропускаем его
             i += 1
-            if words[i] in ["lowp", "mediump", "highp", "PRECISION_LOW", "PRECISION_MEDIUM", "PRECISION_HIGH", "PLATFORM_PRECISION"]:
+            if words[i] in precisionWords:
                 i += 1
 
             # Получаем тип аттрибута
@@ -88,7 +141,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
             # TODO: ???
             # Если после uniform идет описание точности - пропускаем его
             i += 1
-            if words[i] in ["lowp", "mediump", "highp", "PRECISION_LOW", "PRECISION_MEDIUM", "PRECISION_HIGH", "PLATFORM_PRECISION"]:
+            if words[i] in precisionWords:
                 i += 1
 
             # Если после uniform идет sampler2D - не обрабоатываем
@@ -103,9 +156,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
                 # Добавляем аттрибут к тексту нового шейдера
                 if (uniformName not in uniformsMap):
                     if uniformName in mainFunctionText:
-                        newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformType, uniformName)
-                        constantBufferOffset += convertTypeToOffset(uniformType)
-                        uniformsMap[uniformName] = newShaderVariableName
+                        uniformsMap[uniformName] = {"type": uniformType, "name": uniformName}
                         uniformsNamesList.append(uniformName)
                     else:
                         print("Unused uniform variable %s in shader %s" % (uniformName, inputPath))
@@ -125,7 +176,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
             # TODO: ???
             # Если после varying идет описание точности - пропускаем его
             i += 1
-            if words[i] in ["lowp", "mediump", "highp", "PRECISION_LOW", "PRECISION_MEDIUM", "PRECISION_HIGH", "PLATFORM_PRECISION"]:
+            if words[i] in precisionWords:
                 i += 1
 
             # Получаем тип аттрибута
@@ -149,10 +200,17 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
 
     # Result shader header
     resultShaderText = "#version 450\n\n"
-                       #"#extension GL_ARB_separate_shader_objects : enable\n\n"
+                        #"#extension GL_ARB_separate_shader_objects : enable\n\n"
 
     if isVertexShader:
         resultShaderText += "// Vertex shader\n\n"
+
+        # Defines
+        if len(definesNamesList) > 0:
+            resultShaderText += "// Defines\n"
+            for defineName in definesNamesList:
+                resultShaderText += definesMap[defineName]
+            resultShaderText += "\n"
 
         # Attributes
         if len(attributesNamesList) > 0:
@@ -164,9 +222,19 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
         # Uniforms
         if len(uniformsNamesList) > 0:
             pushConstantsText = ""
+
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
+
+            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+
             for uniformName in uniformsNamesList:
+                uniformDict = uniformsMap[uniformName]
+                newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformDict["type"], uniformDict["name"])
+                constantBufferOffset += convertTypeToSize(uniformDict["type"])
                 # Only used uniforms
-                pushConstantsText += uniformsMap[uniformName]
+                pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Push constants\n" \
@@ -189,6 +257,13 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     else:
         resultShaderText += "// Fragment shader\n\n"
 
+        # Defines
+        if len(definesNamesList) > 0:
+            resultShaderText += "// Defines\n"
+            for defineName in definesNamesList:
+                resultShaderText += definesMap[defineName]
+            resultShaderText += "\n"
+
         # Varying
         if len(varyingsNamesList) > 0:
             resultShaderText += "// Varying variables\n"
@@ -206,9 +281,19 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
         # Uniforms
         if len(uniformsNamesList) > 0:
             pushConstantsText = ""
+
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
+
+            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+
             for uniformName in uniformsNamesList:
+                uniformDict = uniformsMap[uniformName]
+                newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformDict["type"], uniformDict["name"])
+                constantBufferOffset += convertTypeToSize(uniformDict["type"])
                 # Only used uniforms
-                pushConstantsText += uniformsMap[uniformName]
+                pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Push constants\n" \
@@ -220,6 +305,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
         resultShaderText += "// Fragment output\n" \
                             "layout(location = 0) out vec4 outputFragColor;\n"
 
+
     functionDeclaration = re.search("void main\s*\(void\)\s*{", mainFunctionText, flags=0)[0]
 
     # Function declaration replace
@@ -227,14 +313,30 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
 
     # Replace uniforms on push constants
     for uniformName in uniformsNamesList:
-        mainFunctionText = mainFunctionText.replace(uniformName, "pc."+uniformName)
+        #expression = "[^a-zA-Z_](%s)[^a-zA-Z_]" % uniformName
+        expression = r"[\+\-\ * \ /(<>=](%s)[\+\-\ * \ /, ;.\[)<>=]" % uniformName
+        replaceValue = "pc.%s" % uniformName
+
+        matches = re.search(expression, mainFunctionText)
+
+        while matches:
+            for groupNum in range(0, len(matches.groups())):
+                groupNum = groupNum + 1
+                start = matches.start(groupNum)
+                end = matches.end(groupNum)
+                # group = matches.group(groupNum)
+                mainFunctionText = mainFunctionText[0:start] + replaceValue + mainFunctionText[end:]
+            matches = re.search(expression, mainFunctionText)
+
+        # mainFunctionText = re.sub(expression, mainFunctionText, replaceValue)
+        # mainFunctionText = mainFunctionText.replace(uniformName, "pc."+uniformName)
 
     # Fragment out variable
     if isVertexShader == False:
         mainFunctionText = mainFunctionText.replace("texture2D", "texture")
         mainFunctionText = mainFunctionText.replace("gl_FragColor", "outputFragColor")
 
-    resultShaderText += "\n\n// Main function\n"
+    resultShaderText += "\n// Main function\n"
     resultShaderText += mainFunctionText
 
     # Сохраняем
@@ -251,13 +353,13 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
 def processShadersFolder(inputPath, outputPath):
     for root, dirs, files in os.walk(inputPath, topdown=True):
         for fileName in files:
-            if (not fileName.startswith(".")) and (".vsh" in fileName):
+            if (not fileName.startswith(".")) and (".psh" in fileName):
                 resultFolder = root.replace(inputPath, outputPath)
 
-                sourceVertexFilePath = os.path.join(root, fileName)
-                sourceFragmentFilePath = sourceVertexFilePath.replace(".vsh", ".psh")
-                resultVertexFilePath = os.path.join(resultFolder, fileName).replace(".vsh", ".vert")
-                resultFragmentFilePath = os.path.join(resultFolder, fileName).replace(".vsh", ".frag")
+                sourceFragmentFilePath = os.path.join(root, fileName)
+                sourceVertexFilePath = sourceFragmentFilePath.replace(".psh", ".vsh")
+                resultFragmentFilePath = os.path.join(resultFolder, fileName).replace(".psh", ".frag")
+                resultVertexFilePath = os.path.join(resultFolder, fileName).replace(".psh", ".vert")
 
                 # Проверка налиция обоих файлов
                 if not os.path.exists(sourceVertexFilePath) or not os.path.exists(sourceFragmentFilePath):
@@ -268,7 +370,6 @@ def processShadersFolder(inputPath, outputPath):
                 constantBufferSize = 0
                 constantBufferSize += processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, constantBufferSize)
                 constantBufferSize += processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, constantBufferSize)
-
 
 if __name__ == '__main__':
     # Params
