@@ -160,6 +160,8 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
                         uniformsNamesList.append(uniformName)
                     else:
                         print("Unused uniform variable %s in shader %s" % (uniformName, inputPath))
+
+
             else:
                 # Получаем имя семплера
                 i += 1
@@ -186,16 +188,39 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
             i += 1
             varyingName = words[i].replace(";", "")
 
-            # Добавляем аттрибут к тексту нового шейдера
-            if varyingName not in varyingsMap:
-                if isVertexShader:
-                    newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingName)
-                else:
-                    newShaderVariableName = "layout(location = %d) in %s %s;\n" % (varyingIndex, varyingType, varyingName)
-                varyingsMap[varyingName] = newShaderVariableName
-                varyingsNamesList.append(varyingName)
-                varyingIndex += 1
+            # Может быть у нас массив varying переменных
+            if "[" in varyingName:
+                varyingMatches = re.search("([a-zA-Z_]+)\[([0-9]+)\]", varyingName)
+                if varyingMatches:
+                    name = varyingMatches.group(1)
+                    count = int(varyingMatches.group(2))
 
+                    for index in range(0, count):
+                        varyingCountName = "%s_%d" % (name, index)
+
+                        # Добавляем аттрибут к тексту нового шейдера
+                        if varyingCountName not in varyingsMap:
+                            if isVertexShader:
+                                newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingCountName)
+                            else:
+                                newShaderVariableName = "layout(location = %d) in %s %s;\n" % (varyingIndex, varyingType, varyingCountName)
+                            varyingsMap[varyingCountName] = newShaderVariableName
+                            varyingsNamesList.append(varyingCountName)
+                            varyingIndex += 1
+
+                            # Замена в тексте
+                            expression = "%s\[[ ]*%d[ ]*\]" % (name, index)
+                            mainFunctionText = re.sub(expression, varyingCountName, mainFunctionText)
+            else:
+                # Добавляем аттрибут к тексту нового шейдера
+                if varyingName not in varyingsMap:
+                    if isVertexShader:
+                        newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingName)
+                    else:
+                        newShaderVariableName = "layout(location = %d) in %s %s;\n" % (varyingIndex, varyingType, varyingName)
+                    varyingsMap[varyingName] = newShaderVariableName
+                    varyingsNamesList.append(varyingName)
+                    varyingIndex += 1
         i += 1
 
     # Result shader header
