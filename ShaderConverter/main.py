@@ -49,7 +49,7 @@ def convertTypeToSortPriority(typeName):
         sys.exit(2)
 
 
-def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffset: int) -> int:
+def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffset: int, inputVaryingLocations: dict) -> (int, dict):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -93,6 +93,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     varyingsMap = {}
     samplersNamesList = []
     samplersMap = {}
+    resultVaryingLocations = {}
 
     # Обходим слова и ищем аттрибуты
     attributeIndex = 0
@@ -195,29 +196,45 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
                     name = varyingMatches.group(1)
                     count = int(varyingMatches.group(2))
 
-                    for index in range(0, count):
-                        varyingCountName = "%s_%d" % (name, index)
+                    if name in mainFunctionText:
+                        for index in range(0, count):
+                            varyingCountName = "%s_%d" % (name, index)
 
-                        # Добавляем аттрибут к тексту нового шейдера
-                        if varyingCountName not in varyingsMap:
-                            if isVertexShader:
-                                newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingCountName)
-                            else:
-                                newShaderVariableName = "layout(location = %d) in %s %s;\n" % (varyingIndex, varyingType, varyingCountName)
-                            varyingsMap[varyingCountName] = newShaderVariableName
-                            varyingsNamesList.append(varyingCountName)
-                            varyingIndex += 1
+                            # Добавляем аттрибут к тексту нового шейдера
+                            if varyingCountName not in varyingsMap:
+                                if isVertexShader:
+                                    resultVaryingLocations[varyingCountName] = varyingIndex
+                                    newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingCountName)
+                                else:
+                                    if varyingCountName in inputVaryingLocations:
+                                        inputIndex = inputVaryingLocations[varyingCountName]
+                                        newShaderVariableName = "layout(location = %d) in %s %s;\n" % (inputIndex, varyingType, varyingCountName)
+                                    else:
+                                        print("Is not compatible varyings for %s with vertex shader" % inputPath)
+                                        sys.exit(2)
 
-                            # Замена в тексте
-                            expression = "%s\[[ ]*%d[ ]*\]" % (name, index)
-                            mainFunctionText = re.sub(expression, varyingCountName, mainFunctionText)
+                                varyingsMap[varyingCountName] = newShaderVariableName
+                                varyingsNamesList.append(varyingCountName)
+                                varyingIndex += 1
+
+                                # Замена в тексте
+                                expression = "%s\[[ ]*%d[ ]*\]" % (name, index)
+                                mainFunctionText = re.sub(expression, varyingCountName, mainFunctionText)
             else:
                 # Добавляем аттрибут к тексту нового шейдера
-                if varyingName not in varyingsMap:
+                if (varyingName not in varyingsMap) and (varyingName in mainFunctionText):
+                    newShaderVariableName = ""
                     if isVertexShader:
+                        resultVaryingLocations[varyingName] = varyingIndex
                         newShaderVariableName = "layout(location = %d) out %s %s;\n" % (varyingIndex, varyingType, varyingName)
                     else:
-                        newShaderVariableName = "layout(location = %d) in %s %s;\n" % (varyingIndex, varyingType, varyingName)
+                        if varyingName in inputVaryingLocations:
+                            inputIndex = inputVaryingLocations[varyingName]
+                            newShaderVariableName = "layout(location = %d) in %s %s;\n" % (inputIndex, varyingType, varyingName)
+                        else:
+                            print("Is not compatible varyings for %s with vertex shader" % inputPath)
+                            sys.exit(2)
+
                     varyingsMap[varyingName] = newShaderVariableName
                     varyingsNamesList.append(varyingName)
                     varyingIndex += 1
@@ -372,7 +389,8 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     if (constantBufferOffset % 16) != 0:
         constantBufferOffset += 16
         constantBufferOffset -= constantBufferOffset % 16
-    return constantBufferOffset
+
+    return constantBufferOffset, resultVaryingLocations
 
 
 def processShadersFolder(inputPath, outputPath):
@@ -392,9 +410,9 @@ def processShadersFolder(inputPath, outputPath):
                     sys.exit(2)
 
                 # Обработка шейдеров
-                constantBufferSize = 0
-                constantBufferSize += processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, constantBufferSize)
-                constantBufferSize += processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, constantBufferSize)
+                constantBufferSize, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {})
+                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, constantBufferSize, varyingLocations)
+
 
 if __name__ == '__main__':
     # Params
