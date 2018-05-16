@@ -61,25 +61,25 @@ message("******** System libs search ***********")
 
 # Стандартный поиск плохо работает на Mac с MoltenVK https://cmake.org/cmake/help/v3.7/module/FindVulkan.html, 
 # Как результат - требует установки переменной окружения VULKAN_SDK, используется кастомный поиск Vulkan из CMake папки (взято из GLFW)
-find_package(Vulkan)
-if(VULKAN_FOUND)
-    include_directories(${VULKAN_INCLUDE_DIR})
-    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${VULKAN_LIBRARY})
-    message("Vulkan includes: ${VULKAN_INCLUDE_DIR}")
-    message("Vulkan libs: ${VULKAN_LIBRARY}")
-else()
-    message(FATAL_ERROR "Vulkan lib not found!")
-endif()
+# find_package(Vulkan)
+# if(VULKAN_FOUND)
+#     include_directories(${VULKAN_INCLUDE_DIR})
+#     set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES} ${VULKAN_LIBRARY})
+#     message("Vulkan includes: ${VULKAN_INCLUDE_DIR}")
+#     message("Vulkan libs: ${VULKAN_LIBRARY}")
+# else()
+#     message(FATAL_ERROR "Vulkan lib not found!")
+# endif()
 
-# Список фреймворков OSX для MoltenVK
-if(APPLE)
-    set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES}
-        "-framework Metal"
-        "-framework IOSurface"
-        "-framework QuartzCore"
-        "-framework IOKit"
-        "-framework Foundation")
-endif()
+# # Список фреймворков OSX для MoltenVK
+# if(APPLE)
+#     set(LIBS_LINK_NAMES ${LIBS_LINK_NAMES}
+#         "-framework Metal"
+#         "-framework IOSurface"
+#         "-framework QuartzCore"
+#         "-framework IOKit"
+#         "-framework Foundation")
+# endif()
 
 ##############
 # Системные библиотеки
