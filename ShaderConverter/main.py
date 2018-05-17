@@ -49,7 +49,7 @@ def convertTypeToSortPriority(typeName):
         sys.exit(2)
 
 
-def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inputVaryingLocations: dict) -> (int, dict):
+def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, bindIndex: int, inputVaryingLocations: dict) -> (int, int, dict):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -272,10 +272,10 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Uniform buffer\n" \
-                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
+                                    "layout(set = 0, binding = %d) uniform UniformBufferObject {\n" % bindIndex
                 resultShaderText += pushConstantsText
                 resultShaderText += "} ubo;\n\n"  # TODO: ???
-                setIndex += 1
+                bindIndex += 1
 
         # Varying
         if len(varyingsNamesList) > 0:
@@ -324,9 +324,10 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Uniform buffer\n" \
-                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
+                                    "layout(set = 0, binding = %d) uniform UniformBufferObject {\n" % bindIndex
                 resultShaderText += pushConstantsText
                 resultShaderText += "} ubo;\n\n"  # TODO: ???
+                bindIndex += 1
                 setIndex += 1
 
         # Samplers
@@ -379,7 +380,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
     with open(outputPath, "w") as file:
         file.write(resultShaderText)
 
-    return setIndex, resultVaryingLocations
+    return setIndex, bindIndex, resultVaryingLocations
 
 
 def processShadersFolder(inputPath, outputPath):
@@ -399,8 +400,8 @@ def processShadersFolder(inputPath, outputPath):
                     sys.exit(2)
 
                 # Обработка шейдеров
-                setIndex, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {})
-                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations)
+                setIndex, bindIndex, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, 0, {})
+                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, bindIndex, varyingLocations)
 
 
 if __name__ == '__main__':
