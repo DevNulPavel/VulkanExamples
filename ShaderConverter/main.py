@@ -271,7 +271,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
                 pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
-                resultShaderText += "// Push constants\n" \
+                resultShaderText += "// Uniform buffer\n" \
                                     "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
                 resultShaderText += pushConstantsText
                 resultShaderText += "} ubo;\n\n"  # TODO: ???
