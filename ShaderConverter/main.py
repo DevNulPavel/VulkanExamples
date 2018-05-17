@@ -49,7 +49,7 @@ def convertTypeToSortPriority(typeName):
         sys.exit(2)
 
 
-def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffset: int, inputVaryingLocations: dict) -> (int, dict):
+def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inputVaryingLocations: dict) -> (int, dict):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -92,13 +92,11 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     varyingsNamesList = []
     varyingsMap = {}
     samplersNamesList = []
-    samplersMap = {}
     resultVaryingLocations = {}
 
     # Обходим слова и ищем аттрибуты
     attributeIndex = 0
     varyingIndex = 0
-    samplerIndex = 0
     i = 0
     while i < len(words):
         if words[i] == "#define":
@@ -161,19 +159,14 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
                         uniformsNamesList.append(uniformName)
                     else:
                         print("Unused uniform variable %s in shader %s" % (uniformName, inputPath))
-
-
             else:
                 # Получаем имя семплера
                 i += 1
                 samplerName = words[i].replace(";", "")
 
                 # Добавляем аттрибут к тексту нового шейдера
-                if samplerName not in samplersMap:
-                    newShaderVariableName = "layout(set = %s, binding = 0) uniform sampler2D %s;\n" % (samplerIndex, samplerName)
-                    samplersMap[samplerName] = newShaderVariableName
+                if samplerName not in samplersNamesList:
                     samplersNamesList.append(samplerName)
-                    samplerIndex += 1
 
         if words[i] == "varying":
             # TODO: ???
@@ -273,16 +266,16 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
 
             for uniformName in uniformsNamesList:
                 uniformDict = uniformsMap[uniformName]
-                newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformDict["type"], uniformDict["name"])
-                constantBufferOffset += convertTypeToSize(uniformDict["type"])
+                newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
                 # Only used uniforms
                 pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Push constants\n" \
-                                    "layout(push_constant) uniform PushConstants {\n"
+                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
                 resultShaderText += pushConstantsText
-                resultShaderText += "} pc;\n\n"  # TODO: ???
+                resultShaderText += "} ubo;\n\n"  # TODO: ???
+                setIndex += 1
 
         # Varying
         if len(varyingsNamesList) > 0:
@@ -313,13 +306,6 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
                 resultShaderText += varyingsMap[varyingName]
             resultShaderText += "\n"
 
-        # Samplers
-        if len(samplersNamesList) > 0:
-            resultShaderText += "// Samplers\n"
-            for samplerName in samplersNamesList:
-                resultShaderText += samplersMap[samplerName]
-            resultShaderText += "\n"
-
         # Uniforms
         if len(uniformsNamesList) > 0:
             pushConstantsText = ""
@@ -332,16 +318,24 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
 
             for uniformName in uniformsNamesList:
                 uniformDict = uniformsMap[uniformName]
-                newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (constantBufferOffset, uniformDict["type"], uniformDict["name"])
-                constantBufferOffset += convertTypeToSize(uniformDict["type"])
+                newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
                 # Only used uniforms
                 pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
-                resultShaderText += "// Push constants\n" \
-                                    "layout(push_constant) uniform PushConstants {\n"
+                resultShaderText += "// Uniform buffer\n" \
+                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
                 resultShaderText += pushConstantsText
-                resultShaderText += "} pc;\n\n"  # TODO: ???
+                resultShaderText += "} ubo;\n\n"  # TODO: ???
+                setIndex += 1
+
+        # Samplers
+        if len(samplersNamesList) > 0:
+            resultShaderText += "// Samplers\n"
+            for samplerName in samplersNamesList:
+                resultShaderText += "layout(set = %s, binding = 0) uniform sampler2D %s;\n" % (setIndex, samplerName)
+                setIndex += 1
+            resultShaderText += "\n"
 
         # Выходные переменные
         resultShaderText += "// Fragment output\n" \
@@ -357,7 +351,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     for uniformName in uniformsNamesList:
         #expression = "[^a-zA-Z_](%s)[^a-zA-Z_]" % uniformName
         expression = r"[\+\-\ * \ /(<>=](%s)[\+\-\ * \ /, ;.\[)<>=]" % uniformName
-        replaceValue = "pc.%s" % uniformName
+        replaceValue = "ubo.%s" % uniformName
 
         matches = re.search(expression, mainFunctionText)
 
@@ -385,12 +379,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, constantBufferOffse
     with open(outputPath, "w") as file:
         file.write(resultShaderText)
 
-    # Выравнивание
-    if (constantBufferOffset % 16) != 0:
-        constantBufferOffset += 16
-        constantBufferOffset -= constantBufferOffset % 16
-
-    return constantBufferOffset, resultVaryingLocations
+    return setIndex, resultVaryingLocations
 
 
 def processShadersFolder(inputPath, outputPath):
@@ -410,8 +399,8 @@ def processShadersFolder(inputPath, outputPath):
                     sys.exit(2)
 
                 # Обработка шейдеров
-                constantBufferSize, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {})
-                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, constantBufferSize, varyingLocations)
+                setIndex, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {})
+                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations)
 
 
 if __name__ == '__main__':
