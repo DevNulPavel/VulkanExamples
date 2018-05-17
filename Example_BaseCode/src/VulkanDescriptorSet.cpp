@@ -71,12 +71,13 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
     _usedObjects.clear();
     
     // Настройки дескрипторов
-    std::vector<VkDescriptorImageInfo> imageInfos;
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
+    std::vector<VkDescriptorImageInfo> imageInfos(configs.size());   // Специально, чтобы не происходила реаллокация данных при добавлении в вектор
+    std::vector<VkDescriptorBufferInfo> bufferInfos(configs.size()); // Специально, чтобы не происходила реаллокация данных при добавлении в вектор
     std::vector<VkWriteDescriptorSet> descriptorWrites;
     descriptorWrites.reserve(configs.size());
     
-    for (const VulkanDescriptorSetUpdateConfig& config: configs) {
+    for (uint32_t i = 0; i < configs.size(); i++) {
+        const VulkanDescriptorSetUpdateConfig& config = configs[i];
         VkWriteDescriptorSet writeSet = {};
         memset(&writeSet, 0, sizeof(VkWriteDescriptorSet));
         
@@ -106,9 +107,9 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
                 }
                 
                 // Сохраняем структуру, чтобы не уничтожилась
-                imageInfos.push_back(imageInfo);
+                imageInfos[i] = imageInfo;
                 // Указатель на сохраненый объект
-                writeSet.pImageInfo = &(imageInfos.back());
+                writeSet.pImageInfo = &(imageInfos[i]);
             }break;
                 
             case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
@@ -125,9 +126,9 @@ void VulkanDescriptorSet::updateDescriptorSet(const std::vector<VulkanDescriptor
                 }
                 
                 // Сохраняем структуру, чтобы не уничтожилась
-                bufferInfos.push_back(bufferInfo);
+                bufferInfos[i] = bufferInfo;
                 // Указатель на сохраненый объект
-                writeSet.pBufferInfo = &(bufferInfos.back());
+                writeSet.pBufferInfo = &(bufferInfos[i]);
             }break;
                 
             default:
