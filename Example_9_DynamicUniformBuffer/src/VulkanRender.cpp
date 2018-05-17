@@ -357,6 +357,10 @@ void VulkanRender::createGraphicsPipeline() {
     blendConfig.srcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blendConfig.dstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     
+    // Лаяуты
+    std::vector<VulkanDescriptorSetLayoutPtr> layouts;
+    layouts.push_back(vulkanDescriptorSetLayout);
+    
     // Пайплайн
     vulkanPipeline = std::make_shared<VulkanPipeline>(vulkanLogicalDevice,
                                                       vulkanVertexModule, vulkanFragmentModule,
@@ -368,7 +372,7 @@ void VulkanRender::createGraphicsPipeline() {
                                                       scissor,
                                                       cullingConfig,
                                                       blendConfig,
-                                                      vulkanDescriptorSetLayout,
+                                                      layouts,
                                                       vulkanRenderPass);
 }
 
