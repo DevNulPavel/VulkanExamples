@@ -49,7 +49,7 @@ def convertTypeToSortPriority(typeName):
         sys.exit(2)
 
 
-def analyseUniformsSize(filePath) -> int:
+def analyseUniformsSize(filePath) -> (int, dict):
     with open(filePath, "r") as file:
         inputFileText = file.read()
 
@@ -80,6 +80,7 @@ def analyseUniformsSize(filePath) -> int:
     mainFunctionText = mainFunctionText.replace("PRECISION ", "")
 
     testUniformsNamesList = []
+    uniformsDict = {}
 
     # Обходим слова и ищем аттрибуты
     uniformsSize = 0
@@ -104,12 +105,13 @@ def analyseUniformsSize(filePath) -> int:
                 if (testUniformName not in testUniformsNamesList) and (testUniformName in mainFunctionText):
                     uniformsSize += convertTypeToSize(testUniformType)
                     testUniformsNamesList.append(testUniformName)
+                    uniformsDict[testUniformName] = testUniformType
         i += 1
 
-    return uniformsSize
+    return uniformsSize, uniformsDict
 
 
-def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVaryingLocations, previousStageUniforms, pushConstantOffset, usePushConstant) -> (int, str, int, dict):
+def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVaryingLocations, fullUniformsDict, pushConstantOffset, usePushConstant) -> (int, int, dict):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -315,19 +317,20 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVary
             resultShaderText += "\n"
 
         # Uniforms
-        if len(uniformsNamesList) > 0:
-            pushConstantsText = ""
-
+        if usePushConstant:
             # Сортируем по убыванию размера
             def sortFunction(uniformName):
                 return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
 
-            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+            if len(uniformsNamesList) > 0:
+                uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
 
-            if usePushConstant:
+                pushConstantsText = ""
+
                 for uniformName in uniformsNamesList:
                     uniformDict = uniformsMap[uniformName]
-                    newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (pushConstantOffset, uniformDict["type"], uniformDict["name"])
+                    newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (
+                    pushConstantOffset, uniformDict["type"], uniformDict["name"])
                     pushConstantOffset += convertTypeToSize(uniformDict["type"])
                     # Only used uniforms
                     pushConstantsText += newShaderVariableName
@@ -337,19 +340,26 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVary
                                         "layout(push_constant) uniform PushConstants {\n"
                     resultShaderText += pushConstantsText
                     resultShaderText += "} uni;\n\n"  # TODO: ???
-            else:
-                for uniformName in uniformsNamesList:
-                    uniformDict = uniformsMap[uniformName]
-                    newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
-                    pushConstantsText += newShaderVariableName
+        else:
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(fullUniformsDict[uniformName])
 
-                if len(pushConstantsText) > 0:
-                    previousStageUniforms += pushConstantsText
+            uniformsNamesList = fullUniformsDict.keys()
+            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
 
-                    resultShaderText += "// Uniform buffer\n" \
-                                        "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
-                    resultShaderText += pushConstantsText
-                    resultShaderText += "} uni;\n\n"  # TODO: ???
+            pushConstantsText = ""
+
+            for uniformName in uniformsNamesList:
+                uniformType = fullUniformsDict[uniformName]
+                newShaderVariableName = "    %s %s;\n" % (uniformType, uniformName)
+                pushConstantsText += newShaderVariableName
+
+            if len(pushConstantsText) > 0:
+                resultShaderText += "// Uniform buffer\n" \
+                                    "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
+                resultShaderText += pushConstantsText
+                resultShaderText += "} uni;\n\n"  # TODO: ???
 
         # Varying
         if len(varyingsNamesList) > 0:
@@ -381,20 +391,21 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVary
             resultShaderText += "\n"
 
         # Uniforms
-        if len(uniformsNamesList) > 0:
-            pushConstantsText = ""
-
+        if usePushConstant:
             # Сортируем по убыванию размера
             def sortFunction(uniformName):
                 return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
 
-            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+            if len(uniformsNamesList) > 0:
+                uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
 
-            if usePushConstant:
+                pushConstantsText = ""
+
                 for uniformName in uniformsNamesList:
                     uniformDict = uniformsMap[uniformName]
                     newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (pushConstantOffset, uniformDict["type"], uniformDict["name"])
                     pushConstantOffset += convertTypeToSize(uniformDict["type"])
+                    # Only used uniforms
                     pushConstantsText += newShaderVariableName
 
                 if len(pushConstantsText) > 0:
@@ -402,19 +413,27 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVary
                                         "layout(push_constant) uniform PushConstants {\n"
                     resultShaderText += pushConstantsText
                     resultShaderText += "} uni;\n\n"  # TODO: ???
-            else:
-                for uniformName in uniformsNamesList:
-                    uniformDict = uniformsMap[uniformName]
-                    newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
-                    pushConstantsText += newShaderVariableName
+        else:
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(fullUniformsDict[uniformName])
 
-                if len(pushConstantsText) > 0:
-                    resultShaderText += "// Uniform buffer\n" \
-                                        "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
-                    resultShaderText += previousStageUniforms
-                    resultShaderText += pushConstantsText
-                    resultShaderText += "} uni;\n\n"  # TODO: ???
-                    setIndex += 1
+            uniformsNamesList = fullUniformsDict.keys()
+            uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+
+            pushConstantsText = ""
+
+            for uniformName in uniformsNamesList:
+                uniformType = fullUniformsDict[uniformName]
+                newShaderVariableName = "    %s %s;\n" % (uniformType, uniformName)
+                pushConstantsText += newShaderVariableName
+
+            if len(pushConstantsText) > 0:
+                resultShaderText += "// Uniform buffer\n" \
+                                    "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
+                resultShaderText += pushConstantsText
+                resultShaderText += "} uni;\n\n"  # TODO: ???
+                setIndex += 1
 
         # Samplers
         if len(samplersNamesList) > 0:
@@ -471,7 +490,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVary
         pushConstantOffset += 16
         pushConstantOffset -= pushConstantOffset % 16
 
-    return setIndex, previousStageUniforms, pushConstantOffset, resultVaryingLocations
+    return setIndex, pushConstantOffset, resultVaryingLocations
 
 
 def processShadersFolder(inputPath, outputPath):
@@ -490,17 +509,22 @@ def processShadersFolder(inputPath, outputPath):
                     print("Missing shaders %s + %s" % (sourceVertexFilePath, sourceFragmentFilePath))
                     sys.exit(2)
 
-                vertexUniformsSize = analyseUniformsSize(sourceVertexFilePath)
-                fragmentUniformsSize = analyseUniformsSize(sourceFragmentFilePath)
+                vertexUniformsSize, vertexUniforms = analyseUniformsSize(sourceVertexFilePath)
+                fragmentUniformsSize, fragmentUniforms = analyseUniformsSize(sourceFragmentFilePath)
                 totalUniformsSize = vertexUniformsSize + fragmentUniformsSize
+
+                fullUniformsDict = {}
 
                 usePushConstants = False
                 if totalUniformsSize <= 128:
                     usePushConstants = True
+                else:
+                    fullUniformsDict.update(vertexUniforms)
+                    fullUniformsDict.update(fragmentUniforms)
 
                 # Обработка шейдеров
-                setIndex, previousStageUniforms, pushConstantOffset, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {}, "", 0, usePushConstants)
-                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations, previousStageUniforms, pushConstantOffset, usePushConstants)
+                setIndex, pushConstantOffset, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, [], fullUniformsDict, 0, usePushConstants)
+                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations, fullUniformsDict, pushConstantOffset, usePushConstants)
 
 
 if __name__ == '__main__':
