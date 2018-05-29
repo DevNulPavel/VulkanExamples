@@ -49,7 +49,69 @@ def convertTypeToSortPriority(typeName):
         sys.exit(2)
 
 
-def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inputVaryingLocations: dict) -> (int, dict):
+def analyseUniformsSize(filePath) -> (int, dict):
+    with open(filePath, "r") as file:
+        inputFileText = file.read()
+
+    # Табы заменяем на пробелы
+    inputFileText = inputFileText.replace("\t", "    ")
+
+    # Удаляем комментарии
+    inputFileText = re.sub("\/\*.+\*\/", "", inputFileText, flags=0) #re.DOTALL
+    inputFileText = re.sub("\/\*.+\*\/\n", "\n", inputFileText, flags=0)
+    inputFileText = re.sub("\/\/.+\n", "\n", inputFileText, flags=0)
+
+    # Удаляем странные дефайны
+    inputFileText = inputFileText.replace("FLOAT", "float")
+
+    # Удаляем пустые строки
+    # inputFileText = re.sub("^\s*$", "", inputFileText, flags=re.MULTILINE)
+
+    words = inputFileText.replace("\n", " ").split(" ")
+    words = list(filter(lambda a: a != "", words))
+
+    # Main function handle
+    mainFunctionText = re.search("void main\s*\(void\)\s*{[\s\S=]+}", inputFileText, flags=re.MULTILINE)[0]
+
+    # Remove precision words
+    precisionWords = ["lowp", "mediump", "highp", "PRECISION_LOW", "PRECISION_MEDIUM", "PRECISION_HIGH", "PLATFORM_PRECISION"]
+    for precisionWord in precisionWords:
+        mainFunctionText = mainFunctionText.replace(precisionWord, "PRECISION")
+    mainFunctionText = mainFunctionText.replace("PRECISION ", "")
+
+    testUniformsNamesList = []
+    uniformsDict = {}
+
+    # Обходим слова и ищем аттрибуты
+    uniformsSize = 0
+    i = 0
+    while i < len(words):
+        if words[i] == "uniform":
+            # TODO: ???
+            # Если после uniform идет описание точности - пропускаем его
+            i += 1
+            if words[i] in precisionWords:
+                i += 1
+
+            # Если после uniform идет sampler2D - не обрабоатываем
+            if words[i] != "sampler2D":
+                # Получаем тип аттрибута
+                testUniformType = words[i]
+
+                # Получаем имя аттрибута
+                i += 1
+                testUniformName = words[i].replace(";", "")
+
+                if (testUniformName not in testUniformsNamesList) and (testUniformName in mainFunctionText):
+                    uniformsSize += convertTypeToSize(testUniformType)
+                    testUniformsNamesList.append(testUniformName)
+                    uniformsDict[testUniformName] = testUniformType
+        i += 1
+
+    return uniformsSize, uniformsDict
+
+
+def processShaderFile(isVertexShader, inputPath, outputPath, setIndex, inputVaryingLocations, fullUniformsDict, pushConstantOffset, usePushConstant) -> (int, int, dict):
     with open(inputPath, "r") as file:
         inputFileText = file.read()
 
@@ -255,27 +317,49 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
             resultShaderText += "\n"
 
         # Uniforms
-        if len(uniformsNamesList) > 0:
-            pushConstantsText = ""
-
+        if usePushConstant:
             # Сортируем по убыванию размера
             def sortFunction(uniformName):
                 return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
 
+            if len(uniformsNamesList) > 0:
+                uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+
+                pushConstantsText = ""
+
+                for uniformName in uniformsNamesList:
+                    uniformDict = uniformsMap[uniformName]
+                    newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (
+                    pushConstantOffset, uniformDict["type"], uniformDict["name"])
+                    pushConstantOffset += convertTypeToSize(uniformDict["type"])
+                    # Only used uniforms
+                    pushConstantsText += newShaderVariableName
+
+                if len(pushConstantsText) > 0:
+                    resultShaderText += "// Push constants\n" \
+                                        "layout(push_constant) uniform PushConstants {\n"
+                    resultShaderText += pushConstantsText
+                    resultShaderText += "} uni;\n\n"  # TODO: ???
+        else:
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(fullUniformsDict[uniformName])
+
+            uniformsNamesList = fullUniformsDict.keys()
             uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
 
+            pushConstantsText = ""
+
             for uniformName in uniformsNamesList:
-                uniformDict = uniformsMap[uniformName]
-                newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
-                # Only used uniforms
+                uniformType = fullUniformsDict[uniformName]
+                newShaderVariableName = "    %s %s;\n" % (uniformType, uniformName)
                 pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Uniform buffer\n" \
-                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
+                                    "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
                 resultShaderText += pushConstantsText
-                resultShaderText += "} ubo;\n\n"  # TODO: ???
-                setIndex += 1
+                resultShaderText += "} uni;\n\n"  # TODO: ???
 
         # Varying
         if len(varyingsNamesList) > 0:
@@ -307,26 +391,48 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
             resultShaderText += "\n"
 
         # Uniforms
-        if len(uniformsNamesList) > 0:
-            pushConstantsText = ""
-
+        if usePushConstant:
             # Сортируем по убыванию размера
             def sortFunction(uniformName):
                 return convertTypeToSortPriority(uniformsMap[uniformName]["type"])
 
+            if len(uniformsNamesList) > 0:
+                uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
+
+                pushConstantsText = ""
+
+                for uniformName in uniformsNamesList:
+                    uniformDict = uniformsMap[uniformName]
+                    newShaderVariableName = "    layout(offset = %d) %s %s;\n" % (pushConstantOffset, uniformDict["type"], uniformDict["name"])
+                    pushConstantOffset += convertTypeToSize(uniformDict["type"])
+                    # Only used uniforms
+                    pushConstantsText += newShaderVariableName
+
+                if len(pushConstantsText) > 0:
+                    resultShaderText += "// Push constants\n" \
+                                        "layout(push_constant) uniform PushConstants {\n"
+                    resultShaderText += pushConstantsText
+                    resultShaderText += "} uni;\n\n"  # TODO: ???
+        else:
+            # Сортируем по убыванию размера
+            def sortFunction(uniformName):
+                return convertTypeToSortPriority(fullUniformsDict[uniformName])
+
+            uniformsNamesList = fullUniformsDict.keys()
             uniformsNamesList = sorted(uniformsNamesList, key=sortFunction, reverse=True)
 
+            pushConstantsText = ""
+
             for uniformName in uniformsNamesList:
-                uniformDict = uniformsMap[uniformName]
-                newShaderVariableName = "    %s %s;\n" % (uniformDict["type"], uniformDict["name"])
-                # Only used uniforms
+                uniformType = fullUniformsDict[uniformName]
+                newShaderVariableName = "    %s %s;\n" % (uniformType, uniformName)
                 pushConstantsText += newShaderVariableName
 
             if len(pushConstantsText) > 0:
                 resultShaderText += "// Uniform buffer\n" \
-                                    "layout(set = %d, binding = 0) uniform UniformBufferObject {\n" % setIndex
+                                    "layout(set = 0, binding = 0) uniform UniformBufferObject {\n"
                 resultShaderText += pushConstantsText
-                resultShaderText += "} ubo;\n\n"  # TODO: ???
+                resultShaderText += "} uni;\n\n"  # TODO: ???
                 setIndex += 1
 
         # Samplers
@@ -351,7 +457,7 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
     for uniformName in uniformsNamesList:
         #expression = "[^a-zA-Z_](%s)[^a-zA-Z_]" % uniformName
         expression = r"[\+\-\ * \ /(<>=](%s)[\+\-\ * \ /, ;.\[)<>=]" % uniformName
-        replaceValue = "ubo.%s" % uniformName
+        replaceValue = "uni.%s" % uniformName
 
         matches = re.search(expression, mainFunctionText)
 
@@ -379,7 +485,12 @@ def processShaderFile(isVertexShader, inputPath, outputPath, setIndex: int, inpu
     with open(outputPath, "w") as file:
         file.write(resultShaderText)
 
-    return setIndex, resultVaryingLocations
+    # Выравнивание
+    if (pushConstantOffset % 16) != 0:
+        pushConstantOffset += 16
+        pushConstantOffset -= pushConstantOffset % 16
+
+    return setIndex, pushConstantOffset, resultVaryingLocations
 
 
 def processShadersFolder(inputPath, outputPath):
@@ -398,9 +509,22 @@ def processShadersFolder(inputPath, outputPath):
                     print("Missing shaders %s + %s" % (sourceVertexFilePath, sourceFragmentFilePath))
                     sys.exit(2)
 
+                vertexUniformsSize, vertexUniforms = analyseUniformsSize(sourceVertexFilePath)
+                fragmentUniformsSize, fragmentUniforms = analyseUniformsSize(sourceFragmentFilePath)
+                totalUniformsSize = vertexUniformsSize + fragmentUniformsSize
+
+                fullUniformsDict = {}
+
+                usePushConstants = False
+                if totalUniformsSize <= 128:
+                    usePushConstants = True
+                else:
+                    fullUniformsDict.update(vertexUniforms)
+                    fullUniformsDict.update(fragmentUniforms)
+
                 # Обработка шейдеров
-                setIndex, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, {})
-                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations)
+                setIndex, pushConstantOffset, varyingLocations = processShaderFile(True, sourceVertexFilePath, resultVertexFilePath, 0, [], fullUniformsDict, 0, usePushConstants)
+                processShaderFile(False, sourceFragmentFilePath, resultFragmentFilePath, setIndex, varyingLocations, fullUniformsDict, pushConstantOffset, usePushConstants)
 
 
 if __name__ == '__main__':
